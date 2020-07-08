@@ -23,7 +23,10 @@ F = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
 # Also compute forward for Niklas data.
 from volcapy.loading import load_niklas
 niklas_data = load_niklas("/home/cedric/PHD/Dev/Volcano/data/Cedric.mat")
-niklas_data_coords = np.array(niklas_data["data_coords"])
+
+# TODO: WARNING!!! There is one too many data site. Here remove the first, but
+# maybe its the last who should be removed.
+niklas_data_coords = np.array(niklas_data["data_coords"])[1:]
 
 F_niklas = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
         my_grid.res_y, my_grid.res_z, niklas_data_coords, n_procs=4)
@@ -31,6 +34,7 @@ F_niklas = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
 # Save everything.
 np.save("surface_data_coords.npy", data_coords)
 np.save("niklas_data_coords.npy", niklas_data_coords)
+np.save("niklas_data_obs.npy", niklas_data['d'])
 np.save("F_niklas.npy", F_niklas)
 np.save("F.npy", F)
 my_grid.save("grid.pickle")
