@@ -4,19 +4,47 @@ The grid will have the same xy resolution as the dsm.
 
 """
 import numpy as np
+import pickle
 
 
 class Grid():
-    def __init__(self, dsm_x, dsm_y, dsm_z, z_low, z_step):
+    def __init__(self, cells, cells_roof, surface_inds, res_x, res_y, res_z):
+        self.cells = cells
+        self.cells_roof = cells_roof
+        self.surface_inds = surface_inds
+        self.res_x = res_x
+        self.res_y = res_y
+        self.res_z = res_z
+
+    @classmethod
+    def build_grid(cls, dsm_x, dsm_y, dsm_z, z_low, z_step):
 
         # Deduce resolutions
-        self.res_x = np.abs(dsm_x[0] - dsm_x[1])
-        self.res_y = np.abs(dsm_y[0] - dsm_y[1])
+        res_x = np.abs(dsm_x[0] - dsm_x[1])
+        res_y = np.abs(dsm_y[0] - dsm_y[1])
 
-        self.res_z = z_step
+        res_z = z_step
 
-        self.cells, self.cells_roof, self.surface_inds = build_grid_below_dsm(
+        cells, cells_roof, surface_inds = build_grid_below_dsm(
                 dsm_x, dsm_y, dsm_z, z_low, z_step)
+        return cls(cells, cells_roof, surface_inds, res_x, res_y, res_z)
+
+    @classmethod
+    def load(cls, path):
+        with open(path) as f:
+                t = pickle.load(f)
+                return cls(
+                        t['cells'], t['cells_roof'], t['surface_inds'],
+                        t['res_x'], t['res_y'], t['res_z'])
+
+    def save(self, path):
+        pickled_grid = {
+                'cells': self.cells, 'cells_roof': self.cells_roof,
+                'surface_inds': self.surface_inds,
+                'res_x': self.res_x, 'res_y': self.res_y, 'res_z': self.res_z}
+
+        with open(path, 'wb') as f:
+                pickle.dump(pickled_grid, f)
 
     def __getitem__(self, index):
         return self.cells[index]
