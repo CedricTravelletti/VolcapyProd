@@ -11,7 +11,9 @@ dsm_x = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_x_coarse.np
 dsm_y = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_y_coarse.npy")
 dsm_z = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_z_coarse.npy")
 
-my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-450, z_step=120)
+my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1600, z_step=120)
+
+print("Grid with {} cells.".format(my_grid.shape[0]))
 
 # Put measurement stations on the whole surface, at 1 meter from the ground.
 data_coords = my_grid.surface
