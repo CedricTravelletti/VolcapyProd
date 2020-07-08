@@ -31,7 +31,7 @@ class Grid():
 
     @classmethod
     def load(cls, path):
-        with open(path) as f:
+        with open(path, 'rb') as f:
                 t = pickle.load(f)
                 return cls(
                         t['cells'], t['cells_roof'], t['surface_inds'],
@@ -72,6 +72,12 @@ def build_grid_below_dsm(dsm_x, dsm_y, dsm_z, z_low, z_step):
     z_levels = np.arange(z_low, z_max, z_step)
     for i, x in enumerate(dsm_x):
         for j, y in enumerate(dsm_y):
+            # Edge case: if we are already above the dsm. Something is wrong.
+            if dsm_z[i, j] < z_low:
+                raise ValueError(""""Warning: the floor for z-modelling is 
+                    above the dsm in some regions. This will create artificial
+                    landmasses.
+                    DSM altitude: {}.""".format(dsm_z[i, j]))
             for z in z_levels:
                 cells.append([x, y, z])
 
