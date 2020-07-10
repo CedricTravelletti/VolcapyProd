@@ -31,7 +31,8 @@ cpu = torch.device('cpu')
 # Load Niklas Data
 # ------------------------------------------------------
 # Dimension of the response.
-F = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/F_niklas.npy")
+# F = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/F_niklas.npy")
+F = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/F_niklas_corr.npy")
 F = torch.as_tensor(F).float()
 d_obs = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/niklas_data_obs.npy")
 grid = Grid.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/grid.pickle")
@@ -107,7 +108,21 @@ _array_to_vtk_point_cloud(
 
 # Plot in 3d.
 from mayavi.mlab import points3d
-points3d(my_grid[:, 0], my_grid[:, 1], my_grid[:, 2], sample.list)
+# points3d(my_grid[:, 0], my_grid[:, 1], my_grid[:, 2], sample.list)
 
 # Invert.
 # TODO: Implement.
+noise_std = 0.1 * torch.ones(d_obs.shape[0])
+my_discrete_grf.inverse_update(F, d_obs, noise_std)
+
+irregular_array_to_point_cloud(
+        my_grid.points.numpy(), my_discrete_grf.mean_vec.list.numpy(),
+        "cond_mean.vtk")
+
+cond_sample = my_discrete_grf.sample()
+irregular_array_to_point_cloud(
+        my_grid.points.numpy(), cond_sample.list.numpy(), "cond_sample1.vtk")
+
+cond_sample = my_discrete_grf.sample()
+irregular_array_to_point_cloud(
+        my_grid.points.numpy(), cond_sample.list.numpy(), "cond_sample2.vtk")
