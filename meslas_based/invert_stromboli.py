@@ -119,6 +119,7 @@ irregular_array_to_point_cloud(
         my_grid.points.numpy(), my_discrete_grf.mean_vec.list.numpy(),
         "cond_mean.vtk")
 
+"""
 cond_sample = my_discrete_grf.sample()
 irregular_array_to_point_cloud(
         my_grid.points.numpy(), cond_sample.list.numpy(), "cond_sample1.vtk")
@@ -126,3 +127,9 @@ irregular_array_to_point_cloud(
 cond_sample = my_discrete_grf.sample()
 irregular_array_to_point_cloud(
         my_grid.points.numpy(), cond_sample.list.numpy(), "cond_sample2.vtk")
+"""
+
+
+cond_sample_foxy = my_discrete_grf.sample_foxy(F, d_obs, noise_std)
+irregular_array_to_point_cloud(
+        my_grid.points.numpy(), cond_sample_foxy.numpy(), "cond_sample_foxy.vtk")
