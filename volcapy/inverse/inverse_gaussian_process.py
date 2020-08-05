@@ -126,7 +126,7 @@ class InverseGaussianProcess(torch.nn.Module):
             # Check if GPU available and otherwise go for CPU.
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.main_device = device
+        self.device = device
 
         self.m0 = m0
         self.sigma0 = torch.nn.Parameter(torch.tensor(sigma0))
