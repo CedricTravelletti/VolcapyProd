@@ -161,8 +161,6 @@ def irregular_array_to_point_cloud(coords, data, output_path, fill_nan_val=0.0):
     # Concatenate and save.
     all_coords = np.vstack([coords, non_grid_coords])
     all_data = np.vstack([data, data_non_grid])
-    print(all_coords.shape)
-    print(all_data.shape)
 
     _array_to_vtk_point_cloud(all_coords, all_data, output_path)
 
