@@ -19,10 +19,10 @@ torch.set_num_threads(8)
 gpu = torch.device('cuda:0')
 cpu = torch.device('cpu')
 
-F = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/F_niklas.npy")
+F = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/input_data/F_niklas.npy")
 F = torch.as_tensor(F).float()
-d_obs = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/niklas_data_obs.npy")
-grid = Grid.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/grid.pickle")
+d_obs = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/input_data/niklas_data_obs.npy")
+grid = Grid.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/input_data/grid.pickle")
 cells_coords = grid.cells
 
 
@@ -76,5 +76,5 @@ print("Train error (model conditioning): {}".format(train_error.item()))
 loocv_rmse = myGP.loo_error()
 print("LOOCV error (model conditioning): {}".format(loocv_rmse.item()))
 
-irregular_array_to_point_cloud(cells_coords.numpy(), m_post_m.numpy(), "m_post.vtk")
-_array_to_vtk_point_cloud(cells_coords.numpy(), m_post_m.numpy(), "m_post_irreg.vtk")
+irregular_array_to_point_cloud(cells_coords.numpy(), m_post_m.numpy(),
+        "./output_data/m_post.vtk", fill_nan_val=-20000.0)

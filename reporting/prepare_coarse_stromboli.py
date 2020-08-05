@@ -1,4 +1,5 @@
 """ Prepares grid and forward for a downsampled Stromboli.
+Needs coarse dsm to begin with.
 
 """
 import numpy as np
@@ -11,7 +12,8 @@ dsm_x = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_x_coarse.np
 dsm_y = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_y_coarse.npy")
 dsm_z = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_z_coarse.npy")
 
-my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1600, z_step=140)
+z_step = 140
+my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1600, z_step=200)
 
 print("Grid with {} cells.".format(my_grid.shape[0]))
 
@@ -44,10 +46,10 @@ F_ref_station = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x
 F_niklas_corr = F_niklas - F_ref_station
 
 # Save everything.
-np.save("surface_data_coords.npy", data_coords)
-np.save("niklas_data_coords.npy", niklas_data_coords)
-np.save("niklas_data_obs.npy", niklas_data['d'])
-np.save("F_niklas.npy", F_niklas)
-np.save("F_niklas_corr.npy", F_niklas_corr)
-np.save("F.npy", F)
+np.save("./input_data/surface_data_coords.npy", data_coords)
+np.save("./input_data/niklas_data_coords.npy", niklas_data_coords)
+np.save("./input_data/niklas_data_obs.npy", niklas_data['d'])
+np.save("./input_data/F_niklas.npy", F_niklas)
+np.save("./input_data/F_niklas_corr.npy", F_niklas_corr)
+np.save("./input_data/F.npy", F)
 my_grid.save("grid.pickle")
