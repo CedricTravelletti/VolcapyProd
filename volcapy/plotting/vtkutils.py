@@ -121,7 +121,7 @@ def _array_to_vtk_point_cloud(coords, data, output_path):
          
     save_point_cloud(pointCloud, output_path)
 
-def irregular_array_to_point_cloud(coords, data, output_path):
+def irregular_array_to_point_cloud(coords, data, output_path, fill_nan_val=0.0):
     """ Same as array to point cloud, but takes care of putting back in a prism
     and filling missing values with zero. This tends to make visualization
     easier.
@@ -134,6 +134,8 @@ def irregular_array_to_point_cloud(coords, data, output_path):
         Data array (n_points).
     output_path: str
         Path to output file. Should end with .vtk."
+    fill_nan_val: float
+        Value with which to fill the missing values. Defaults to 0.0.
 
     """
     # Reshape if necessary.
@@ -153,8 +155,8 @@ def irregular_array_to_point_cloud(coords, data, output_path):
     non_grid_coords = multidim_setdiff(regular_points, coords)
 
     # Set their density to zero and stack.
-    data_non_grid = np.zeros((non_grid_coords.shape[0], 1),
-            dtype=np.float32)
+    data_non_grid = np.full((non_grid_coords.shape[0], 1),
+            fill_nan_val, dtype=np.float32)
 
     # Concatenate and save.
     all_coords = np.vstack([coords, non_grid_coords])
