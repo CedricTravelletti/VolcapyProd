@@ -157,7 +157,7 @@ class InverseGaussianProcess(torch.nn.Module):
         # Check if GPU available.
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        if not G.device == device
+        if not G.device == device:
             logger.info("Moving to GPU.")
             G = G.to(device)
         # Compute the compute_covariance_pushforward and data-side covariance matrix
