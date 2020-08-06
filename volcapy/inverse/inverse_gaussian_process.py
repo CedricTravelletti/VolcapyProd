@@ -71,6 +71,7 @@ import numpy as np
 import torch
 import pandas as pd
 from timeit import default_timer as timer
+from volcapy.utils import _make_column_vector
 
 
 class InverseGaussianProcess(torch.nn.Module):
@@ -550,15 +551,3 @@ class InverseGaussianProcess(torch.nn.Module):
         z, _ = torch.triangular_solve(x, self.inv_op_L, upper=False)
         y, _ = torch.triangular_solve(z, self.inv_op_L.t(), upper=True)
         return y
-
-def _make_column_vector(y):
-    """ Make sure the data is a column vector.
-
-    """
-    if ((len(y.shape) >= 2) and (y.shape[1] == 1)):
-        return y
-    elif len(y.shape) == 1:
-        return y.reshape(-1, 1)
-    else:
-        raise ValueError(
-        "Shape of data vector {} is not valid. Please provide a column vector.".format(y.shape))
