@@ -210,6 +210,9 @@ class InverseGaussianProcess(torch.nn.Module):
             self.compute_pushfwd(G)
 
         y = _make_column_vector(y)
+        
+        print("Shape y {}".format(y.shape))
+        print("Shape pushfwd {}".format(self.pushfwd.shape))
 
         # Get Cholesky factor (lower triangular) of the inversion operator.
         self.inv_op_L, data_std = self.get_inversion_op_cholesky(self.K_d, data_std)
@@ -226,6 +229,7 @@ class InverseGaussianProcess(torch.nn.Module):
         prior_misfit = y - mu0_d
 
         self.weights = self.inv_op_vector_mult(prior_misfit)
+        print("Shape weights {}".format(self.weights.shape))
 
         m_post_d = mu0_d + torch.mm(self.sigma0**2 * self.K_d, self.weights)
 
@@ -555,10 +559,10 @@ def _make_column_vector(y):
     """ Make sure the data is a column vector.
 
     """
-    if (len(y.shape) >= 2) and (y.shape[1] == 1):
+    if ((len(y.shape) >= 2) and (y.shape[1] == 1)):
         return y
     elif len(y.shape) == 1:
-        return y.reshape(y.shape, 1)
+        return y.reshape(-1, 1)
     else:
         raise ValueError(
         "Shape of data vector {} is not valid. Please provide a column vector.".format(y.shape))
