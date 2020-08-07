@@ -12,8 +12,7 @@ dsm_x = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_x_coarse.np
 dsm_y = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_y_coarse.npy")
 dsm_z = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_stromboli_z_coarse.npy")
 
-z_step = 140
-my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1600, z_step=200)
+my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1600, z_step=50)
 
 print("Grid with {} cells.".format(my_grid.shape[0]))
 
@@ -53,4 +52,4 @@ np.save("./input_data/niklas_data_obs.npy", niklas_data['d'])
 np.save("./input_data/F_niklas.npy", F_niklas)
 np.save("./input_data/F_niklas_corr.npy", F_niklas_corr)
 np.save("./input_data/F_full_surface.npy", F_full_surface)
-my_grid.save("grid.pickle")
+my_grid.save("./input_data/grid.pickle")
