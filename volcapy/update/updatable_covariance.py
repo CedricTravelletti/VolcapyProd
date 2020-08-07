@@ -39,11 +39,12 @@ from volcapy.utils import _make_column_vector
 torch.set_num_threads(8)
 
 # Select gpu if available and fallback to cpu else.
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 # TODO: Refactor to automatically determine in the covariance module.
-n_chunks = 500
+N_CHUNKS = 100
+N_CHUNKS_VAR = 10 # Chunking for the variance extraction and IVR.
 
 class UpdatableCovariance:
     """ Covariance matrix that can be sequentially updated to include new
@@ -76,7 +77,7 @@ class UpdatableCovariance:
         self.lambda0 = lambda0
         self.sigma0 = sigma0
         self.cells_coords = cells_coords
-        self.model_size = cells_coords.shape[0]
+        self.n_model = cells_coords.shape[0]
 
         self.pushforwards = []
         self.inversion_ops = []
@@ -101,9 +102,7 @@ class UpdatableCovariance:
         # Warning: the original covariance pushforward method was used to
         # comput K G^T, taking G as an argument, i.e. it does transposing in
         # the background. We hence have to feed it A.t.
-        cov_pushfwd_0 = self.sigma0**2 * self.cov_module.compute_cov_pushforward(
-                self.lambda0, A.t(), self.cells_coords, device, n_chunks=n_chunks,
-                n_flush=50)
+        cov_pushfwd_0 = self.compute_prior_pushfwd(A.t())
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
             cov_pushfwd_0 -= p @ (r @ (p.t() @ A))
@@ -113,6 +112,7 @@ class UpdatableCovariance:
         # have two one.
         return cov_pushfwd_0
 
+    # TODO: Is this ever used?
     def sandwich(self, A):
         """ Sandwich the covariance matrix on both sides.
         Note that the matrix with which we sandwich should map to a smaller
@@ -133,9 +133,7 @@ class UpdatableCovariance:
         # Warning: the original covariance pushforward method was used to
         # comput K G^T, taking G as an argument, i.e. it does transposing in
         # the background. We hence have to feed it A.t.
-        cov_pushfwd_0 = self.sigma0**2 * A.t() @ self.cov_module.compute_cov_pushforward(
-                self.lambda0, A.t(), self.cells_coords, device, n_chunks=n_chunks,
-                n_flush=50)
+        cov_pushfwd_0 = A.t() @ self.compute_prior_pushfwd(A.t())
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
             tmp = p.t() @ A
@@ -163,10 +161,96 @@ class UpdatableCovariance:
             L = torch.cholesky(R)
         except RuntimeError:
             print("Error inverting.")
-            print(G)
 
         inversion_op = torch.cholesky_inverse(L)
         self.inversion_ops.append(inversion_op)
+
+    def compute_prior_pushfwd(self, G):
+        """ Given an operator G, compute the covariance pushforward K_0 G^T,
+        i.e. the pushforward with respect to the prior.
+
+        Parameters
+        ----------
+        G: (n_data, self.n_model) Tensor
+
+        Returns
+        -------
+        pushfwd: (self.n_model, n_data) Tensor
+
+        """
+        pushfwd = self.sigma0**2 * self.cov_module.compute_cov_pushforward(
+                self.lambda0, G, self.cells_coords, DEVICE,
+                n_chunks=N_CHUNKS,
+                n_flush=50)
+        return pushfwd
+
+    def extract_variance(self, n_chunks=N_CHUNKS_VAR):
+        """ Extracts the pointwise variance from an UpdatableCovariane module.
+    
+        Parameters
+        ----------
+        n_chunks: int
+            Number of chunks to break the covariane matrix in.
+            Increase if computations do not fit in memory.
+    
+        Returns
+        -------
+        variances: (cov_module.n_model) Tensor
+            Variance at each point.
+    
+        """
+        prior_variances = self.sigma0**2 * self.cov_module.compute_diagonal(
+                self.lambda0, self.cells_coords, DEVICE,
+                n_chunks=N_CHUNKS, n_flush=50)
+
+        for p, r in zip(self.pushforwards, self.inversion_ops):
+            prior_variances -= torch.einsum("ij,jk,ik->i",p,r,p)
+
+        return prior_variances
+
+    def compute_IVR(self, G, n_chunks=N_CHUNKS_VAR):
+        """ Compute the (integrated) variance reduction (IVR) that would
+        result from collecting the data described by the measurement operator
+        G.    
+
+        Parameters
+        ----------
+        G: (n_data, self.n_model) Tensor
+            Measurement operator
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
+        n_chunks: int
+            Number of chunks to break the covariane matrix in.
+            Increase if computations do not fit in memory.
+    
+        Returns
+        -------
+        IVR: float
+            Integrated variance reduction resulting from the observation of G.    
+
+        """
+        # First subdivide the cells in subgroups.
+        chunked_indices = torch.chunk(list(range(self.n_model)), n_chunks)
+
+        # Compute the current pushforward.
+        G_dash = self.mul_right(G.t())
+
+        # Get inversion op by Cholesky.
+        R = G @ G_dash + data_std**2 * torch.eye(G.shape[0])
+        try:
+            L = torch.cholesky(R)
+        except RuntimeError:
+            print("Error inverting.")
+        inversion_op = torch.cholesky_inverse(L)
+
+        IVR = 0
+        for inds in chunked_indices:
+            G_part = G[inds,:]
+            V = G_part @ inversion_op @ G.t()
+            IVR += torch.sum(V.diag())
+        return IVR.item()
+            
 
 class UpdatableMean:
     """ Mean vector that can be sequentially updated. This is an addon to the
@@ -190,17 +274,22 @@ class UpdatableMean:
         self.prior = prior
         self.m = prior # Current value of conditional mean.
 
-        self.model_size = prior.shape[0]
+        self.n_model = prior.shape[0]
         self.cov_module = cov_module
         
-        if not (self.model_size == cov_module.model_size):
+        if not (self.n_model == cov_module.n_model):
             raise ValueError(
                 "Model size for mean: {} does not agree with "\
                 "model size for covariance {}.".format(
-                        self.model_size, cov_module.model_size))
+                        self.n_model, cov_module.n_model))
         
+    # TODO: Find a better design patter. This subtlety of having to make sure
+    # that the covariance_module has been updated first is dangerous. Maybe an
+    # observer pattern on something like that.
     def update(self, y, G):
-        """ Perform conditioning.
+        """ Updates the means.
+        WARNING: should only be used after the covariance module has been
+        updated, since it depends on it having computed the latest quantities.
 
         Params
         ------
@@ -208,8 +297,9 @@ class UpdatableMean:
             Data vector.
         G: Tensor
             Measurement matrix.
-        std: float
-            Measurement noise standard deviation.
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
 
         """
         y = _make_column_vector(y)
