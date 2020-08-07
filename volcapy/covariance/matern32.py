@@ -10,7 +10,7 @@ cpu = torch.device('cpu')
 from timeit import default_timer as timer
 
 
-def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
+def compute_cov_pushforward(lambda0, F, cells_coords, device, n_chunks=200,
         n_flush=50):
     """ Compute the covariance pushforward.
 
@@ -30,8 +30,6 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         n_cells * n_dims: cells coordinates
     device: toch.Device
         Device to perform the computation on, CPU or GPU.
-        Defaults to None, in which case first tries gpu and falls back to cpu
-        if unavailable.
     n_chunks: int
         Number of chunks to split the matrix into.
         Default is 200. Increase if get OOM errors.
@@ -46,9 +44,6 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         n_model * n_data covariance pushforward K F^t.
     """
     start = timer()
-
-    if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Transfer everything to device.
     lambda0 = torch.tensor(lambda0, requires_grad=False).to(device)
@@ -95,6 +90,39 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
 
     return tot
 
+def compute_diagonal(lambda0, cells_coords, device=None, n_chunks=200,
+        n_flush=50):
+    """ Compute the diagonal of the covariance matrix.
+
+    Note that the sigam0^2 is not included, and one has to manually add it when
+    using the covariance pushforward computed here.
+
+    Parameters
+    ----------
+    lambda0: float
+        Lenght-scale parameter
+    cells_coords: tensor
+        n_cells * n_dims: cells coordinates
+    device: toch.Device
+        Device to perform the computation on, CPU or GPU.
+        Defaults to None, in which case first tries gpu and falls back to cpu
+        if unavailable.
+    n_chunks: int
+        Number of chunks to split the matrix into.
+        Default is 200. Increase if get OOM errors.
+    n_flush: int
+        Synchronize threads and flush GPU cache every *n_flush* iterations.
+        This is necessary to avoid OOM errors.
+        Default is 50.
+
+    Returns
+    -------
+    Tensor (n_cells)
+        Diagonal of the covariance matrix.
+    """
+    # We have a stationary covariance, so the diagonal is trivial.
+    return torch.ones(cells_coords.shape[0])
+
 def compute_cov(lambda0, cells_coords, i, j):
     """ Compute the covariance between two points.
 
@@ -117,6 +145,11 @@ def compute_cov(lambda0, cells_coords, i, j):
         (Stripped) covariance between cell nr i and cell nr j.
     """
     # Convert to torch.
+    lambda0 = torch.tensor(lambda0, requires_grad=False)
+    inv_lambda2 = - np.sqrt(3) / lambda0
+
+    # Euclidean distance.
+    d = torch.sqrt(torch.pow(
     lambda0 = torch.tensor(lambda0, requires_grad=False)
     inv_lambda2 = - np.sqrt(3) / lambda0
 
@@ -227,11 +260,6 @@ def compute_cov_cpu(lambda0, coords, n_procs):
     n_cells = coords.shape[0]
     n_dim_coords = coords.shape[1]
     cov_shape = (n_cells, n_cells)
-    coords_shape = (n_cells, n_dim_coords)
-
-    # ----------------------------
-    # Prepare the parallelization.
-    # ----------------------------
     cov_shared_buffer = RawArray('d', n_cells * n_cells)
     # Wrap as a numpy array so we can easily manipulates its data.
     cov_np = np.frombuffer(cov_shared_buffer).reshape(cov_shape)

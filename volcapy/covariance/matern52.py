@@ -97,6 +97,39 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
 
     return tot
 
+def compute_diagonal(lambda0, cells_coords, device=None, n_chunks=200,
+        n_flush=50):
+    """ Compute the diagonal of the covariance matrix.
+
+    Note that the sigam0^2 is not included, and one has to manually add it when
+    using the covariance pushforward computed here.
+
+    Parameters
+    ----------
+    lambda0: float
+        Lenght-scale parameter
+    cells_coords: tensor
+        n_cells * n_dims: cells coordinates
+    device: toch.Device
+        Device to perform the computation on, CPU or GPU.
+        Defaults to None, in which case first tries gpu and falls back to cpu
+        if unavailable.
+    n_chunks: int
+        Number of chunks to split the matrix into.
+        Default is 200. Increase if get OOM errors.
+    n_flush: int
+        Synchronize threads and flush GPU cache every *n_flush* iterations.
+        This is necessary to avoid OOM errors.
+        Default is 50.
+
+    Returns
+    -------
+    Tensor (n_cells)
+        Diagonal of the covariance matrix.
+    """
+    # We have a stationary covariance, so the diagonal is trivial.
+    return torch.ones(cells_coords.shape[0])
+
 def compute_cov(lambda0, cells_coords, i, j):
     """ Compute the covariance between two points.
 
