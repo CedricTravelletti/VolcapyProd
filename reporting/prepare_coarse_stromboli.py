@@ -21,7 +21,8 @@ print("Grid with {} cells.".format(my_grid.shape[0]))
 data_coords = my_grid.surface
 data_coords[:, 2] = data_coords[:, 2] + 1.0
 
-F = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
+# Compute forward on whole surface.
+F_full_surface = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
         my_grid.res_y, my_grid.res_z, data_coords, n_procs=4)
 
 # Also compute forward for Niklas data.
@@ -51,5 +52,5 @@ np.save("./input_data/niklas_data_coords.npy", niklas_data_coords)
 np.save("./input_data/niklas_data_obs.npy", niklas_data['d'])
 np.save("./input_data/F_niklas.npy", F_niklas)
 np.save("./input_data/F_niklas_corr.npy", F_niklas_corr)
-np.save("./input_data/F.npy", F)
+np.save("./input_data/F_full_surface.npy", F_full_surface)
 my_grid.save("grid.pickle")
