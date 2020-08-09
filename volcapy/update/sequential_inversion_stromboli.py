@@ -23,8 +23,7 @@ def main():
     # Load
     data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/input_data"
     F = torch.from_numpy(
-            np.load(os.path.join(data_folder,
-                    "F_niklas.npy"))).float().detach()
+            np.load(os.path.join(data_folder, "F_niklas.npy"))).float().detach()
     grid = Grid.load(os.path.join(data_folder,
                     "grid.pickle"))
     volcano_coords = torch.from_numpy(
@@ -34,6 +33,17 @@ def main():
             np.load(os.path.join(data_folder,"niklas_data_coords.npy"))).float()
     data_values = torch.from_numpy(
             np.load(os.path.join(data_folder,"niklas_data_obs.npy"))).float()
+
+
+    # Subdivide for variance reduction computation.
+    part_ind = 60
+    F_rest = F[part_ind:, :]
+    F = F[:part_ind, :]
+
+    data_coords_part = data_coords[part_ind:, :]
+    data_coords = data_coords[:part_ind, :]
+
+    data_values = data_values[:part_ind]
 
     print("Size of inversion grid: {} cells.".format(volcano_coords.shape[0]))
     print("Number of datapoints: {}.".format(data_coords.shape[0]))
@@ -56,13 +66,14 @@ def main():
     updatable_mean = UpdatableMean(m0 * torch.ones(volcano_coords.shape[0]),
             updatable_cov)
 
+    n_chunks = 5
     # Loop over measurement chunks.
-    for i, (F_part, data_part) in enumerate(zip(
-                torch.chunk(F, chunks=20, dim=0),
-                torch.chunk(data_values, chunks=20, dim=0))):
+    for i, (F_i, data_part) in enumerate(zip(
+                torch.chunk(F, chunks=n_chunks, dim=0),
+                torch.chunk(data_values, chunks=n_chunks, dim=0))):
         print("Processing data chunk nr {}.".format(i))
-        updatable_cov.update(F_part, data_std)
-        updatable_mean.update(data_part, F_part)
+        updatable_cov.update(F_i, data_std)
+        updatable_mean.update(data_part, F_i)
         m = updatable_mean.m.cpu().numpy()
         np.save("m_post_{}_stromboli.npy".format(i), m)
 
@@ -88,6 +99,26 @@ def main():
     array_to_vtk_vector_cloud(data_coords.numpy(),
             orientation_data,
             "data_points.vtk")
+
+    IVRs = []
+    # Now compute the variance reduction associated to the other points.
+    for i, F_i in enumerate(F_rest):
+        IVR = updatable_cov.compute_IVR(F_i.reshape(1, -1), data_std)
+        print(IVR)
+        IVRs.append(IVR)
+
+        # Save periodically.
+        if i % 15 == 0:
+            print("Saving at {}.".format(i))
+            np.save("IVRs.npy", np.array(IVRs))
+
+    np.save("IVRs.npy", np.array(IVRs))
+    data_coords_part[:, 2] = data_coords_part[:, 2] + 50.0
+    np.save("data_coords_IVR.npy", data_coords_part)
+    # Add an offset for easier visualization.
+    _array_to_vtk_point_cloud(data_coords_part.numpy(),
+            np.array(IVRs),
+            "IVRs.vtk")
 
     """
     # Run inversion in one go to compare.
