@@ -208,7 +208,7 @@ class UpdatableCovariance:
 
         return prior_variances
 
-    def compute_IVR(self, G, n_chunks=N_CHUNKS_VAR):
+    def compute_IVR(self, G, data_std, n_chunks=N_CHUNKS_VAR):
         """ Compute the (integrated) variance reduction (IVR) that would
         result from collecting the data described by the measurement operator
         G.    
@@ -231,7 +231,7 @@ class UpdatableCovariance:
 
         """
         # First subdivide the cells in subgroups.
-        chunked_indices = torch.chunk(list(range(self.n_model)), n_chunks)
+        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_model))), n_chunks)
 
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
@@ -246,10 +246,53 @@ class UpdatableCovariance:
 
         IVR = 0
         for inds in chunked_indices:
-            G_part = G[inds,:]
-            V = G_part @ inversion_op @ G.t()
+            G_part = G_dash[inds,:]
+            V = G_part @ inversion_op @ G_part.t()
             IVR += torch.sum(V.diag())
         return IVR.item()
+
+    def compute_VR(self, G, data_std, n_chunks=N_CHUNKS_VAR):
+        """ Compute the variance reduction (VR) (no integral) that would
+        result from collecting the data described by the measurement operator
+        G.    
+
+        Parameters
+        ----------
+        G: (n_data, self.n_model) Tensor
+            Measurement operator
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
+        n_chunks: int
+            Number of chunks to break the covariane matrix in.
+            Increase if computations do not fit in memory.
+    
+        Returns
+        -------
+        VR: (self.n_model) Tensor
+            Variance reduction, at each point resulting from the observation of G.    
+
+        """
+        # First subdivide the model cells in subgroups.
+        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_model))), n_chunks)
+
+        # Compute the current pushforward.
+        G_dash = self.mul_right(G.t())
+
+        # Get inversion op by Cholesky.
+        R = G @ G_dash + data_std**2 * torch.eye(G.shape[0])
+        try:
+            L = torch.cholesky(R)
+        except RuntimeError:
+            print("Error inverting.")
+        inversion_op = torch.cholesky_inverse(L)
+
+        VR = torch.zeros(self.n_model)
+        for inds in chunked_indices:
+            G_part = G_dash[inds,:]
+            V = G_part @ inversion_op @ G_part.t()
+            VR[inds] = V.diag()
+        return VR
             
 
 class UpdatableMean:
