@@ -212,7 +212,7 @@ def irregular_array_to_point_cloud(coords, data, output_path, fill_nan_val=0.0):
     all_coords = np.vstack([coords, non_grid_coords])
     all_data = np.vstack([data, data_non_grid])
 
-    _array_to__point_cloud(all_coords, all_data, output_path)
+    _array_to_point_cloud(all_coords, all_data, output_path)
 
 def multidim_setdiff(arr1, arr2):
     """ Returns elements of arr1 that are not in arr2.
