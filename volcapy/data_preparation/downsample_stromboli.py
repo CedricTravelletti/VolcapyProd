@@ -6,8 +6,7 @@ import h5py
 from skimage.transform import downscale_local_mean
 from scipy.spatial import KDTree
 
-
-def main(path, nx=60, ny=60):
+def main(path, nx=50, ny=50):
     dataset = h5py.File(path, 'r')
 
     # Load the arrays.
@@ -40,9 +39,10 @@ def main(path, nx=60, ny=60):
     a, b = np.meshgrid(inds_x, inds_y)
     z = dsm_z[a, b]
 
-    np.save("dsm_stromboli_x_coarse.npy", x)
-    np.save("dsm_stromboli_y_coarse.npy", y)
-    np.save("dsm_stromboli_z_coarse.npy", z)
+    out_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse"
+    np.save(os.path.join(out_path, "dsm_stromboli_x_coarse.npy"), x)
+    np.save(os.path.join(out_path, "dsm_stromboli_y_coarse.npy"), y)
+    np.save(os.path.join(out_path, "dsm_stromboli_z_coarse.npy"), z)
 
 if __name__ == "__main__":
-    main("/home/cedric/PHD/Dev/VolcapySIAM/data/Cedric.mat")
+    main("/home/cedric/PHD/Dev/VolcapySIAM/data/original/Cedric.mat")
