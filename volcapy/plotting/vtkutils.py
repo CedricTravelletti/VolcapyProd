@@ -223,7 +223,7 @@ def multidim_setdiff(arr1, arr2):
     intersected = np.setdiff1d(arr1_view, arr2_view)
     return intersected.view(arr1.dtype).reshape(-1, arr1.shape[1])
 
-def array_to_vtk_vector_cloud(coords, data, output_path):
+def array_to_vector_cloud(coords, data, output_path):
     """ Convert a list of points, stored in a numpy array to a VTK point cloud.
 
     Parameters
