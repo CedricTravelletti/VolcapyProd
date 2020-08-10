@@ -61,6 +61,56 @@ class VtkPointCloud:
         self.vtkPolyData.SetVerts(self.vtkCells)
         self.vtkPolyData.GetPointData().SetScalars(self.vtkValues)
         self.vtkPolyData.GetPointData().SetActiveScalars('PointValues')
+
+class VtkVectorCloud(VtkPointCloud):
+    """ Same as point cloud, but with vector data.
+
+    """
+    def __init__(self, n_dims, zMin=-10.0, zMax=10.0, maxNumPoints=1e6):
+        self.n_dims = n_dims
+        super(VtkVectorCloud, self).__init__(zMin=-10.0, zMax=10.0, maxNumPoints=1e6)
+
+    def clearPoints(self):
+        self.vtkPoints = vtk.vtkPoints()
+        self.vtkCells = vtk.vtkCellArray()
+        self.vtkValues = vtk.vtkDoubleArray()
+
+        # Set number of dimensions
+        self.vtkValues.SetNumberOfComponents(self.n_dims)
+
+        self.vtkValues.SetName('PointValues')
+        self.vtkPolyData.SetPoints(self.vtkPoints)
+        self.vtkPolyData.SetVerts(self.vtkCells)
+        self.vtkPolyData.GetPointData().SetScalars(self.vtkValues)
+        self.vtkPolyData.GetPointData().SetActiveScalars('PointValues')
+
+    def addPoint(self, point, point_data):
+        """ Point with data.
+
+        Parameters
+        ----------
+        point
+        point_data: List
+            Vector field value at point.
+
+        """
+        if self.vtkPoints.GetNumberOfPoints() < self.maxNumPoints:
+            pointId = self.vtkPoints.InsertNextPoint(point[:])
+
+            self.vtkValues.InsertNextTuple(point_data)
+
+            self.vtkCells.InsertNextCell(1)
+            self.vtkCells.InsertCellPoint(pointId)
+
+            # Perso
+            self.vtkActor.GetProperty().SetPointSize(2)
+
+        self.vtkCells.Modified()
+        self.vtkPoints.Modified()
+        self.vtkValues.Modified()
+        
+        # Perso
+        self.vtkActor.Modified()
  
 def txt_to_vtk_pointcloud(path):
     """ Generate a point cloud from a text file.
@@ -172,3 +222,24 @@ def multidim_setdiff(arr1, arr2):
     arr2_view = arr2.view([('',arr2.dtype)]*arr2.shape[1])
     intersected = np.setdiff1d(arr1_view, arr2_view)
     return intersected.view(arr1.dtype).reshape(-1, arr1.shape[1])
+
+def array_to_vtk_vector_cloud(coords, data, output_path):
+    """ Convert a list of points, stored in a numpy array to a VTK point cloud.
+
+    Parameters
+    ----------
+    coords: array
+        Coordinates array (n_points, n_dims).
+    data: array
+        Data array (n_points, d).
+    output_path: str
+        Path to output file. Should end with .vtk."
+
+    """
+    n_dims = data.shape[1]
+    print(n_dims)
+    pointCloud = VtkVectorCloud(n_dims)
+    for i, point in enumerate(coords):
+        pointCloud.addPoint(point, data[i, :])
+         
+    save_point_cloud(pointCloud, output_path)
