@@ -208,7 +208,8 @@ class UpdatableCovariance:
 
         return prior_variances
 
-    def compute_IVR(self, G, data_std, n_chunks=N_CHUNKS_VAR):
+    def compute_IVR(self, G, data_std, n_chunks=N_CHUNKS_VAR,
+            integration_inds=None):
         """ Compute the (integrated) variance reduction (IVR) that would
         result from collecting the data described by the measurement operator
         G.    
@@ -223,6 +224,10 @@ class UpdatableCovariance:
         n_chunks: int
             Number of chunks to break the covariane matrix in.
             Increase if computations do not fit in memory.
+        integration_inds: array_like [int]
+            List of indices (wrt the model grid) over which to integrate. May
+            be used if only want to consider some region. Defaults to the whole
+            grid.
     
         Returns
         -------
@@ -230,8 +235,11 @@ class UpdatableCovariance:
             Integrated variance reduction resulting from the observation of G.    
 
         """
+        if integration_inds is None:
+            integration_inds = list(range(self.n_model))
+
         # First subdivide the cells in subgroups.
-        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_model))), n_chunks)
+        chunked_indices = torch.chunk(torch.tensor(integration_inds), n_chunks)
 
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
