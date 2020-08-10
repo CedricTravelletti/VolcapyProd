@@ -9,7 +9,7 @@ import numpy as np
 import volcapy.covariance.exponential as cl
 from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
 from volcapy.grid.grid_from_dsm import Grid
-from volcapy.plotting.vtkutils import irregular_array_to_point_cloud, _array_to_vtk_point_cloud
+from volcapy.plotting.vtkutils import irregular_array_to_point_cloud, _array_to_point_cloud
 from volcapy.plotting.vtkutils import array_to_vtk_vector_cloud
 
 from timeit import default_timer as timer
@@ -98,7 +98,7 @@ def main():
     data_coords[:, 2] = data_coords[:, 2] + 50.0
     array_to_vtk_vector_cloud(data_coords.numpy(),
             orientation_data,
-            "data_points.vtk")
+            "data_points_in_IVR.vtk")
 
     IVRs = []
     # Now compute the variance reduction associated to the other points.
@@ -116,7 +116,7 @@ def main():
     data_coords_part[:, 2] = data_coords_part[:, 2] + 50.0
     np.save("data_coords_IVR.npy", data_coords_part)
     # Add an offset for easier visualization.
-    _array_to_vtk_point_cloud(data_coords_part.numpy(),
+    _array_to_point_cloud(data_coords_part.numpy(),
             np.array(IVRs),
             "IVRs.vtk")
 

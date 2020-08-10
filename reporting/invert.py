@@ -5,7 +5,7 @@ from volcapy.inverse.inverse_problem import InverseProblem
 from volcapy.inverse.gaussian_process import GaussianProcess
 import volcapy.covariance.matern52 as cl
 from volcapy.grid.grid_from_dsm import Grid
-from volcapy.plotting.vtkutils import irregular_array_to_point_cloud, _array_to_vtk_point_cloud
+from volcapy.plotting.vtkutils import irregular_array_to_point_cloud, _array_to_point_cloud
 
 
 import numpy as np

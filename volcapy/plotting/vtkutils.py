@@ -152,7 +152,7 @@ def save_point_cloud(point_cloud, path):
     writer.SetInputData(point_cloud.vtkPolyData)
     writer.Write()
 
-def _array_to_vtk_point_cloud(coords, data, output_path):
+def _array_to_point_cloud(coords, data, output_path):
     """ Convert a list of points, stored in a numpy array to a VTK point cloud.
 
     Parameters
