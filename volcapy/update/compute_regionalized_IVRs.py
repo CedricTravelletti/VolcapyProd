@@ -114,7 +114,7 @@ def main():
 
     np.save(os.path.join(output_path, "IVRs.npy"), np.array(IVRs))
     data_coords_out[:, 2] = data_coords_out[:, 2] + 50.0
-    np.save(os.path.join(output_path, "data_coords_out.npy"), data_coords_part)
+    np.save(os.path.join(output_path, "data_coords_out.npy"), data_coords_out)
     # Add an offset for easier visualization.
     _array_to_vtk_point_cloud(data_coords_out.numpy(),
             np.array(IVRs),
