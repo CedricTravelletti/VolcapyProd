@@ -3,6 +3,7 @@ Needs coarse dsm to begin with.
 
 """
 import numpy as np
+import os
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.forward import compute_forward
 from scipy.spatial import KDTree
@@ -11,6 +12,9 @@ from scipy.spatial import KDTree
 dsm_x = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse/dsm_stromboli_x_coarse.npy")
 dsm_y = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse/dsm_stromboli_y_coarse.npy")
 dsm_z = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse/dsm_stromboli_z_coarse.npy")
+
+output_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/inversion_data_dsm_coarse"
+# output_path = "/home/cedric/PHD/Dev/ODEBO/example_runs/volcano/input_data"
 
 my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1600, z_step=50)
 
