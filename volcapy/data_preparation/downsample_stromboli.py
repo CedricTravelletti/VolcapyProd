@@ -2,6 +2,7 @@
 
 """
 import numpy as np
+import os
 import h5py
 from skimage.transform import downscale_local_mean
 from scipy.spatial import KDTree
