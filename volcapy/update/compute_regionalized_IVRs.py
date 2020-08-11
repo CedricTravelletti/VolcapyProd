@@ -22,7 +22,13 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-output_path = "/home/cedric/PHD/Dev/VolcapySIAM/volcapy/update/regionalized_IVR_results"
+output_path = "/home/cedric/PHD/Dev/VolcapySIAM/volcapy/update/regionalized_IVR_results_coast"
+
+# Indices of the data points that are along the coast.
+coast_data_inds = np.array(list(range(0, 47)) + list(range(73, 88))
+        + list(range(189, 193)) + list(range(284, 316))
+        + list(range(336, 340)) + list(range(349, 367))
+        + list(range(507, 510)) + list(range(536, 541)))
 
 def main():
     # Load
@@ -45,14 +51,14 @@ def main():
 
 
     # Subdivide for variance reduction computation.
-    part_ind = 60
-    F_out = F[part_ind:, :]
-    F = F[:part_ind, :]
+    non_coast_inds = np.delete(np.array(list(range(F.shape[0]))), coast_data_inds)
+    F_out = F[non_coast_inds, :]
+    F = F[coast_data_inds, :]
 
-    data_coords_out = data_coords[part_ind:, :]
-    data_coords = data_coords[:part_ind, :]
+    data_coords_out = data_coords[non_coast_inds, :]
+    data_coords = data_coords[coast_data_inds, :]
 
-    data_values = data_values[:part_ind]
+    data_values = data_values[coast_data_inds]
 
     print("Size of inversion grid: {} cells.".format(volcano_coords.shape[0]))
     print("Number of datapoints: {}.".format(data_coords.shape[0]))
@@ -116,7 +122,7 @@ def main():
     data_coords_out[:, 2] = data_coords_out[:, 2] + 50.0
     np.save(os.path.join(output_path, "data_coords_out.npy"), data_coords_out)
     # Add an offset for easier visualization.
-    _array_to_vtk_point_cloud(data_coords_out.numpy(),
+    _array_to_point_cloud(data_coords_out.numpy(),
             np.array(IVRs),
             os.path.join(output_path, "IVRs.vtk"))
 
