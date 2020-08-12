@@ -40,7 +40,7 @@ ext_modules = [
     # "volcapy/kernels/squared_exponential.pyx",
     # "volcapy/kernels/exponential.pyx",
     # "volcapy/niklas/banerjee.pyx",
-    # "volcapy/grid/covariance_tools.pyx",
+    "volcapy/grid/covariance_tools.pyx",
 ]
 
 
@@ -77,7 +77,9 @@ setup(
     url=URL,
     packages=find_packages(),
     include_package_data=False,
-    install_requires=io.open(requirements, encoding='utf8').read(),
+    install_requires=[io.open(requirements, encoding='utf8').read(),
+            'mvnorm @ git+https://github.com/CedricTravelletti/torch-mvnorm.git#egg=mvnorm'
+            ],
     classifiers=[],
     ext_modules=ext_modules_settings,
     include_dirs=[np.get_include()],
