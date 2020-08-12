@@ -209,7 +209,7 @@ class UpdatableCovariance:
         return prior_variances
 
     def compute_IVR(self, G, data_std, n_chunks=N_CHUNKS_VAR,
-            integration_inds=None):
+            integration_inds=None, weights=None):
         """ Compute the (integrated) variance reduction (IVR) that would
         result from collecting the data described by the measurement operator
         G.    
@@ -228,6 +228,8 @@ class UpdatableCovariance:
             List of indices (wrt the model grid) over which to integrate. May
             be used if only want to consider some region. Defaults to the whole
             grid.
+        weights: (self.n_model) Tensor, optional
+            Can be provided to weight the integral differently for each cell.
     
         Returns
         -------
@@ -253,10 +255,16 @@ class UpdatableCovariance:
         inversion_op = torch.cholesky_inverse(L)
 
         IVR = 0
-        for inds in chunked_indices:
-            G_part = G_dash[inds,:]
-            V = G_part @ inversion_op @ G_part.t()
-            IVR += torch.sum(V.diag())
+        if weights is None:
+            for inds in chunked_indices:
+                G_part = G_dash[inds,:]
+                V = G_part @ inversion_op @ G_part.t()
+                IVR += torch.sum(V.diag())
+        else:
+            for inds in chunked_indices:
+                G_part = G_dash[inds,:]
+                V = G_part @ inversion_op @ G_part.t()
+                IVR += torch.sum(V.diag() * weights[inds])
         return IVR.item()
 
     def compute_VR(self, G, data_std, n_chunks=N_CHUNKS_VAR):
