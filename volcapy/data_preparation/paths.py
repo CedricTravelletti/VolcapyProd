@@ -37,11 +37,11 @@ path18_inds = np.array(list(range(474, 490)))
 
 path19_inds = np.array(list(range(492, 506)))
 path20_inds = np.array(list(range(510, 516)))
-path21_inds = np.array(list(range(517, 524))
+path21_inds = np.array(list(range(517, 524)))
 
-path22_inds = np.array(list(range(525, 535))
+path22_inds = np.array(list(range(525, 535)))
 
-paths = [path1_inds, path2_inds, path3_inds, path4_inds, path5_inds, path6_inds
+paths = [path1_inds, path2_inds, path3_inds, path4_inds, path5_inds, path6_inds,
         path7_inds, path8_inds, path9_inds, path10_inds, path11_inds, path12_inds,
         path13_inds, path14_inds, path15_inds, path16_inds, path17_inds, path18_inds,
         path19_inds, path20_inds, path21_inds, path22_inds]
