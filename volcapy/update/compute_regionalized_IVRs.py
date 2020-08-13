@@ -25,10 +25,7 @@ logger = logging.getLogger(__name__)
 output_path = "/home/cedric/PHD/Dev/VolcapySIAM/volcapy/update/regionalized_IVR_results_coast"
 
 # Indices of the data points that are along the coast.
-coast_data_inds = np.array(list(range(0, 47)) + list(range(73, 88))
-        + list(range(189, 193)) + list(range(284, 316))
-        + list(range(336, 340)) + list(range(349, 367))
-        + list(range(507, 510)) + list(range(536, 541)))
+from volcapy.data_preparation.paths import coast_data_inds
 
 def main():
     # Load
