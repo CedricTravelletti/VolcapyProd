@@ -4,6 +4,7 @@
 import os
 import numpy as np
 import networkx as nx
+import readchar
 import seaborn
 import matplotlib.pyplot as plt
 
@@ -35,8 +36,9 @@ def main():
 
         print("Node {}".format(i))
         while True:
-            ind_to_connect = input(
-                    "Connect cell {} to cell (-1 to skip to next cell): ".format(i))
+            print("Connect cell {} to cell (-1 to skip to next cell): ".format(i))
+            ind_to_connect = readchar.readchar()
+
             try:
                 ind_to_connect = int(ind_to_connect)
 

@@ -14,7 +14,8 @@ from scipy.spatial import KDTree
 
 DEPTH_THRESHOLD = 150.0 # Only keep cells at least that far from the surface.
 
-output_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/inversion_data_dsm_coarse"
+# output_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/inversion_data_dsm_coarse"
+output_path = "/home/cedric/PHD/Dev/ODEBO/odebo/example_runs/volcano/input_data"
 
 dsm_x = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse/dsm_stromboli_x_coarse.npy")
 dsm_y = np.load("/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse/dsm_stromboli_y_coarse.npy")
