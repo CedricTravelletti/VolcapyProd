@@ -4,7 +4,6 @@
 import os
 import numpy as np
 import networkx as nx
-import readchar
 import seaborn
 import matplotlib.pyplot as plt
 
@@ -28,16 +27,15 @@ def main():
                 ind1, ind2,
                 weight=np.linalg.norm(data_coords[ind1, :] - data_coords[ind2, :]))
 
-    # for i in range(data_coords.shape[0]):
-    for i in range(10):
+    for i in range(data_coords.shape[0]):
         # Save periodically.
         if i % 20 == 0:
             nx.write_edgelist(G, "stromboli.edgelist")
 
         print("Node {}".format(i))
         while True:
-            print("Connect cell {} to cell (-1 to skip to next cell): ".format(i))
-            ind_to_connect = readchar.readchar()
+            ind_to_connect = input(
+                    "Connect cell {} to cell (-1 to skip to next cell): ".format(i))
 
             try:
                 ind_to_connect = int(ind_to_connect)
