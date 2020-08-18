@@ -18,10 +18,14 @@ def main():
     data_coords = np.load(os.path.join(data_folder,"niklas_data_coords.npy"))
 
     # Plot full set.
-    plt.scatter(data_coords[:, 0], data_coords[:, 1], s=0.2, c=data_coords[:, 2])
-    plt.savefig(os.path.join(output_path, "full_dataset.png"), dpi=400)
+    fig, ax = plt.subplots()
+    ax.scatter(data_coords[:, 0], data_coords[:, 1], s=0.2, c=data_coords[:, 2])
 
-    """
+    # Add annotations.
+    for i in range(data_coords.shape[0]):
+        ax.annotate(str(i), (data_coords[i, 0], data_coords[i, 1]), size=1.5)
+    plt.savefig(os.path.join(output_path, "full_dataset.png"), dpi=800)
+
     for i, current_pt in enumerate(data_coords):
         plt.figure()
         # Plot full set.
@@ -32,7 +36,6 @@ def main():
         plt.scatter(data_coords[i, 0], data_coords[i, 1], s=80, c="red")
         plt.title("Cell {} / {}".format(i, data_coords.shape[0]))
         plt.savefig(os.path.join(output_path, "fig_{}.png".format(i)))
-    """
 
 if __name__ == "__main__":
     main()
