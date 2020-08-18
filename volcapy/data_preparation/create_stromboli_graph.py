@@ -29,20 +29,30 @@ def main():
 
     # for i in range(data_coords.shape[0]):
     for i in range(10):
+        # Save periodically.
+        if i % 20 == 0:
+            nx.write_edgelist(G, "stromboli.edgelist")
+
         print("Node {}".format(i))
-        ind_to_connect = 0
-        while ind_to_connect > -1:
+        while True:
+            ind_to_connect = input(
+                    "Connect cell {} to cell (-1 to skip to next cell): ".format(i))
             try:
-                ind_to_connect = int(
-                    input("Connect cell {} to cell (-1 to skip to next cell): ".format(i)))
+                ind_to_connect = int(ind_to_connect)
+
+                if ind_to_connect < 0:
+                    print("Skipping.")
+                    break
+                else:
+                    print("Connecting {} and {}.".format(i, ind_to_connect))
+                    connect_points(i, ind_to_connect)
             except:
-                print("Input has to be integer.")
-                continue
-            if ind_to_connect < 0:
-                print("Skipping.")
-            else:
-                print("Connecting {} and {}.".format(i, ind_to_connect))
-                connect_points(i, ind_to_connect)
+                if ind_to_connect == "n":
+                    print("connecting to next and skipping")
+                    connect_points(i, i + 1)
+                    break
+                else: 
+                    print("Input has to be integer.")
 
     print("Done. Saving.")
     nx.write_edgelist(G, "stromboli.edgelist")
