@@ -3,12 +3,20 @@
 """
 import numpy as np
 import os
+import sys
 import h5py
 from skimage.transform import downscale_local_mean
 from scipy.spatial import KDTree
 
-def main(path, nx=50, ny=50):
-    dataset = h5py.File(path, 'r')
+
+ORIGINAL_NIKLAS_DATA_PATH = "/home/cedric/PHD/Dev/VolcapySIAM/data/original/Cedric.mat"
+DEFAULT_OUTPATH = "/home/cedric/PHD/Dev/VolcapySIAM/data/DSMs"
+
+NX, NY = 120, 120
+
+
+def downsample_stromboli(output_path, nx=NX, ny=NY):
+    dataset = h5py.File(ORIGINAL_NIKLAS_DATA_PATH, 'r')
 
     # Load the arrays.
     dsm_x = np.array(dataset['x'], dtype=np.float32)
@@ -16,9 +24,14 @@ def main(path, nx=50, ny=50):
     dsm_z = np.array(dataset['z'], dtype=np.float32)
 
     # Cut the outer regions.
-    dsm_x = dsm_x[50:-80]
-    dsm_y = dsm_y[50:-80]
-    dsm_z = dsm_z[50:-80, 50:-80]
+    low_x_cutoff_ind = 250
+    low_y_cutoff_ind = 243
+    high_x_cutoff_ind = -250
+    high_y_cutoff_ind = -243
+
+    dsm_x = dsm_x[low_x_cutoff_ind:high_x_cutoff_ind]
+    dsm_y = dsm_y[low_y_cutoff_ind:high_y_cutoff_ind]
+    dsm_z = dsm_z[low_x_cutoff_ind:high_x_cutoff_ind, low_y_cutoff_ind:high_y_cutoff_ind]
 
     # Find boundaries.
     x_min = np.min(dsm_x)
@@ -27,8 +40,10 @@ def main(path, nx=50, ny=50):
     y_max = np.max(dsm_y)
 
     # Regrid.
-    x = np.linspace(x_min, x_max, nx, endpoint=True)
-    y = np.linspace(y_min, y_max, ny, endpoint=True)
+    x, x_step = np.linspace(x_min, x_max, nx, retstep=True, endpoint=True)
+    y, y_step = np.linspace(y_min, y_max, ny, retstep=True, endpoint=True)
+
+    print("x:y resolution {}:{}".format(x_step, y_step))
 
     # Find z by getting closest cell in fine grid.
     tree_x = KDTree(dsm_x)
@@ -40,10 +55,16 @@ def main(path, nx=50, ny=50):
     a, b = np.meshgrid(inds_x, inds_y)
     z = dsm_z[a, b]
 
-    out_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse"
-    np.save(os.path.join(out_path, "dsm_stromboli_x_coarse.npy"), x)
-    np.save(os.path.join(out_path, "dsm_stromboli_y_coarse.npy"), y)
-    np.save(os.path.join(out_path, "dsm_stromboli_z_coarse.npy"), z)
+
+    # Name the output directory with the resolution.
+    dir_name = "dsm_res_x{}_y{}".format(int(x_step), int(y_step))
+    output_path = os.path.join(output_path, dir_name)
+    os.makedirs(output_path, exist_ok=True)
+    np.save(os.path.join(output_path, "dsm_stromboli_x.npy"), x)
+    np.save(os.path.join(output_path, "dsm_stromboli_y.npy"), y)
+    np.save(os.path.join(output_path, "dsm_stromboli_z.npy"), z)
 
 if __name__ == "__main__":
-    main("/home/cedric/PHD/Dev/VolcapySIAM/data/original/Cedric.mat")
+    print("Usage: downsample_stromboli NX NY")
+    NX, NY = int(sys.argv[1]), int(sys.argv[2])
+    downsample_stromboli(output_path=DEFAULT_OUTPATH, nx=NX, ny=NY)
