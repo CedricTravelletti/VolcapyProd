@@ -11,29 +11,28 @@ from scipy.spatial import KDTree
 
 
 ORIGINAL_NIKLAS_DATA_PATH =  "/home/cedric/PHD/Dev/VolcapySIAM/data/original/Cedric.mat"   
-
-# input_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_coarse"
-input_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/dsm_lesscoarse"
-# output_path = "/home/cedric/PHD/Dev/VolcapySIAM/data/inversion_data_dsm_lesscoarse"
-# output_path = "/home/cedric/PHD/Dev/ODEBO/example_runs/volcano/input_data"
-output_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/variance_extraction_benchmark"
+DEFAULT_OUTPATH = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas"
 
 def prepare_stromboli(input_path, output_path, z_step):
     dsm_x = np.load(os.path.join(input_path, "dsm_stromboli_x.npy"))
     dsm_y = np.load(os.path.join(input_path, "dsm_stromboli_y.npy"))
     dsm_z = np.load(os.path.join(input_path, "dsm_stromboli_z.npy"))
     
-    my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1500, z_step=z_step)
+    my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-1000, z_step=z_step)
     
     print("Grid with {} cells.".format(my_grid.shape[0]))
     
     # Name the output directory with the number of cells.
     dir_name = "stromboli_{}_cells".format(my_grid.shape[0])
     output_path = os.path.join(output_path, dir_name)
-    os.mkdir(output_path)
+    os.makedirs(output_path, exist_ok=True)
     
     # Put measurement stations on the whole surface, at 1 meter from the ground.
-    data_coords = my_grid.surface
+    # TODO: WARNING: Here we subsample the surface, since otherwise it is way
+    # too big.
+    # First only keep cells that are outside the water.
+    data_coords = np.array([x for x in my_grid.surface if x[2] > 0.0])
+    print("{} surface cells.".format(data_coords.shape[0]))
     data_coords[:, 2] = data_coords[:, 2] + 1.0
     
     # Compute forward on whole surface.
@@ -70,13 +69,16 @@ def prepare_stromboli(input_path, output_path, z_step):
     np.save(os.path.join(output_path, "F_full_surface.npy"), F_full_surface)
     my_grid.save(os.path.join(output_path, "grid.pickle"))
     
-    # Save the surface of the volcano in vtk.
+    # Save the surface of the volcano and the datapoints. in vtk.
     from volcapy.plotting.vtkutils import irregular_array_to_point_cloud
     irregular_array_to_point_cloud(my_grid.surface,
             np.ones(my_grid.surface.shape[0]),
             os.path.join(output_path, "surface.vtk"), fill_nan_val=-20000.0)
+    irregular_array_to_point_cloud(data_coords,
+            np.ones(data_coords.shape[0]),
+            os.path.join(output_path, "data_points.vtk"), fill_nan_val=-20000.0)
 
 if __name__ == "__main__":
-    print("Usage: prepare_stromboli.py input_path output_path z_step")
-    input_path, output_path, z_step = sys.argv[1], sys.argv[2], sys.argv[3]
-    prepare_stromboli(input_path, output_path, z_step)
+    print("Usage: prepare_stromboli.py input_path z_step")
+    input_path, z_step = sys.argv[1], float(sys.argv[2])
+    prepare_stromboli(input_path, output_path=DEFAULT_OUTPATH, z_step=z_step)
