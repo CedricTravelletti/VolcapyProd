@@ -27,7 +27,7 @@ def init_worker(F, F_shape, coords, coords_shape,
     var_dict['meta'] = meta
 
 def _worker_func(i):
-    F_np = np.frombuffer(var_dict['F']).reshape(var_dict['F_shape'])
+    F_np = np.frombuffer(var_dict['F'], dtype=np.float32).reshape(var_dict['F_shape'])
     coords_np = np.frombuffer(var_dict['coords']).reshape(var_dict['coords_shape'])
     roofs_np = np.frombuffer(var_dict['roofs']).reshape(var_dict['roofs_shape'])
     data_np = np.frombuffer(var_dict['data_coords']).reshape(var_dict['data_coords_shape'])
@@ -88,7 +88,7 @@ def compute_forward(coords, roofs, res_x, res_y, res_z, data_coords, n_procs):
     # ----------------------------
     F_shared_buffer = RawArray('f', n_data * n_cells)
     # Wrap as a numpy array so we can easily manipulates its data.
-    F_np = np.frombuffer(F_shared_buffer).reshape(F_shape)
+    F_np = np.frombuffer(F_shared_buffer, dtype=np.float32).reshape(F_shape)
     # Copy data to our shared array.
     np.copyto(F_np, np.zeros(F_shape))
 
