@@ -61,8 +61,8 @@ class UpdatableCovariance:
     def __init__(self, cov_module, lambda0, sigma0, cells_coords):
         """ Build an updatable covariance from a traditional covariance module.
 
-        Params
-        ------
+        Parameters
+        ----------
         cov_module: CovarianceModule
             Defines which kernel to use.
         lambda0: float
@@ -367,3 +367,45 @@ class UpdatableMean:
         K_dash = self.cov_module.pushforwards[-1]
         R = self.cov_module.inversion_ops[-1]
         self.m = self.m + K_dash @ R @ (y - G @ self.m)
+
+def UpdatableGP():
+    """ Bundles the two above classes into an updatable Gaussian process.
+
+    Parameters
+    ----------
+    cov_module: CovarianceModule
+        Defines which kernel to use.
+    lambda0: float
+        Prior lengthscale parameter for the module.
+    sigma0: float
+        Prior standard deviation for the covariance.
+    m0: float
+        Prior mean, constant over the domain.
+    cells_coords: (n_cells, n_dims) Tensor
+        Coordinates of the model points.
+
+    """
+    def __init__(self, cov_module, lambda0, sigma0, m0, cells_coords) 
+        self.covariance = UpdatableCovariance(cov_module, lambda0,
+                sigma0, cells_coords)
+        self.mean = UpdatableMean(m0 * torch.ones(cells_coords.shape[0]),
+            self.covariance)
+
+        self.n_cells = cells_coords.shape[0]
+
+    def update(self, G, y, data_std):
+        """ Given some data, update the model.
+
+        Parameters
+        ----------
+        G: (n_data, self.n_cells) Tensor
+            Measurement (forward) operator.
+        y: (n_data) Tensor
+            Observed data values.
+        data_std: float
+            Standard deviation of observations noise (assumed centred iid
+            gaussian).
+
+        """
+        self.covariance.update(G, data_std)
+        self.mean.update(y, G)
