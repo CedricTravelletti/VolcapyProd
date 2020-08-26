@@ -33,7 +33,14 @@ Implement computation of the diagonal.
 
 """
 import torch
+import numpy as np
 from volcapy.utils import _make_column_vector
+from rpy2.robjects import numpy2ri
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+
+# Activate auto-wrapping of numpy arrays as rpy2 objects.
+numpy2ri.activate()
 
 # General torch settings and devices.
 torch.set_num_threads(8)
@@ -77,7 +84,7 @@ class UpdatableCovariance:
         self.lambda0 = lambda0
         self.sigma0 = sigma0
         self.cells_coords = cells_coords
-        self.n_model = cells_coords.shape[0]
+        self.n_cells = cells_coords.shape[0]
 
         self.pushforwards = []
         self.inversion_ops = []
@@ -146,7 +153,7 @@ class UpdatableCovariance:
 
         Params
         ------
-        F: Tensor
+        G: Tensor
             Measurement operator.
         data_std: float
             Standard deviation of data noise, assumed to be iid centered gaussian.
@@ -171,11 +178,11 @@ class UpdatableCovariance:
 
         Parameters
         ----------
-        G: (n_data, self.n_model) Tensor
+        G: (n_data, self.n_cells) Tensor
 
         Returns
         -------
-        pushfwd: (self.n_model, n_data) Tensor
+        pushfwd: (self.n_cells, n_data) Tensor
 
         """
         pushfwd = self.sigma0**2 * self.cov_module.compute_cov_pushforward(
@@ -195,7 +202,7 @@ class UpdatableCovariance:
     
         Returns
         -------
-        variances: (cov_module.n_model) Tensor
+        variances: (cov_module.n_cells) Tensor
             Variance at each point.
     
         """
@@ -216,7 +223,7 @@ class UpdatableCovariance:
 
         Parameters
         ----------
-        G: (n_data, self.n_model) Tensor
+        G: (n_data, self.n_cells) Tensor
             Measurement operator
         data_std: float
             Measurement noise standard deviation, assumed to be iid centered
@@ -228,7 +235,7 @@ class UpdatableCovariance:
             List of indices (wrt the model grid) over which to integrate. May
             be used if only want to consider some region. Defaults to the whole
             grid.
-        weights: (self.n_model) Tensor, optional
+        weights: (self.n_cells) Tensor, optional
             Can be provided to weight the integral differently for each cell.
     
         Returns
@@ -238,7 +245,7 @@ class UpdatableCovariance:
 
         """
         if integration_inds is None:
-            integration_inds = list(range(self.n_model))
+            integration_inds = list(range(self.n_cells))
 
         # First subdivide the cells in subgroups.
         chunked_indices = torch.chunk(torch.tensor(integration_inds), n_chunks)
@@ -274,7 +281,7 @@ class UpdatableCovariance:
 
         Parameters
         ----------
-        G: (n_data, self.n_model) Tensor
+        G: (n_data, self.n_cells) Tensor
             Measurement operator
         data_std: float
             Measurement noise standard deviation, assumed to be iid centered
@@ -285,12 +292,12 @@ class UpdatableCovariance:
     
         Returns
         -------
-        VR: (self.n_model) Tensor
+        VR: (self.n_cells) Tensor
             Variance reduction, at each point resulting from the observation of G.    
 
         """
         # First subdivide the model cells in subgroups.
-        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_model))), n_chunks)
+        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_cells))), n_chunks)
 
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
@@ -303,7 +310,7 @@ class UpdatableCovariance:
             print("Error inverting.")
         inversion_op = torch.cholesky_inverse(L)
 
-        VR = torch.zeros(self.n_model)
+        VR = torch.zeros(self.n_cells)
         for inds in chunked_indices:
             G_part = G_dash[inds,:]
             V = G_part @ inversion_op @ G_part.t()
@@ -333,14 +340,14 @@ class UpdatableMean:
         self.prior = prior
         self.m = prior # Current value of conditional mean.
 
-        self.n_model = prior.shape[0]
+        self.n_cells = prior.shape[0]
         self.cov_module = cov_module
         
-        if not (self.n_model == cov_module.n_model):
+        if not (self.n_cells == cov_module.n_cells):
             raise ValueError(
                 "Model size for mean: {} does not agree with "\
                 "model size for covariance {}.".format(
-                        self.n_model, cov_module.n_model))
+                        self.n_cells, cov_module.n_cells))
         
     # TODO: Find a better design patter. This subtlety of having to make sure
     # that the covariance_module has been updated first is dangerous. Maybe an
@@ -368,7 +375,7 @@ class UpdatableMean:
         R = self.cov_module.inversion_ops[-1]
         self.m = self.m + K_dash @ R @ (y - G @ self.m)
 
-def UpdatableGP():
+class UpdatableGP():
     """ Bundles the two above classes into an updatable Gaussian process.
 
     Parameters
@@ -385,13 +392,21 @@ def UpdatableGP():
         Coordinates of the model points.
 
     """
-    def __init__(self, cov_module, lambda0, sigma0, m0, cells_coords) 
+    def __init__(self, cov_module, lambda0, sigma0, m0, cells_coords):
         self.covariance = UpdatableCovariance(cov_module, lambda0,
                 sigma0, cells_coords)
         self.mean = UpdatableMean(m0 * torch.ones(cells_coords.shape[0]),
             self.covariance)
 
         self.n_cells = cells_coords.shape[0]
+
+    @property
+    def mean_vec(self):
+        return self.mean.m
+
+    @property
+    def prior_mean_vec(self):
+        return self.mean.prior
 
     def update(self, G, y, data_std):
         """ Given some data, update the model.
@@ -400,8 +415,8 @@ def UpdatableGP():
         ----------
         G: (n_data, self.n_cells) Tensor
             Measurement (forward) operator.
-        y: (n_data) Tensor
-            Observed data values.
+        y: Tensor
+            Data vector.
         data_std: float
             Standard deviation of observations noise (assumed centred iid
             gaussian).
@@ -409,3 +424,40 @@ def UpdatableGP():
         """
         self.covariance.update(G, data_std)
         self.mean.update(y, G)
+
+    def sample_prior(self):
+        """ Sample from prior model.
+
+        Returns
+        -------
+        sample: (self.n_cells, 1)
+            Column vector of sampled values at each cells.
+
+        """
+        # Import the R RandomFields library.
+        rflib = importr("RandomFields")
+
+        # Create the model and sample.
+        # TODO: Autodetect covariance model.
+        model = rflib.RMmatern(nu=2.5, var=self.covariance.sigma0**2,
+                scale=self.covariance.lambda0)
+        simu = rflib.RFsimulate(model,
+                self.covariance.cells_coords.detach().cpu().numpy())
+
+        # Back to numpy, make column vector also.
+        sample = torch.from_numpy(
+                np.asarray(simu.slots['data']).astype(np.float32)[:, None])
+
+        return sample + self.mean.m
+
+    def sample_conditional(self, G, y, data_std):
+        """ Sample conditionally on the data GZ = y.
+        Note that we here only condition on that data, starting from the prior,
+        i.e. there are no update involved.
+
+        """
+        prior_sample = self.sample_prior
+
+        # Update model.
+        self.update(G, y, data_std)
+        return self.prior_mean_vec + self.mean_vec
