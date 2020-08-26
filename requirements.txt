@@ -4,3 +4,4 @@ torch
 h5py
 scikit-image
 vtk <= 8.1.2
+rpy2
