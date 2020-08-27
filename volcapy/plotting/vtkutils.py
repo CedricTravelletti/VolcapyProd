@@ -10,7 +10,7 @@ class VtkPointCloud:
     """ Class for unstructured point data.
 
     """
-    def __init__(self, zMin=-10.0, zMax=10.0, maxNumPoints=1e6):
+    def __init__(self, zMin=-10.0, zMax=10.0, maxNumPoints=1e9):
         self.maxNumPoints = maxNumPoints
         self.vtkPolyData = vtk.vtkPolyData()
         self.clearPoints()
@@ -66,9 +66,9 @@ class VtkVectorCloud(VtkPointCloud):
     """ Same as point cloud, but with vector data.
 
     """
-    def __init__(self, n_dims, zMin=-10.0, zMax=10.0, maxNumPoints=1e6):
+    def __init__(self, n_dims, zMin=-10.0, zMax=10.0, maxNumPoints=1e9):
         self.n_dims = n_dims
-        super(VtkVectorCloud, self).__init__(zMin=-10.0, zMax=10.0, maxNumPoints=1e6)
+        super(VtkVectorCloud, self).__init__(zMin=-10.0, zMax=10.0, maxNumPoints=1e9)
 
     def clearPoints(self):
         self.vtkPoints = vtk.vtkPoints()
