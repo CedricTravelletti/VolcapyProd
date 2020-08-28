@@ -19,19 +19,23 @@ def downsample_stromboli(output_path, nx=NX, ny=NY):
     dataset = h5py.File(ORIGINAL_NIKLAS_DATA_PATH, 'r')
 
     # Load the arrays.
-    dsm_x = np.array(dataset['x'], dtype=np.float32)
-    dsm_y = np.array(dataset['y'], dtype=np.float32)
-    dsm_z = np.array(dataset['z'], dtype=np.float32)
+    dsm_x = np.array(dataset['x_fine'], dtype=np.float32)
+    dsm_y = np.array(dataset['y_fine'], dtype=np.float32).reshape(-1, 1)
+    dsm_z = np.array(dataset['z_fine'], dtype=np.float32)
 
+    """
     # Cut the outer regions.
     low_x_cutoff_ind = 250
     low_y_cutoff_ind = 243
-    high_x_cutoff_ind = -250
-    high_y_cutoff_ind = -243
+    # high_x_cutoff_ind = -250
+    high_x_cutoff_ind = -310
+    # high_y_cutoff_ind = -243
+    high_y_cutoff_ind = -303
 
     dsm_x = dsm_x[low_x_cutoff_ind:high_x_cutoff_ind]
     dsm_y = dsm_y[low_y_cutoff_ind:high_y_cutoff_ind]
     dsm_z = dsm_z[low_x_cutoff_ind:high_x_cutoff_ind, low_y_cutoff_ind:high_y_cutoff_ind]
+    """
 
     # Find boundaries.
     x_min = np.min(dsm_x)
@@ -52,7 +56,7 @@ def downsample_stromboli(output_path, nx=NX, ny=NY):
     _, inds_y = tree_y.query(y[:, None])
 
     # Remesh the z-s.
-    a, b = np.meshgrid(inds_x, inds_y)
+    a, b = np.meshgrid(inds_x, inds_y, indexing='ij')
     z = dsm_z[a, b]
 
 
