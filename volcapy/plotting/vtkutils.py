@@ -237,7 +237,6 @@ def array_to_vector_cloud(coords, data, output_path):
 
     """
     n_dims = data.shape[1]
-    print(n_dims)
     pointCloud = VtkVectorCloud(n_dims)
     for i, point in enumerate(coords):
         pointCloud.addPoint(point, data[i, :])
