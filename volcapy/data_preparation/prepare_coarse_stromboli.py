@@ -19,18 +19,40 @@ def prepare_stromboli(input_path, output_path, z_step):
     dsm_z = np.load(os.path.join(input_path, "dsm_stromboli_z.npy"))
     
     my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-800, z_step=z_step)
-    
     print("Grid with {} cells.".format(my_grid.shape[0]))
-    
+
     # Name the output directory with the number of cells.
     dir_name = "stromboli_{}_cells".format(my_grid.shape[0])
     output_path = os.path.join(output_path, dir_name)
     os.makedirs(output_path, exist_ok=True)
     
+    # Determines which cells lie deep inside the volcano (i.e. away from the
+    # surface).
+    # This is useful when using IVR to select new datapoints, since we are mostly
+    # interested at variance reduction deep below the surface.
+    DEPTH_THRESHOLD = 150.0 # Only keep cells at least that far from the surface.
+    surface_tree = KDTree(my_grid.surface)
+
+    # Loop over cells and only keep the ones that are far away from the surface.
+    deep_cells_inds = []
+    for i, cell in enumerate(my_grid.cells):
+        print("Processing cell {}/{}".format(i, my_grid.cells.shape[0]))
+        d, _ = surface_tree.query(cell)
+        if d > DEPTH_THRESHOLD:
+            deep_cells_inds.append(i)
+    
+    print("There are {} surface cells.".format(my_grid.surface.shape[0]))
+    print("Kept {}/{} cells".format(len(deep_cells_inds), my_grid.cells.shape[0]))
+    
+    np.save(os.path.join(output_path, "deep_cells_inds.npy"),
+            np.array(deep_cells_inds, dtype=np.int32))
+    
     # Put measurement stations on the whole surface, at 1 meter from the ground.
     # First only keep cells that are outside the water.
     data_coords = np.array([x for x in my_grid.surface if x[2] > 0.0])
-    print("{} surface cells.".format(data_coords.shape[0]))
+    print(("There are {} surface cells above sea level. "
+            + "Placing potential observation "
+            + "sites on each of those..").format(data_coords.shape[0]))
     data_coords[:, 2] = data_coords[:, 2] + 1.0
 
     # Also load locations of Niklas data points.
