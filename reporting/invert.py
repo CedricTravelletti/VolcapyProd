@@ -2,11 +2,15 @@
 """ Run inversion. 
 """
 from volcapy.inverse.inverse_problem import InverseProblem
-from volcapy.inverse.gaussian_process import GaussianProcess
+from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
 import volcapy.covariance.matern52 as cl
 from volcapy.grid.grid_from_dsm import Grid
-from volcapy.plotting.vtkutils import irregular_array_to_point_cloud, _array_to_point_cloud
 
+from timeit import default_timer as timer
+
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 import numpy as np
 import os
@@ -19,62 +23,60 @@ torch.set_num_threads(8)
 gpu = torch.device('cuda:0')
 cpu = torch.device('cpu')
 
-F = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/input_data/F_niklas.npy")
-F = torch.as_tensor(F).float()
-d_obs = np.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/input_data/niklas_data_obs.npy")
-grid = Grid.load("/home/cedric/PHD/Dev/VolcapySIAM/reporting/input_data/grid.pickle")
-cells_coords = grid.cells
+
+def main():
+    # Load
+    data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_40357_cells"
+    F = torch.from_numpy(
+            np.load(os.path.join(data_folder, "F_niklas.npy"))).float().detach()
+
+    F = torch.from_numpy(
+            np.load(os.path.join(data_folder, "F_niklas_corr.npy"))).float().detach()
+
+    grid = Grid.load(os.path.join(data_folder,
+                    "grid.pickle"))
+    volcano_coords = torch.from_numpy(
+            grid.cells).float().detach()
+
+    data_coords = torch.from_numpy(
+            np.load(os.path.join(data_folder,"niklas_data_coords.npy"))).float()
+    data_values = torch.from_numpy(
+            np.load(os.path.join(data_folder,"niklas_data_obs.npy"))).float()
+
+    print("Size of inversion grid: {} cells.".format(volcano_coords.shape[0]))
+    print("Number of datapoints: {}.".format(data_coords.shape[0]))
+    size = data_coords.shape[0]*volcano_coords.shape[0]*4 / 1e9
+    cov_size = (volcano_coords.shape[0])**2 * 4 / 1e9
+    print("Size of Covariance matrix: {} GB.".format(cov_size))
+    print("Size of Pushforward matrix: {} GB.".format(size))
+
+    # HYPERPARAMETERS
+    data_std = 0.1
+    sigma0 = 221.6
+    m0 = 2133.8
+    lambda0 = 462.0
+
+    # Run inversion in one go to compare.
+    import volcapy.covariance.exponential as kernel
+    start = timer()
+    myGP = InverseGaussianProcess(m0, sigma0, lambda0,
+            volcano_coords, kernel,
+            logger=logger)
+
+    cov_pushfwd = cl.compute_cov_pushforward(
+            lambda0, F, volcano_coords, n_chunks=20,
+            n_flush=50)
+    
+    m_post_m, m_post_d = myGP.condition_model(F, data_values, data_std,
+            concentrate=False,
+            is_precomp_pushfwd=False)
+
+    end = timer()
+    print("Non-sequential inversion run in {} s.".format(end - start))
+
+    # Train.
+    myGP.train_fixed_lambda(200.0, F, data_values, data_std)
 
 
-# Careful: we have to make a column vector here.
-data_std = 0.1
-d_obs = torch.as_tensor(d_obs)[:, None]
-n_data = d_obs.shape[0]
-data_cov = torch.eye(n_data)
-cells_coords = torch.as_tensor(cells_coords).detach()
-
-# HYPERPARAMETERS
-sigma0_init = 221.6
-m0 = 2133.8
-lambda0 = 462.0
-
-# Define GP model.
-myGP = GaussianProcess(F, d_obs, sigma0_init,
-    data_std=data_std)
-
-# Create the covariance pushforward.
-cov_pushfwd = cl.compute_cov_pushforward(
-        lambda0, F, cells_coords, cpu, n_chunks=20,
-        n_flush=50)
-K_d = torch.mm(F, cov_pushfwd)
-
-
-m_post_d = myGP.condition_data(
-        K_d, sigma0_init, concentrate=True)
-
-# Compute diagonal of posterior covariance.
-post_cov_diag = myGP.compute_post_cov_diag(
-        cov_pushfwd, cells_coords, lambda0, sigma0_init, cl)
-
-# Compute train_error
-train_error = myGP.train_RMSE()
-print("Train error (data conditioning): {}".format(train_error.item()))
-
-# Compute LOOCV RMSE.
-loocv_rmse = myGP.loo_error()
-print("LOOCV error (data conditioning): {}".format(loocv_rmse.item()))
-
-# Once finished, run a forward pass.
-m_post_m, m_post_d = myGP.condition_model(
-        cov_pushfwd, F, sigma0_init, concentrate=True)
-
-# Compute train_error
-train_error = myGP.train_RMSE()
-print("Train error (model conditioning): {}".format(train_error.item()))
-
-# Compute LOOCV RMSE.
-loocv_rmse = myGP.loo_error()
-print("LOOCV error (model conditioning): {}".format(loocv_rmse.item()))
-
-irregular_array_to_point_cloud(cells_coords.numpy(), m_post_m.numpy(),
-        "./output_data/m_post.vtk", fill_nan_val=-20000.0)
+if __name__ == "__main__":
+    main()
