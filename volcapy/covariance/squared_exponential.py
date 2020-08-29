@@ -8,6 +8,9 @@ cpu = torch.device('cpu')
 
 from timeit import default_timer as timer
 
+# This is a flag to tell the R interface which covariance model is being use.
+# TODO: Implement a Kernel class to make things cleaner.
+KERNEL_FAMILY = "squared exponential"
 
 def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         n_flush=50):
