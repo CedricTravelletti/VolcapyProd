@@ -72,6 +72,7 @@ import torch
 import pandas as pd
 from timeit import default_timer as timer
 from volcapy.utils import _make_column_vector
+import volcapy.covariance.sample as Rinterface
 
 
 class InverseGaussianProcess(torch.nn.Module):
@@ -129,7 +130,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         self.device = device
 
-        self.m0 = m0
+        self.m0 = torch.tensor(m0, requires_grad=False)
         self.sigma0 = torch.nn.Parameter(torch.tensor(sigma0))
         self.lambda0 = lambda0
 
@@ -150,7 +151,7 @@ class InverseGaussianProcess(torch.nn.Module):
             logger = logging.getLogger(__name__)
         self.logger = logger
 
-    def compute_pushfwd(self, G):
+    def compute_pushfwd(self, G, n_chunks=200, n_flush=50):
         """ Given a measurement operator, compute the associated covariance
         pushforward K G^T.
 
@@ -164,11 +165,12 @@ class InverseGaussianProcess(torch.nn.Module):
         # Compute the compute_covariance_pushforward and data-side covariance matrix
         self.pushfwd = self.kernel.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords,
-                n_chunks=200, n_flush=50)
+                n_chunks=n_chunks, n_flush=n_flush)
         self.K_d = G @ self.pushfwd
 
     def condition_data(self, G, y, data_std, concentrate=False,
-            is_precomp_pushfwd=False, device=None):
+            is_precomp_pushfwd=False, device=None,
+            n_chunks=200, n_flush=50):
         """ Given a bunch of measurement, condition model on the data side.
         I.e. only compute the conditional law of the data vector G Z, not of Z
         itself.
@@ -193,6 +195,10 @@ class InverseGaussianProcess(torch.nn.Module):
             Device on which to perform the training. Should be the same as the
             one the inputs are located on.
             If None, defaults to gpu0.
+        hypothetical: bool, default=False
+            If set to true, then the internals of the GP (pushfwd,
+            inversion_op) are not updated.
+            Use when considering hypothetical data.
 
         Returns
         -------
@@ -208,7 +214,7 @@ class InverseGaussianProcess(torch.nn.Module):
         if device is None:
             device = self.device
         if not is_precomp_pushfwd:
-            self.compute_pushfwd(G)
+            self.compute_pushfwd(G, n_chunks, n_flush)
 
         y = _make_column_vector(y)
 
@@ -282,7 +288,8 @@ class InverseGaussianProcess(torch.nn.Module):
 
         """
         if device is None:
-            device = torch.device('cuda:0')
+            # Check if GPU available and otherwise go for CPU.
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         y = _make_column_vector(y)
 
@@ -296,7 +303,7 @@ class InverseGaussianProcess(torch.nn.Module):
         return conc_m0
 
     def condition_model(self, G, y, data_std, concentrate=False,
-            is_precomp_pushfwd=False, device=None):
+            is_precomp_pushfwd=False, device=None, hypothetical=False):
         """ Given a bunch of measurement, condition model on the data side.
         I.e. only compute the conditional law of the data vector G Z, not of Z
         itself.
@@ -321,6 +328,10 @@ class InverseGaussianProcess(torch.nn.Module):
             Device on which to perform the training. Should be the same as the
             one the inputs are located on.
             If None, defaults to gpu0.
+        hypothetical: bool, default=False
+            If set to true, then the internals of the GP (pushfwd,
+            inversion_op) are not updated.
+            Use when considering hypothetical data.
 
         Returns
         -------
@@ -354,7 +365,8 @@ class InverseGaussianProcess(torch.nn.Module):
 
     def train_fixed_lambda(self, lambda0, G, y, data_std,
             device=None,
-            n_epochs=5000, lr=0.01):
+            n_epochs=5000, lr=0.1,
+            n_chunks=200, n_flush=50):
         """ Given lambda0, optimize the two remaining hyperparams via MLE.
         Here, instead of giving lambda0, we give a (stripped) covariance
         matrix. Stripped means without sigma0.
@@ -393,7 +405,7 @@ class InverseGaussianProcess(torch.nn.Module):
         # Compute the pushforward once and for all, since it only depends on
         # lambda0 and G.
         self.lambda0 = lambda0
-        self.compute_pushfwd(G)
+        self.compute_pushfwd(G, n_chunks, n_flush)
 
         # Make column vector.
 
@@ -426,7 +438,8 @@ class InverseGaussianProcess(torch.nn.Module):
 
     def train(self, lambda0s, G, y, data_std,
             out_path, device=None,
-            n_epochs=5000, lr=0.01):
+            n_epochs=5000, lr=0.1,
+            n_chunks=200, n_flush=50):
         """ Given lambda0, optimize the two remaining hyperparams via MLE.
         Here, instead of giving lambda0, we give a (stripped) covariance
         matrix. Stripped means without sigma0.
@@ -471,7 +484,8 @@ class InverseGaussianProcess(torch.nn.Module):
         for lambda0 in lambda0s:
             (sigma0, m0, nll, train_RMSE) = self.train_fixed_lambda(
                     lambda0, G, y, data_std,
-                    device=device, n_epochs=n_epochs, lr=lr)
+                    device=device, n_epochs=n_epochs, lr=lr,
+                    n_chunks=n_chunks, n_flush=n_flush)
             df = df.append({'lambda0': lambda0, 'sigma0': sigma0,
                     'm0': m0,
                     'nll': nll, 'train_RMSE': train_RMSE}, ignore_index=True)
@@ -551,3 +565,57 @@ class InverseGaussianProcess(torch.nn.Module):
         z, _ = torch.triangular_solve(x, self.inv_op_L, upper=False)
         y, _ = torch.triangular_solve(z, self.inv_op_L.t(), upper=True)
         return y
+
+    def sample_prior(self):
+        """ Sample from prior model.
+
+        Returns
+        -------
+        sample: (self.n_cells, 1) Tensor
+            Column vector of sampled values at each cells.
+
+        """
+        m0 = self.m0.detach().cpu().item()
+        sigma0 = self.sigma0.detach().cpu().item()
+        lambda0 = self.lambda0
+
+        sample = Rinterface.sample(self.kernel, sigma0, lambda0, m0, self.cells_coords)
+        return sample
+
+    def posterior_variance(self):
+        """ Computes posterior variance at every point.
+        WARNING: needs pushforward and inversion operator to be only computed,
+        hence, only call after having conditioned the model.
+
+        """
+    def sample_posterior(self, G, y, data_std):
+        """ Sample from the posterior.
+        
+        Parameters
+        ----------
+        G: tensor
+            Measurement matrix
+        y: (n_data, 1) Tensor
+            Observed data. Has to be column vector.
+        data_std: flot
+            Data noise standard deviation.
+
+        Returns
+        -------
+        sample: (self.n_cells, 1) Tensor
+            Column vector of sampled values at each cells.
+
+        """
+        post_mean, _ = self.condition_model(G, y, data_std, hypothetical=True)
+
+        # Sample from prior.
+        sample = self.sample_prior()
+
+        # Generate hypotherical data.
+        noise = torch.normal(mean=0.0, std=data_std, size=(G.shape[0], 1))
+        y_prime = G @ sample + noise
+
+        mu_prime, _ = self.condition_model(G, y_prime, data_std, hypothetical=True)
+
+        post_sample = post_mean + sample - mu_prime
+        return post_sample
