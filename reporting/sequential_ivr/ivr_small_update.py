@@ -1,6 +1,8 @@
 """ Sequentially compute IVR on small volcano.
 Use updatable covariance.
 
+Here we compare IVRS for different paths.
+
 """
 import os
 import torch
@@ -24,6 +26,7 @@ data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_23
 # Indices of the data points that are along the coast.
 from volcapy.data_preparation.paths import coast_data_inds
 
+
 def main():
     os.makedirs(output_path, exist_ok=True)
 
@@ -46,13 +49,37 @@ def main():
     # Dictionary between the original Niklas data and our discretization.
     niklas_data_inds = torch.from_numpy(
             np.load(os.path.join(data_folder, "niklas_data_inds_insurf.npy"))).long()
-
-    # Plot Niklas data.
     niklas_coords = data_coords[niklas_data_inds].numpy()
+
+    # PATHS ON THE VOLCANO.
+    from volcapy.data_preparation.paths import paths as paths_niklas
+    # Convert to indices in the full dataset.
+    paths = []
+    for path in paths_niklas:
+        paths.append(niklas_data_inds[path].long())
+
+    # --------------------------------
+    # DEFINITION OF THE EXCURSION SET.
+    # --------------------------------
+    THRESHOLD = 500.0
+    excursion_inds = (ground_truth >= 500.0).nonzero()[:, 0]
+
+    # Plot situation.
     plt.scatter(data_coords[:, 0], data_coords[:, 1], c="k", alpha=0.1)
-    plt.scatter(niklas_coords[:, 0], niklas_coords[:, 1], c=niklas_coords[:, 2])
+
+    plt.scatter(
+            volcano_coords[excursion_inds, 0],
+            volcano_coords[excursion_inds, 1], c="r", alpha=0.07)
+
+    plt.scatter(niklas_coords[:, 0], niklas_coords[:, 1],
+            c=niklas_coords[:, 2])
     plt.scatter(niklas_coords[coast_data_inds, 0], niklas_coords[coast_data_inds, 1], c="r")
-    plt.title("Paths on the Stromboli and location of coastal data.")
+
+    for i, path in enumerate(paths):
+        for x, y in zip(data_coords[path, 0], data_coords[path, 1]):
+                plt.text(x, y, str(i), color="black", fontsize=6)
+
+    plt.title("Paths on the Stromboli, location of coastal data and excursion set.")
     plt.show()
 
     # Remove the coast data.
@@ -62,6 +89,14 @@ def main():
     F_coast = F[coast_data_inds_infull, :]
     data_coast = data_values[coast_data_inds_infull]
 
+    # Get Niklas data
+    F_niklas = F[niklas_data_inds, :]
+    data_niklas = data_values[niklas_data_inds]
+    F_niklas = F_niklas[np.delete(np.array(list(range(F_niklas.shape[0]))),
+            coast_data_inds), :]
+    data_niklas = data_niklas[np.delete(np.array(list(range(data_niklas.shape[0]))),
+            coast_data_inds)]
+
     print("Size of inversion grid: {} cells.".format(volcano_coords.shape[0]))
     print("Number of datapoints: {}.".format(data_coords.shape[0]))
     size = data_coords.shape[0]*volcano_coords.shape[0]*8 / 1e9
@@ -69,9 +104,9 @@ def main():
     
     # Params
     data_std = 0.1
-    lambda0 = 200.0
-    sigma0 = 200.0
-    m0 = 1300
+    lambda0 = 338.0
+    sigma0 = 414.0
+    m0 = -150.0
 
     # Now ready to go to updatable covariance.
     from volcapy.update.updatable_covariance import UpdatableCovariance
@@ -93,25 +128,48 @@ def main():
         print("Processing data chunk nr {}.".format(i))
         updatable_cov.update(F_i, data_std)
         updatable_mean.update(data_part, F_i)
-        m = updatable_mean.m.cpu().numpy()
 
     end = timer()
     print("Inversion of coastal data run in {} mins.".format((end - start)/60.0))
 
-    """
+    # PLOT CURRENT ESTIMATION OF THE EXCURSION SET.
+    excursion_inds_est = (updatable_mean.m >= 500.0).nonzero()[:, 0]
+
+    plt.scatter(
+            volcano_coords[excursion_inds, 0],
+            volcano_coords[excursion_inds, 1], c="r", alpha=0.07,
+            s=60)
+    plt.scatter(
+            volcano_coords[excursion_inds_est, 0],
+            volcano_coords[excursion_inds_est, 1], c="g", alpha=0.07)
+    plt.show()
+
+    # --------------------------
+    # COMPUTE IVR FOR EACH PATH.
+    # --------------------------
     IVRs = []
-    # Now compute the variance reduction associated to the other points.
-    for i, F_i in enumerate(F_out):
-        IVR = updatable_cov.compute_IVR(F_i.reshape(1, -1), data_std,
+    # Now compute the variance reduction associated to each path.
+    for i, path in enumerate(paths):
+        IVR = updatable_cov.compute_IVR(F[path, :], data_std,
                 integration_inds=deep_cells_inds)
         print(IVR)
         IVRs.append(IVR)
 
-        # Save periodically.
-        if i % 15 == 0:
-            print("Saving at {}.".format(i))
-            np.save(os.path.join(output_path, "IVRs.npy"), np.array(IVRs))
+    # Plot the results.
+    ivrs_min = np.min(IVRs)
+    ivrs_max = np.max(IVRs)
+    plt.scatter(
+            volcano_coords[excursion_inds, 0],
+            volcano_coords[excursion_inds, 1], c="r", alpha=0.07,
+            s=60)
+    for i, path in enumerate(paths):
+        plt.scatter(data_coords[path, 0], data_coords[path, 1],
+                c=IVRs[i]*np.ones(len(path)), cmap="inferno",
+                vmin=ivrs_min, vmax=ivrs_max)
+    plt.colorbar()
+    plt.show()
 
+    """
     np.save(os.path.join(output_path, "IVRs.npy"), np.array(IVRs))
     data_coords_out[:, 2] = data_coords_out[:, 2] + 50.0
     np.save(os.path.join(output_path, "data_coords_out.npy"), data_coords_out)
