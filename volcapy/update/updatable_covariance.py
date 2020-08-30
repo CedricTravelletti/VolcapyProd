@@ -163,14 +163,32 @@ class UpdatableCovariance:
 
         # Get inversion op by Cholesky.
         R = G @ self.pushforwards[-1]
-        R =  R + data_std**2 * torch.eye(G.shape[0])
-        try:
-            L = torch.cholesky(R)
-        except RuntimeError:
-            print("Error inverting.")
+
+        L, _ = self._cholesky_helper(R, data_std)
 
         inversion_op = torch.cholesky_inverse(L)
         self.inversion_ops.append(inversion_op)
+
+    def _cholesky_helper(self, R, data_std):
+        data_std_orig = data_std
+        # Try to Cholesky.
+        MAX_ATTEMPTS = 200
+        for attempt in range(MAX_ATTEMPTS):
+            try:
+                L = torch.cholesky(R + data_std**2 * torch.eye(R.shape[0]))
+            except RuntimeError:
+                print("Cholesky failed: Singular Matrix.")
+                # Increase noise in steps of 5%.
+                data_std += 0.05 * data_std
+                print(
+                        "Increasing data std from original {} to {} and retrying.".format(
+                        data_std_orig, data_std))
+            else:
+                return L, data_std
+        # If didnt manage to invert.
+        raise ValueError(
+            "Impossible to invert matrix, even at noise std {}".format(self.data_std))
+        return -1, data_std
 
     def compute_prior_pushfwd(self, G):
         """ Given an operator G, compute the covariance pushforward K_0 G^T,
@@ -248,17 +266,16 @@ class UpdatableCovariance:
             integration_inds = list(range(self.n_cells))
 
         # First subdivide the cells in subgroups.
-        chunked_indices = torch.chunk(torch.tensor(integration_inds), n_chunks)
+        chunked_indices = torch.chunk(torch.tensor(integration_inds).long(), n_chunks)
 
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
 
         # Get inversion op by Cholesky.
-        R = G @ G_dash + data_std**2 * torch.eye(G.shape[0])
-        try:
-            L = torch.cholesky(R)
-        except RuntimeError:
-            print("Error inverting.")
+        R = G @ G_dash
+
+        L, _ = self._cholesky_helper(R, data_std)
+
         inversion_op = torch.cholesky_inverse(L)
 
         IVR = 0
