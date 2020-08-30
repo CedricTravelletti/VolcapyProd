@@ -48,19 +48,15 @@ def main():
 
     # HYPERPARAMETERS
     data_std = 0.1
-    sigma0 = 221.6
-    m0 = 2133.8
-    lambda0 = 462.0
+    sigma0 = 100.6
+    m0 = 1000.0
+    lambda0 = 300.0
 
     start = timer()
     myGP = InverseGaussianProcess(m0, sigma0, lambda0,
             volcano_coords, kernel,
             logger=logger)
 
-    cov_pushfwd = cl.compute_cov_pushforward(
-            lambda0, F, volcano_coords, n_chunks=20,
-            n_flush=50)
-    
     m_post_m, m_post_d = myGP.condition_model(F, data_values, data_std,
             concentrate=False,
             is_precomp_pushfwd=False)
@@ -69,7 +65,9 @@ def main():
     print("Non-sequential inversion run in {} s.".format(end - start))
 
     # Train.
-    myGP.train(np.linspace(20, 1400, 14), F, data_values, data_std, out_path="./train_res.pck")
+    myGP.train(np.linspace(20, 1400, 14), F, data_values, data_std,
+            out_path="./train_res.pck",
+            n_chunks=2, n_flush=50)
 
 
 if __name__ == "__main__":
