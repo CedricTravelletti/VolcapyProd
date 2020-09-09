@@ -35,6 +35,7 @@ Implement computation of the diagonal.
 import torch
 import numpy as np
 from volcapy.utils import _make_column_vector
+from volcapy.gaussian_cdf import gaussian_cdf
 from rpy2.robjects import numpy2ri
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
@@ -49,10 +50,6 @@ torch.set_num_threads(8)
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-# TODO: Refactor to automatically determine in the covariance module.
-N_CHUNKS = 100
-N_CHUNKS_VAR = 10 # Chunking for the variance extraction and IVR.
-
 class UpdatableCovariance:
     """ Covariance matrix that can be sequentially updated to include new
     measurements (conditioning).
@@ -65,7 +62,7 @@ class UpdatableCovariance:
         The inversion operators corresponding to each conditioning step.
 
     """
-    def __init__(self, cov_module, lambda0, sigma0, cells_coords):
+    def __init__(self, cov_module, lambda0, sigma0, cells_coords, n_chunks):
         """ Build an updatable covariance from a traditional covariance module.
 
         Parameters
@@ -78,6 +75,9 @@ class UpdatableCovariance:
             Prior standard deviation for the covariance.
         cells_coords: Tensor
             Coordinates of the model points.
+        n_chunks: int
+            Number of chunks to break the covariane matrix in.
+            Increase if computations do not fit in memory.
 
         """
         self.cov_module = cov_module
@@ -85,6 +85,7 @@ class UpdatableCovariance:
         self.sigma0 = sigma0
         self.cells_coords = cells_coords
         self.n_cells = cells_coords.shape[0]
+        self.n_chunks = n_chunks
 
         self.pushforwards = []
         self.inversion_ops = []
@@ -205,18 +206,12 @@ class UpdatableCovariance:
         """
         pushfwd = self.sigma0**2 * self.cov_module.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords, DEVICE,
-                n_chunks=N_CHUNKS,
+                n_chunks=self.n_chunks,
                 n_flush=50)
         return pushfwd
 
-    def extract_variance(self, n_chunks=N_CHUNKS_VAR):
+    def extract_variance(self):
         """ Extracts the pointwise variance from an UpdatableCovariane module.
-    
-        Parameters
-        ----------
-        n_chunks: int
-            Number of chunks to break the covariane matrix in.
-            Increase if computations do not fit in memory.
     
         Returns
         -------
@@ -226,15 +221,14 @@ class UpdatableCovariance:
         """
         prior_variances = self.sigma0**2 * self.cov_module.compute_diagonal(
                 self.lambda0, self.cells_coords, DEVICE,
-                n_chunks=N_CHUNKS, n_flush=50)
+                n_chunks=self.n_chunks, n_flush=50)
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
             prior_variances -= torch.einsum("ij,jk,ik->i",p,r,p)
 
         return prior_variances
 
-    def compute_IVR(self, G, data_std, n_chunks=N_CHUNKS_VAR,
-            integration_inds=None, weights=None):
+    def IVR(self, G, data_std, integration_inds=None, weights=None):
         """ Compute the (integrated) variance reduction (IVR) that would
         result from collecting the data described by the measurement operator
         G.    
@@ -246,9 +240,6 @@ class UpdatableCovariance:
         data_std: float
             Measurement noise standard deviation, assumed to be iid centered
             gaussian.
-        n_chunks: int
-            Number of chunks to break the covariane matrix in.
-            Increase if computations do not fit in memory.
         integration_inds: array_like [int]
             List of indices (wrt the model grid) over which to integrate. May
             be used if only want to consider some region. Defaults to the whole
@@ -266,7 +257,8 @@ class UpdatableCovariance:
             integration_inds = list(range(self.n_cells))
 
         # First subdivide the cells in subgroups.
-        chunked_indices = torch.chunk(torch.tensor(integration_inds).long(), n_chunks)
+        chunked_indices = torch.chunk(torch.tensor(integration_inds).long(),
+                self.n_chunks)
 
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
@@ -291,7 +283,7 @@ class UpdatableCovariance:
                 IVR += torch.sum(V.diag() * weights[inds])
         return IVR.item()
 
-    def compute_VR(self, G, data_std, n_chunks=N_CHUNKS_VAR):
+    def compute_VR(self, G, data_std):
         """ Compute the variance reduction (VR) (no integral) that would
         result from collecting the data described by the measurement operator
         G.    
@@ -303,9 +295,6 @@ class UpdatableCovariance:
         data_std: float
             Measurement noise standard deviation, assumed to be iid centered
             gaussian.
-        n_chunks: int
-            Number of chunks to break the covariane matrix in.
-            Increase if computations do not fit in memory.
     
         Returns
         -------
@@ -314,7 +303,8 @@ class UpdatableCovariance:
 
         """
         # First subdivide the model cells in subgroups.
-        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_cells))), n_chunks)
+        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_cells))),
+                self.n_chunks)
 
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
@@ -407,11 +397,14 @@ class UpdatableGP():
         Prior mean, constant over the domain.
     cells_coords: (n_cells, n_dims) Tensor
         Coordinates of the model points.
+    n_chunks: int
+        Number of chunks to break the covariane matrix in.
+        Increase if computations do not fit in memory.
 
     """
     def __init__(self, cov_module, lambda0, sigma0, m0, cells_coords):
         self.covariance = UpdatableCovariance(cov_module, lambda0,
-                sigma0, cells_coords)
+                sigma0, cells_coords, n_chunks)
         self.mean = UpdatableMean(m0 * torch.ones(cells_coords.shape[0]),
             self.covariance)
 
@@ -478,3 +471,62 @@ class UpdatableGP():
         # Update model.
         self.update(G, y, data_std)
         return self.prior_mean_vec + self.mean_vec
+
+    def IVR(self, G, data_std, integration_inds=None, weights=None):
+        """ Compute the (integrated) variance reduction (IVR) that would
+        result from collecting the data described by the measurement operator
+        G.    
+
+        Parameters
+        ----------
+        G: (n_data, self.n_cells) Tensor
+            Measurement operator
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
+        integration_inds: array_like [int]
+            List of indices (wrt the model grid) over which to integrate. May
+            be used if only want to consider some region. Defaults to the whole
+            grid.
+        weights: (self.n_cells) Tensor, optional
+            Can be provided to weight the integral differently for each cell.
+    
+        Returns
+        -------
+        IVR: float
+            Integrated variance reduction resulting from the observation of G.    
+
+        """
+        return self.covariance.IVR(G, data_std, integration_inds, weights)
+
+    def weighted_IVR(self, G, data_std, lower=None, upper=None):
+        """ Weighted IVR crtierion for learning excurions sets. The user can
+        specifies the excursion set to recover by providing upper and lower
+        thresholds. Thresholds are optional, and if one isn't provided, it will
+        default to infinity. The excursion set to recover is defined as the
+        region where the GP takes values in the interval [lower, upper].
+
+        Parameters
+        ----------
+        G: (n_data, self.n_cells) Tensor
+            Measurement operator
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
+        lower: float, defaults to None
+            Lower threshold of the excursion set. If None, then infinity will
+            be used.
+        upper: float, defaults to None
+            Upper threshold of the excursion set. If None, then infinity will
+            be used.
+    
+        Returns
+        -------
+        weighted_IVR: float
+            Integrated variance reduction resulting from the observation of G.    
+
+        """
+        variance = self.covariance..extract_variance()
+        mean = self.mean_vec
+        weights = gaussian_cdf(mean, variance, lower=lower, upper=upper)
+        return self.IVR(G, data_std, weights=weights)
