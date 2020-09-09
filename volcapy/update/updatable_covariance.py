@@ -418,6 +418,11 @@ class UpdatableGP():
     def prior_mean_vec(self):
         return self.mean.prior
 
+    # So we only store once.
+    @property
+    def cells_coords(self):
+        return self.covariance.cells_coords
+
     def update(self, G, y, data_std):
         """ Given some data, update the model.
 
