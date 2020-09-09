@@ -528,5 +528,11 @@ class UpdatableGP():
         """
         variance = self.covariance..extract_variance()
         mean = self.mean_vec
+
+        if lower is not None:
+            lower = torch.tensor([lower])
+        if upper is not None:
+            upper = torch.tensor([upper])
+
         weights = gaussian_cdf(mean, variance, lower=lower, upper=upper)
         return self.IVR(G, data_std, weights=weights)
