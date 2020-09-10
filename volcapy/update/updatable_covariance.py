@@ -402,7 +402,8 @@ class UpdatableGP():
         Increase if computations do not fit in memory.
 
     """
-    def __init__(self, cov_module, lambda0, sigma0, m0, cells_coords):
+    def __init__(self, cov_module, lambda0, sigma0, m0,
+            cells_coords, n_chunks):
         self.covariance = UpdatableCovariance(cov_module, lambda0,
                 sigma0, cells_coords, n_chunks)
         self.mean = UpdatableMean(m0 * torch.ones(cells_coords.shape[0]),
@@ -531,7 +532,7 @@ class UpdatableGP():
             Integrated variance reduction resulting from the observation of G.    
 
         """
-        variance = self.covariance..extract_variance()
+        variance = self.covariance.extract_variance()
         mean = self.mean_vec
 
         if lower is not None:
@@ -539,5 +540,6 @@ class UpdatableGP():
         if upper is not None:
             upper = torch.tensor([upper])
 
-        weights = gaussian_cdf(mean, variance, lower=lower, upper=upper)
+        weights = gaussian_cdf(mean, variance.reshape(-1, 1),
+                lower=lower, upper=upper)
         return self.IVR(G, data_std, weights=weights)
