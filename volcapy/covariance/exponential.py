@@ -93,7 +93,6 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
             torch.cuda.empty_cache()
     
         end = timer()
-        print("Pushforward computed in {} minutes.".format((end - start)/60.0))
     
         return tot
 
