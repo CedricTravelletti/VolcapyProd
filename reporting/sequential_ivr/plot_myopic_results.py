@@ -1,10 +1,10 @@
-""" Run myopic excursion set reconstruction strategy using weighted IVR.
+""" Plot results of run myopic excursion set reconstruction strategy using weighted IVR.
 
 """
 import os
 import torch
 import numpy as np
-import volcapy.covariance.matern52 as cl
+import volcapy.covariance.exponential as cl
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.update.updatable_covariance import UpdatableGP
 from volcapy.plotting.vtkutils import irregular_array_to_point_cloud, _array_to_point_cloud
@@ -60,6 +60,10 @@ def main():
     THRESHOLD_low = 700.0
     excursion_inds = (ground_truth >= THRESHOLD_low).nonzero()[:, 0]
 
+    # Load results.
+    visited_inds = np.load("visited_inds.npy")
+    observed_data = np.load("observed_data.npy")
+
     # Plot situation.
     plt.scatter(data_coords[:, 0], data_coords[:, 1], c="k", alpha=0.1)
 
@@ -67,22 +71,14 @@ def main():
             volcano_coords[excursion_inds, 0],
             volcano_coords[excursion_inds, 1], c="r", alpha=0.07)
 
-    plt.scatter(niklas_coords[:, 0], niklas_coords[:, 1],
-            c=niklas_coords[:, 2])
-    plt.scatter(niklas_coords[coast_data_inds, 0], niklas_coords[coast_data_inds, 1], c="r")
+    # plt.scatter(niklas_coords[:, 0], niklas_coords[:, 1],
+    #         c=niklas_coords[:, 2])
+    plt.scatter(data_coords[visited_inds, 0], data_coords[visited_inds, 1], c="g")
 
-    for i, path in enumerate(paths):
-        for x, y in zip(data_coords[path, 0], data_coords[path, 1]):
-                plt.text(x, y, str(i), color="black", fontsize=6)
-
-    plt.title("Paths on the Stromboli, location of coastal data and excursion set.")
+    plt.title("Visited locations on the Stromboli and excursion set.")
     plt.show()
 
-    # Coast data.
-    coast_data_inds_infull = niklas_data_inds[coast_data_inds]
-
-    # Choose a starting points on the coast.
-    start_ind = coast_data_inds_infull[0]
+    """
     
     # Params
     data_std = 0.1
@@ -101,16 +97,12 @@ def main():
             lower=THRESHOLD_low, upper=None)
 
     start = timer()
-    visited_inds, observed_data, ivrs = strategy.run(
-            start_ind, n_steps=20, data_std=0.1)
+    visited_inds, observed_data = strategy.run(
+            start_ind, n_steps=5, data_std=0.1)
 
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
-
-    np.save("visited_inds.npy", visited_inds)
-    np.save("observed_data.npy", observed_data)
-    np.save("ivrs.npy", ivrs)
-
+    """
 
 if __name__ == "__main__":
     main()
