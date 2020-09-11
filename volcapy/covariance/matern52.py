@@ -97,6 +97,7 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         torch.cuda.empty_cache()
 
     end = timer()
+    print(end - start)
 
     return tot
 
