@@ -17,8 +17,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-output_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results/myopic_23823"
-data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_23823_cells"
+# output_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results/myopic_23823"
+output_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results/myopic_57485"
+# data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_23823_cells"
+data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_57485_cells"
 
 # Indices of the data points that are along the coast.
 from volcapy.data_preparation.paths import coast_data_inds
@@ -94,7 +96,7 @@ def main():
     # Define GP model.
     data_feed = lambda x: data_values[x]
     updatable_gp = UpdatableGP(cl, lambda0, sigma0, m0, volcano_coords,
-            n_chunks=10)
+            n_chunks=6)
     from volcapy.strategy.myopic_weighted_ivr import MyopicStrategy
     strategy = MyopicStrategy(updatable_gp, data_coords,
             F, data_feed,
@@ -102,7 +104,7 @@ def main():
 
     start = timer()
     visited_inds, observed_data, ivrs = strategy.run(
-            start_ind, n_steps=20, data_std=0.1)
+            start_ind, n_steps=30, data_std=0.1)
 
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
