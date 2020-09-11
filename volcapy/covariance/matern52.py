@@ -99,7 +99,7 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
     end = timer()
     print(end - start)
 
-    return tot
+    return tot.detach().cpu()
 
 def compute_diagonal(lambda0, cells_coords, device=None, n_chunks=200,
         n_flush=50):
