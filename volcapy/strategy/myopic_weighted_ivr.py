@@ -106,3 +106,25 @@ class MyopicStrategy:
             np.save("ivrs.npy", ivrs)
 
         return visited_inds, observed_data, ivrs
+
+    def save_plugin_estimate(self, visited_inds, data_std, output_folder):
+        """ Given a list of indices to visit, compute and save posterior means.
+
+        """
+
+        for current_ind in range(visited_inds):
+            # Observe and update model.
+            y = self.data_feed(current_ind)
+            G = self.G[current_ind,:].reshape(1, -1)
+            self.gp.update(G, y, data_std)
+
+            post_mean = self.gp.mean_vec.m.detach().numpy()
+            plugin_est_inds = np.where(
+                    (post_mean >= self.lower) & (post_mean <= self.upper))
+            plugin_est = np.zeros(post_mean.shape)
+            plugin_est [plugin_est_inds] = 1.0
+            np.save(
+                os.path.join(
+                        output_folder,
+                        "plugin_est_{}.npy".format(current_ind)),
+                )
