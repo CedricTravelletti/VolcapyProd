@@ -4,6 +4,7 @@ criterion and myopic path planing.
 """
 from scipy.spatial import KDTree
 import numpy as np
+import os
 import torch
 
 
@@ -112,19 +113,25 @@ class MyopicStrategy:
 
         """
 
-        for current_ind in range(visited_inds):
+        for i, current_ind in enumerate(visited_inds):
             # Observe and update model.
+            current_ind = int(current_ind)
+
             y = self.data_feed(current_ind)
             G = self.G[current_ind,:].reshape(1, -1)
             self.gp.update(G, y, data_std)
 
-            post_mean = self.gp.mean_vec.m.detach().numpy()
+            post_mean = self.gp.mean_vec.detach().numpy()
+            """
             plugin_est_inds = np.where(
                     (post_mean >= self.lower) & (post_mean <= self.upper))
+            """
+            plugin_est_inds = np.where(
+                    (post_mean >= self.lower))
             plugin_est = np.zeros(post_mean.shape)
             plugin_est [plugin_est_inds] = 1.0
             np.save(
                 os.path.join(
                         output_folder,
-                        "plugin_est_{}.npy".format(current_ind)),
-                )
+                        "plugin_est_{}.npy".format(i)),
+                plugin_est)

@@ -18,10 +18,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# output_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results/myopic_23823"
-output_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results/myopic_57485"
-# data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_23823_cells"
-data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_57485_cells"
+output_path = "/home/ubuntu/Dev/VolcapyProd/reporting/sequential_ivr/results/myopic_173018"
+data_folder = "/home/ubuntu/Dev/VolcapyProd/data/InversionDatas/stromboli_173018_cells"
 
 # Indices of the data points that are along the coast.
 from volcapy.data_preparation.paths import coast_data_inds
@@ -63,23 +61,6 @@ def main():
     THRESHOLD_low = 700.0
     excursion_inds = (ground_truth >= THRESHOLD_low).nonzero()[:, 0]
 
-    # Plot situation.
-    plt.scatter(data_coords[:, 0], data_coords[:, 1], c="k", alpha=0.1)
-
-    plt.scatter(
-            volcano_coords[excursion_inds, 0],
-            volcano_coords[excursion_inds, 1], c="r", alpha=0.07)
-
-    plt.scatter(niklas_coords[:, 0], niklas_coords[:, 1],
-            c=niklas_coords[:, 2])
-    plt.scatter(niklas_coords[coast_data_inds, 0], niklas_coords[coast_data_inds, 1], c="r")
-
-    for i, path in enumerate(paths):
-        for x, y in zip(data_coords[path, 0], data_coords[path, 1]):
-                plt.text(x, y, str(i), color="black", fontsize=6)
-
-    plt.title("Paths on the Stromboli, location of coastal data and excursion set.")
-    plt.show()
 
     # Coast data.
     coast_data_inds_infull = niklas_data_inds[coast_data_inds]
@@ -97,22 +78,19 @@ def main():
     # Define GP model.
     data_feed = lambda x: data_values[x]
     updatable_gp = UpdatableGP(cl, lambda0, sigma0, m0, volcano_coords,
-            n_chunks=6)
+            n_chunks=70)
     from volcapy.strategy.myopic_weighted_ivr import MyopicStrategy
     strategy = MyopicStrategy(updatable_gp, data_coords,
             F, data_feed,
             lower=THRESHOLD_low, upper=None)
 
+    visited_inds = np.load("./visited_inds.npy")
     start = timer()
-    visited_inds, observed_data, ivrs = strategy.run(
-            start_ind, n_steps=30, data_std=0.1)
+    strategy.save_plugin_estimate(
+            visited_inds, data_std=0.1, output_folder="./")
 
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
-
-    np.save("visited_inds.npy", visited_inds)
-    np.save("observed_data.npy", observed_data)
-    np.save("ivrs.npy", ivrs)
 
 
 if __name__ == "__main__":
