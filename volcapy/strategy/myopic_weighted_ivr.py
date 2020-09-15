@@ -126,7 +126,8 @@ class MyopicStrategy:
             plugin_est_inds = np.where(
                     (post_mean >= self.lower) & (post_mean <= self.upper))
             """
-            plugin_est_inds = np.where(
+            # TODO: Fix and include upper.
+            plugin_est_inds, _ = np.where(
                     (post_mean >= self.lower))
             print("Excursion set with {} elements".format(plugin_est_inds.shape[0]))
             np.save(
