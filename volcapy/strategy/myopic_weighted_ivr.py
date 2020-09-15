@@ -128,10 +128,9 @@ class MyopicStrategy:
             """
             plugin_est_inds = np.where(
                     (post_mean >= self.lower))
-            plugin_est = np.zeros(post_mean.shape)
-            plugin_est [plugin_est_inds] = 1.0
+            print("Excursion set with {} elements".format(plugin_est_inds.shape[0]))
             np.save(
                 os.path.join(
                         output_folder,
-                        "plugin_est_{}.npy".format(i)),
-                plugin_est)
+                        "plugin_est_inds_{}.npy".format(i)),
+                plugin_est_inds)
