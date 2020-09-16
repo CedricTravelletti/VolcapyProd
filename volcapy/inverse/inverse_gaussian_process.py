@@ -123,12 +123,14 @@ class InverseGaussianProcess(torch.nn.Module):
         """
         super(InverseGaussianProcess, self).__init__()
         
+        """
         # Get GPUS.
         if output_device is None:
             # Check if GPU available and otherwise go for CPU.
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        self.device = device
+        """
+        # self.device = device
+        self.device = torch.device("cpu")
 
         self.m0 = torch.tensor(m0, requires_grad=False)
         self.sigma0 = torch.nn.Parameter(torch.tensor(sigma0))
@@ -156,12 +158,14 @@ class InverseGaussianProcess(torch.nn.Module):
         pushforward K G^T.
 
         """
+        """
         # Check if GPU available.
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         if not G.device == device:
-            logger.info("Moving to GPU.")
+            self.logger.info("Moving to GPU.")
             G = G.to(device)
+        """
         # Compute the compute_covariance_pushforward and data-side covariance matrix
         self.pushfwd = self.kernel.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords,
@@ -295,7 +299,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         # Prior mean (vector) on the data side.
         mu0_d_stripped = torch.mm(G, torch.ones((self.n_model, 1),
-                dtype=torch.float32, device=device))
+                dtype=torch.float32))
         # Compute R^(-1) * G * I_m.
         tmp = self.inv_op_vector_mult(mu0_d_stripped)
         conc_m0 = (y.t() @ tmp) / (mu0_d_stripped.t() @ tmp)
@@ -358,7 +362,7 @@ class InverseGaussianProcess(torch.nn.Module):
         else: m0 = self.m0
 
         m_post_m = (
-                m0 * torch.ones((self.n_model, 1), device=device)
+                m0 * torch.ones((self.n_model, 1))
                 + (self.sigma0**2 * self.pushfwd @ self.weights))
 
         return m_post_m, m_post_d
