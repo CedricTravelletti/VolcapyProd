@@ -69,7 +69,25 @@ class MyopicStrategy:
 
         return neighbors_inds
 
-    def run(self, start_ind, n_steps, data_std):
+    def run(self, start_ind, n_steps, data_std,
+            output_folder, save_plugin):
+        """ Run the myopic acquisition strategy for the weighted IVR
+        criterion.
+
+        Parameters
+        ----------
+        start_ind
+        n_steps: int
+            Number of steps to run the strategy for.
+        data_std: float
+            Standard deviation of observation noise (homoscedactic).
+        output_folder: string
+            Path to folder where to save results.
+        save_plugin: bool, default = False
+            If true, then save the plugin estimate of the excursion set at
+            every step.
+
+        """
         current_ind = start_ind
         visited_inds = []
         observed_data = []
@@ -83,6 +101,19 @@ class MyopicStrategy:
 
             observed_data.append(y)
             visited_inds.append(current_ind)
+
+            # Save current mean if needed.
+            if save_plugin:
+                post_mean = self.gp.mean_vec.detach().numpy()
+                # TODO: Fix and include upper.
+                plugin_est_inds, _ = np.where(
+                        (post_mean >= self.lower))
+                print("Excursion set with {} elements".format(plugin_est_inds.shape[0]))
+                np.save(
+                    os.path.join(
+                            output_folder,
+                            "plugin_est_inds_{}.npy".format(i)),
+                    plugin_est_inds)
 
             # Evaluate criterion on neighbors.
             neighbors_inds = self.get_neighbors(current_ind)
@@ -102,9 +133,9 @@ class MyopicStrategy:
             print("IVRS at current stage: {}.".format(neighbors_ivrs))
             print("Go to cell {}.".format(current_ind))
 
-            np.save("visited_inds.npy", visited_inds)
-            np.save("observed_data.npy", observed_data)
-            np.save("ivrs.npy", ivrs)
+            np.save(os.path.join(output_folder, "visited_inds.npy"), visited_inds)
+            np.save(os.path.join(output_folder, "observed_data.npy"), observed_data)
+            np.save(os.path.join(output_folder, "ivrs.npy"), ivrs)
 
         return visited_inds, observed_data, ivrs
 
