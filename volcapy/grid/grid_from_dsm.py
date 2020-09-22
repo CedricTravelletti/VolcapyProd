@@ -4,7 +4,7 @@ The grid will have the same xy resolution as the dsm.
 
 """
 import numpy as np
-import meshio
+# import meshio
 import pickle
 
 
@@ -108,6 +108,7 @@ def build_grid_below_dsm(dsm_x, dsm_y, dsm_z, z_low, z_step):
         """ Converts grid to a VTK UnstructuredGrid.
 
         """
+        """
         # Arrays of shape (self.n_cell, 3) containin the coords of the corners
         # of the corresponding hexahedron for each cells.
         bottom_front_left = self.cells + np.array([-self.res_x , -self.res_y, -self.res_z])
@@ -134,7 +135,7 @@ def build_grid_below_dsm(dsm_x, dsm_y, dsm_z, z_low, z_step):
 
         hex_mesh = meshio.Mesh(
                 points,
-                {"hexahedron": topology},
-)
+                {"hexahedron": topology},)
 
-meshio.write("out.vtk", hex_mesh)
+        meshio.write("out.vtk", hex_mesh)
+        """
