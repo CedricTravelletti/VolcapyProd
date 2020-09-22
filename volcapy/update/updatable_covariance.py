@@ -481,7 +481,8 @@ class UpdatableGP():
     def IVR(self, G, data_std, integration_inds=None, weights=None):
         """ Compute the (integrated) variance reduction (IVR) that would
         result from collecting the data described by the measurement operator
-        G.    
+        G. Note that this function can also be used to compute the weighted IVR
+        criterion by providing the weights argument.
 
         Parameters
         ----------
@@ -505,6 +506,7 @@ class UpdatableGP():
         """
         return self.covariance.IVR(G, data_std, integration_inds, weights)
 
+    # TODO: Deprecated. Should be removed.
     def weighted_IVR(self, G, data_std, lower=None, upper=None):
         """ Weighted IVR crtierion for learning excurions sets. The user can
         specifies the excursion set to recover by providing upper and lower
@@ -543,3 +545,33 @@ class UpdatableGP():
         weights = gaussian_cdf(mean, variance.reshape(-1, 1),
                 lower=lower, upper=upper)
         return self.IVR(G, data_std, weights=weights)
+
+    def coverage(self, lower=None, upper=None):
+        """ Compute (current) coverage function.
+        Parameters
+        ----------
+        lower: float, defaults to None
+            Lower threshold of the excursion set. If None, then infinity will
+            be used.
+        upper: float, defaults to None
+            Upper threshold of the excursion set. If None, then infinity will
+            be used.
+    
+        Returns
+        -------
+        coverage: (self.n_cells, 1) Tensor
+            Value of the covaerage function (i.e. current excursion probability) 
+            at every cell.
+
+        """
+        variance = self.covariance.extract_variance()
+        mean = self.mean_vec
+
+        if lower is not None:
+            lower = torch.tensor([lower])
+        if upper is not None:
+            upper = torch.tensor([upper])
+
+        coverage = gaussian_cdf(mean, variance.reshape(-1, 1),
+                lower=lower, upper=upper)
+        return coverage

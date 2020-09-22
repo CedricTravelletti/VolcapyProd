@@ -103,7 +103,7 @@ def main():
     start = timer()
     visited_inds, observed_data, ivrs = strategy.run(
             start_ind, n_steps=2000, data_std=0.1,
-            output_folder=output_path, save_plugin=True)
+            output_folder=output_path, save_coverage=True)
 
     end = timer()
     print("Run in {} mins.".format((end - start)/60))

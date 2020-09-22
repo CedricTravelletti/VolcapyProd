@@ -70,7 +70,7 @@ class MyopicStrategy:
         return neighbors_inds
 
     def run(self, start_ind, n_steps, data_std,
-            output_folder, save_plugin):
+            output_folder, save_plugin=False, save_coverage=False):
         """ Run the myopic acquisition strategy for the weighted IVR
         criterion.
 
@@ -86,6 +86,9 @@ class MyopicStrategy:
         save_plugin: bool, default = False
             If true, then save the plugin estimate of the excursion set at
             every step.
+        save_coverage: bool, default = False
+            If true, then save the coverage function at
+            every step.
 
         """
         current_ind = start_ind
@@ -98,6 +101,17 @@ class MyopicStrategy:
             y = self.data_feed(current_ind)
             G = self.G[current_ind,:].reshape(1, -1)
             self.gp.update(G, y, data_std)
+
+            # Extract variance and coverage function.
+            coverage = self.gp.coverage(self.lower, self.upper)
+
+            # Save if necessary.
+            if save_coverage:
+                np.save(
+                    os.path.join(
+                            output_folder,
+                            "coverage_{}.npy".format(i)),
+                    coverage)
 
             observed_data.append(y)
             visited_inds.append(current_ind)
@@ -122,8 +136,8 @@ class MyopicStrategy:
                 # Observation operator for candidate location.
                 candidate_G = self.G[ind,:].reshape(1, -1)
 
-                ivr = self.gp.weighted_IVR(candidate_G, data_std,
-                                self.lower, self.upper)
+                ivr = self.gp.IVR(candidate_G, data_std, 
+                                weights=coverage)
                 neighbors_ivrs.append(ivr)
 
             # Go to best neighbor.
