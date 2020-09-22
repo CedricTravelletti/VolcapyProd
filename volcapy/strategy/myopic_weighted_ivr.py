@@ -122,9 +122,10 @@ class MyopicStrategy:
                 # Observation operator for candidate location.
                 candidate_G = self.G[ind,:].reshape(1, -1)
 
-                neighbors_ivrs.append(
-                        self.gp.weighted_IVR(candidate_G, data_std,
-                                self.lower, self.upper))
+                ivr = self.gp.weighted_IVR(candidate_G, data_std,
+                                self.lower, self.upper)
+                neighbors_ivrs.append(ivr)
+
             # Go to best neighbor.
             tmp_ind = np.argmax(neighbors_ivrs)
             best_ind = neighbors_inds[tmp_ind]
