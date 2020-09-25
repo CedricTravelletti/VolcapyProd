@@ -100,9 +100,9 @@ def main():
         norm = colors.BoundaryNorm(boundaries, cmap.N, clip=True)
 
         # Generate the plot array.
-        fig = plt.figure(figsize=(9, 6))
-        widths = [3, 3]
-        heights = [1.5, 1.5]
+        fig = plt.figure(figsize=(14, 10))
+        widths = [3, 6]
+        heights = [2, 2]
         gs = fig.add_gridspec(
                 ncols=2, nrows=2, width_ratios=widths,
                 height_ratios=heights)
@@ -133,14 +133,14 @@ def main():
         ax_anim.scatter(
                 volcano_coords[:, 0],
                 volcano_coords[:, 1], c=mismatch, cmap=cmap, norm=norm,
-                s=2)
+                s=11)
     
         # Plot visited indices.
         ax_anim.scatter(data_coords[visited_inds, 0], data_coords[visited_inds, 1],
-                marker="o", c="black", s=3, alpha=1.0)
+                marker="o", c="black", s=8, alpha=1.0)
         ax_anim.scatter(data_coords[visited_inds[-1], 0],
                 data_coords[visited_inds[-1], 1],
-                marker="*", c="lightgreen", s=5, alpha=1.0)
+                marker="*", c="lightgreen", s=18, alpha=1.0)
         ax_anim.set_xticks([], [])
         ax_anim.set_yticks([], [])
 
@@ -158,24 +158,25 @@ def main():
         from matplotlib.lines import Line2D
         legend_elements = [
                    Line2D([0], [0], marker='o', color='w', label=label_obs,
-                          markerfacecolor='black', markersize=15,
+                          markerfacecolor='black', markeredgecolor="black", markersize=15,
                           linestyle="None"),
                    Line2D([0], [0], marker='*', color='w', label="current location",
-                          markerfacecolor='lightgreen', markersize=15,
+                          markerfacecolor='lightgreen',
+                          markeredgecolor="lightgreen", markersize=15,
                           linestyle="None"),
                    Line2D([0], [0], marker='o', color='w',
                            label=label_false_pos,
-                           markerfacecolor='b', markersize=15,
+                           markerfacecolor='b', markeredgecolor="b", markersize=15,
                            linestyle="None"),
                    Line2D([0], [0], marker='o', color='w',
                            label=label_false_neg,
-                           markerfacecolor='r', markersize=15,
+                           markerfacecolor='r', markeredgecolor="r", markersize=15,
                            linestyle="None"),
                    Line2D([0], [0], marker='o', color='w',
                            label=label_true,
-                           markerfacecolor='g', markersize=15,
+                           markerfacecolor='g', markeredgecolor="g", markersize=15,
                            linestyle="None")]
-        ax_legend.legend(handles=legend_elements, loc='center')
+        ax_legend.legend(handles=legend_elements, loc='right')
     
         if output_filename is not None:
             plt.savefig(os.path.join("./ANIMATIONS_mismatch", output_filename), bbox_inches='tight', pad_inches=0, dpi=600)
