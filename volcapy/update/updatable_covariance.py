@@ -34,6 +34,7 @@ Implement computation of the diagonal.
 """
 import torch
 import numpy as np
+import pickle
 from volcapy.utils import _make_column_vector
 from volcapy.gaussian_cdf import gaussian_cdf
 from rpy2.robjects import numpy2ri
@@ -323,6 +324,18 @@ class UpdatableCovariance:
             V = G_part @ inversion_op @ G_part.t()
             VR[inds] = V.diag()
         return VR
+
+    def __dict__(self):
+        state_dict = {
+                'kernel_family': self.cov_module.KERNEL_FAMILY,
+                'lambda0': self.lambda0,
+                'sigma0': self.sigma0,
+                'cells_coords': self.cells_coords.cpu().numpy(),
+                'n_chunks': self.n_chunks,
+                'pushforwards': [p.cpu().numpy() for p in self.pushforwards],
+                'inversion_ops': [inv.cpu().numpy() for inv in self.inversion_ops]
+                }
+        return state_dict
             
 
 class UpdatableMean:
@@ -381,6 +394,13 @@ class UpdatableMean:
         K_dash = self.cov_module.pushforwards[-1]
         R = self.cov_module.inversion_ops[-1]
         self.m = self.m + K_dash @ R @ (y - G @ self.m)
+
+    def __dict__(self):
+        state_dict = {
+                'prior': self.prior.cpu().numpy(),
+                'm': self.m.cpu().numpy(),
+                }
+        return state_dict
 
 class UpdatableGP():
     """ Bundles the two above classes into an updatable Gaussian process.
@@ -575,3 +595,20 @@ class UpdatableGP():
         coverage = gaussian_cdf(mean, variance.reshape(-1, 1),
                 lower=lower, upper=upper)
         return coverage
+
+    def __dict__(self):
+        return {'mean': self.mean.__dict__(),
+                'covariance': self.covariance.__dict__()}
+
+    def save(self, path):
+        """ Saves current state to file.
+
+        Parameters
+        ----------
+        path: string
+            Where to save the state.
+
+        """
+        with open(path, 'wb') as f:
+            pickle.dump(self.__dict__(), f)
+            f.close()
