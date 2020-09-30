@@ -54,6 +54,11 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device, n_chunks=200,
     F = F.to(device)
     cells_coords = cells_coords.to(device)
 
+    # Flush to make sure everything clean.
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+
     inv_lambda2 = - np.sqrt(3) / lambda0
     n_dims = 3
     n_model = F.shape[1]

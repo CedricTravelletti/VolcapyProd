@@ -58,6 +58,11 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         lambda0 = torch.tensor(lambda0, requires_grad=False).to(device)
         F = F.to(device)
         cells_coords = cells_coords.to(device)
+
+        # Flush to make sure everything clean.
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
     
         inv_lambda2 = - 1 / lambda0
         n_dims = 3
