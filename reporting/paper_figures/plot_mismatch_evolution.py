@@ -151,6 +151,24 @@ def main():
     plt.plot(list(range(1, visited_inds.shape[0])), mismatches_myopic[:,2],
             label="correct prediction, myopic strategy",
             color="lightgreen", linestyle="solid") 
+
+    # Add the surface fill coverage.
+    coverage_fill = np.load(os.path.join(
+            results_folder, "../coverage_surface_fill.npy"))
+    mismatch_fill = compute_mismatch(coverage_myopic)
+
+    n = visited_inds.shape[0]
+
+    plt.plot(list(range(1, n)), np.repeat(mismatch_fill[0], n-1),
+            label="false positives, surface fill",
+            color="cornflowerblue", linestyle="dotted")
+    plt.plot(list(range(1, n)), np.repeat(mismatch_fill[1], n-1),
+            label="false negatives, surface fill",
+            color="lightcoral", linestyle="dotted")
+    plt.plot(list(range(1, n)), np.repeat(mismatch_fill[2], n-1),
+            label="correct prediction, surface fill",
+            color="lightgreen", linestyle="dotted") 
+    
     plt.xlim([1, 600]) 
     plt.legend()
     plt.xlabel("Number of observations")
