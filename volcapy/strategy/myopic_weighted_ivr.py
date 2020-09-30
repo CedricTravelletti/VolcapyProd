@@ -69,8 +69,43 @@ class MyopicStrategy:
 
         return neighbors_inds
 
+    def get_neighbors_bigstep(self, ind, r):
+        """ This is used for stepping a lot.
+        It find all neighbors within a given radius.
+        Means we can jump by more than one.
+        
+        Parameters
+        ----------
+        ind: int
+            Index of the node in the candidates list.
+        r: float
+            Get all neighbors within that radius.
+
+        Returns
+        -------
+        neighbors_inds: (N, dim) Tensor
+            Indices of the neighboring points in the candidate list.
+
+        """
+        ind_tensor = ind
+        if not torch.is_tensor(ind):
+            ind_tensor = torch.tensor(ind)
+        ind_tensor = ind_tensor.long()
+
+        point_coord = self.candidates[ind]
+        neighbors_inds = np.array(self.tree.query_ball_point(
+                point_coord, r=r))
+        print(neighbors_inds)
+
+        # Remove the point istelf from the list.
+        neighbors_inds = neighbors_inds[neighbors_inds != int(ind)]
+        neighbors_inds = torch.from_numpy(neighbors_inds).long()
+
+        return neighbors_inds
+
     def run(self, start_ind, n_steps, data_std,
-            output_folder, save_plugin=False, save_coverage=False):
+            output_folder, save_plugin=False, save_coverage=False,
+            max_step=None):
         """ Run the myopic acquisition strategy for the weighted IVR
         criterion.
 
@@ -89,8 +124,15 @@ class MyopicStrategy:
         save_coverage: bool, default = False
             If true, then save the coverage function at
             every step.
+        max_step: float
+            If provided, then instead of only walking to neighbors at each
+            step, can go to any cell within distance max_step.
 
         """
+        if max_step is not None:
+            get_neighbors = lambda x: self.get_neighbors_bigstep(x, r=max_step)
+        else: get_neighbors = lambda x: self.get_neighbors(x)
+
         current_ind = start_ind
         visited_inds = []
         observed_data = []
@@ -130,7 +172,7 @@ class MyopicStrategy:
                     plugin_est_inds)
 
             # Evaluate criterion on neighbors.
-            neighbors_inds = self.get_neighbors(current_ind)
+            neighbors_inds = get_neighbors(current_ind)
             neighbors_ivrs = []
             for ind in neighbors_inds:
                 # Observation operator for candidate location.
