@@ -102,6 +102,7 @@ class InverseGaussianProcess(torch.nn.Module):
     """
     def __init__(self, m0, sigma0, lambda0,
             cells_coords, cov_module,
+            n_chunks=200, n_flush=50,
             output_device=None,
             logger=None):
         """
@@ -118,6 +119,13 @@ class InverseGaussianProcess(torch.nn.Module):
             Models cells, fixed once and for all.
         cov_module: CovarianceModule
             Kernel to use.
+        n_chunks: int
+            Number of chunks to split the matrix into.
+            Default is 200. Increase if get OOM errors.
+        n_flush: int
+            Synchronize threads and flush GPU cache every *n_flush* iterations.
+            This is necessary to avoid OOM errors.
+            Default is 50.
         logger: Logger
 
         """
@@ -153,7 +161,7 @@ class InverseGaussianProcess(torch.nn.Module):
             logger = logging.getLogger(__name__)
         self.logger = logger
 
-    def compute_pushfwd(self, G, n_chunks=200, n_flush=50):
+    def compute_pushfwd(self, G):
         """ Given a measurement operator, compute the associated covariance
         pushforward K G^T.
 
@@ -169,12 +177,11 @@ class InverseGaussianProcess(torch.nn.Module):
         # Compute the compute_covariance_pushforward and data-side covariance matrix
         self.pushfwd = self.kernel.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords,
-                n_chunks=n_chunks, n_flush=n_flush)
+                n_chunks=self.n_chunks, n_flush=self.n_flush)
         self.K_d = G @ self.pushfwd
 
     def condition_data(self, G, y, data_std, concentrate=False,
-            is_precomp_pushfwd=False, device=None,
-            n_chunks=200, n_flush=50):
+            is_precomp_pushfwd=False, device=None):
         """ Given a bunch of measurement, condition model on the data side.
         I.e. only compute the conditional law of the data vector G Z, not of Z
         itself.
@@ -218,7 +225,7 @@ class InverseGaussianProcess(torch.nn.Module):
         if device is None:
             device = self.device
         if not is_precomp_pushfwd:
-            self.compute_pushfwd(G, n_chunks, n_flush)
+            self.compute_pushfwd(G)
 
         y = _make_column_vector(y)
 
@@ -409,7 +416,7 @@ class InverseGaussianProcess(torch.nn.Module):
         # Compute the pushforward once and for all, since it only depends on
         # lambda0 and G.
         self.lambda0 = lambda0
-        self.compute_pushfwd(G, n_chunks, n_flush)
+        self.compute_pushfwd(G)
 
         # Make column vector.
 

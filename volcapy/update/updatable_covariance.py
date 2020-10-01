@@ -486,6 +486,7 @@ class UpdatableGP():
 
         return sample + self.mean.m
 
+    # TODO: Finish implementation.
     def sample_conditional(self, G, y, data_std):
         """ Sample conditionally on the data GZ = y.
         Note that we here only condition on that data, starting from the prior,
