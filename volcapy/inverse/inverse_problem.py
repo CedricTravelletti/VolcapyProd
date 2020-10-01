@@ -173,7 +173,6 @@ class InverseProblem():
 
     # TODO: Refactor. Effectively, this is chunked multiplication of a matrix with
     # an implicitly defined one.
-    """
     def compute_covariance_pushforward(self, G, sigma0, lambda0):
         """ (DEPRECATED) Compute the matrix product C_m * G^T, which we call the *covariance
         pushforward*.
@@ -215,7 +214,6 @@ class InverseProblem():
                 + " and multiplication done in " + str(end - mid))
 
         return out
-    """
 
     # TODO: Factor out some methods.
     def inverse(self, out_folder, prior_mean, sigma_d,
