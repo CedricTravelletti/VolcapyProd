@@ -58,37 +58,42 @@ def prepare_groundtruth(input_path):
     m0 = -114.40
     lambda0 = 338.46
 
-    start = timer()
     myGP = InverseGaussianProcess(m0, sigma0, lambda0,
             volcano_coords, kernel,
             logger=logger)
 
-    post_sample = myGP.sample_posterior(F, data_values, data_std)
-
-    end = timer()
-    print("Posterior sampling run in {}s.".format(end - start))
-
-    irregular_array_to_point_cloud(volcano_coords.numpy(),
-            post_sample.detach().cpu().numpy(),
-            os.path.join(input_path, "post_sample.vtk"), fill_nan_val=-20000.0)
-
-    prior_sample = myGP.sample_prior()
-    irregular_array_to_point_cloud(volcano_coords.numpy(),
-            prior_sample.detach().cpu().numpy(),
-            os.path.join(input_path, "prior_sample.vtk"), fill_nan_val=-20000.0)
-
-    np.save(os.path.join(input_path, "post_sample.npy"),
-            post_sample.detach().cpu().numpy())
-    np.save(os.path.join(input_path, "prior_sample.npy"),
-            prior_sample.detach().cpu().numpy())
-
-    post_data_sample = F_full @ post_sample
-    np.save(os.path.join(input_path, "post_data_sample.npy"),
-            post_data_sample.detach().cpu().numpy())
+    for i in range(n_realizations):
+        start = timer()
+    
+        post_sample = myGP.sample_posterior(F, data_values, data_std)
+    
+        end = timer()
+        print("Posterior sampling run in {}s.".format(end - start))
+    
+        """
+        irregular_array_to_point_cloud(volcano_coords.numpy(),
+                post_sample.detach().cpu().numpy(),
+                os.path.join(input_path, "post_sample.vtk"), fill_nan_val=-20000.0)
+    
+        prior_sample = myGP.sample_prior()
+        irregular_array_to_point_cloud(volcano_coords.numpy(),
+                prior_sample.detach().cpu().numpy(),
+                os.path.join(input_path, "prior_sample.vtk"), fill_nan_val=-20000.0)
+    
+        """
+        np.save(os.path.join(input_path, "post_sample_{}.npy".format(i)),
+                post_sample.detach().cpu().numpy())
+        """
+        np.save(os.path.join(input_path, "prior_sample.npy"),
+                prior_sample.detach().cpu().numpy())
+        """
+        post_data_sample = F_full @ post_sample
+        np.save(os.path.join(input_path, "post_data_sample_{}.npy".format(i)),
+                post_data_sample.detach().cpu().numpy())
 
 
 if __name__ == "__main__":
     print("Usage: prepare_groundtruth.py input_path n_realizations")
     input_path = sys.argv[1]
-    n_realizations = sys.argv[2]
+    n_realizations = int(sys.argv[2])
     prepare_groundtruth(input_path)
