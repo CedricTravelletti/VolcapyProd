@@ -54,9 +54,9 @@ def prepare_groundtruth(input_path):
 
     # HYPERPARAMETERS, small volcano.
     data_std = 0.1
-    sigma0 = 414.0
-    m0 = -150.0
-    lambda0 = 338.0
+    sigma0 = 359.49
+    m0 = -114.40
+    lambda0 = 338.46
 
     start = timer()
     myGP = InverseGaussianProcess(m0, sigma0, lambda0,
@@ -88,6 +88,7 @@ def prepare_groundtruth(input_path):
 
 
 if __name__ == "__main__":
-    print("Usage: prepare_groundtruth.py input_path")
+    print("Usage: prepare_groundtruth.py input_path n_realizations")
     input_path = sys.argv[1]
+    n_realizations = sys.argv[2]
     prepare_groundtruth(input_path)
