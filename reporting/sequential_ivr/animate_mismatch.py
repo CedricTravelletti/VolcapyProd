@@ -62,7 +62,7 @@ def main():
     # Load results.
     # visited_inds = np.load("visited_inds.npy")
     # visited_inds = np.load("./results_aws/visited_inds.npy")
-    visited_inds = np.load("./results_aws/latest_coverage/visited_inds.npy")
+    visited_inds = np.load("./results_aws/bigstep/visited_inds.npy")
     # observed_data = np.load("observed_data.npy")
 
     def plot(visited_inds, n_tot, coverage, output_filename=None):
@@ -179,14 +179,14 @@ def main():
         ax_legend.legend(handles=legend_elements, loc='right')
     
         if output_filename is not None:
-            plt.savefig(os.path.join("./ANIMATIONS_mismatch", output_filename), bbox_inches='tight', pad_inches=0, dpi=600)
+            plt.savefig(os.path.join("./ANIMATIONS_mismatch_true", output_filename), bbox_inches='tight', pad_inches=0, dpi=600)
             plt.close()
         else: plt.show()
     
         return
 
     for i in range(1, visited_inds.shape[0]):
-        coverage = np.load("./results_aws/latest_coverage/coverage_{}.npy".format(i))
+        coverage = np.load("./results_aws/bigstep/coverage_{}.npy".format(i))
         plot(visited_inds[:i], visited_inds.shape[0], coverage,
                 output_filename="my_anim_{}.png".format(i))
 

@@ -154,6 +154,9 @@ class InverseGaussianProcess(torch.nn.Module):
         # operation, just leave it as is.
         self.is_precomputed_pushfw = False
 
+        self.n_chunks = n_chunks
+        self.n_flush = n_flush
+
         # If no logger, create one.
         if logger is None:
             import logging
