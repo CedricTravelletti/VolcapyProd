@@ -621,7 +621,7 @@ class InverseGaussianProcess(torch.nn.Module):
         return prior_variances
 
     def sample_posterior(self, G, y, data_std):
-        """ Sample from the posterior.
+        """ Sample from the posterior using residual kriging.
         
         Parameters
         ----------
@@ -650,4 +650,40 @@ class InverseGaussianProcess(torch.nn.Module):
         mu_prime, _ = self.condition_model(G, y_prime, data_std, hypothetical=True)
 
         post_sample = post_mean + sample - mu_prime
+        return post_sample
+
+    def update_sample(self, prior_sample, G, y, data_std):
+        """ Sample from the posterior by updating a realization from the prior
+        using residual kriging.
+        This is useful on platforms whe prior sampling doesn't work (usually
+        because the R interface is not available). Then prior realizations may
+        be generated offline and updated later.
+        
+        Parameters
+        ----------
+        prior_sample: (self.n_cells, 1) Tensor
+            Prior realization in the form of a 
+            column vector of sampled values at each cells.
+        G: tensor
+            Measurement matrix
+        y: (n_data, 1) Tensor
+            Observed data. Has to be column vector.
+        data_std: flot
+            Data noise standard deviation.
+
+        Returns
+        -------
+        sample: (self.n_cells, 1) Tensor
+            Column vector of sampled values at each cells.
+
+        """
+        post_mean, _ = self.condition_model(G, y, data_std, hypothetical=True)
+
+        # Generate hypotherical data.
+        noise = torch.normal(mean=0.0, std=data_std, size=(G.shape[0], 1))
+        y_prime = G @ prior_sample + noise
+
+        mu_prime, _ = self.condition_model(G, y_prime, data_std, hypothetical=True)
+
+        post_sample = post_mean + prior_sample - mu_prime
         return post_sample
