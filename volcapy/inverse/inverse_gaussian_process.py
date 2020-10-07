@@ -75,6 +75,10 @@ from volcapy.utils import _make_column_vector
 import volcapy.covariance.sample as Rinterface
 
 
+# Select gpu if available and fallback to cpu else.
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 class InverseGaussianProcess(torch.nn.Module):
     """
 
@@ -152,7 +156,7 @@ class InverseGaussianProcess(torch.nn.Module):
         # The heavy part is to compute the pushforward. It is needed by all
         # other operations. Hence, if it has already been computed by an
         # operation, just leave it as is.
-        self.is_precomputed_pushfw = False
+        self.is_precomputed_pushfwd = False
 
         self.n_chunks = n_chunks
         self.n_flush = n_flush
@@ -601,7 +605,21 @@ class InverseGaussianProcess(torch.nn.Module):
         WARNING: needs pushforward and inversion operator to be only computed,
         hence, only call after having conditioned the model.
 
+        Returns
+        -------
+        variances: (self.cells_coords.n_cells) Tensor
+            Variance at each point.
+
         """
+        prior_variances = self.sigma0**2 * self.kernel.compute_diagonal(
+                self.lambda0, self.cells_coords, DEVICE,
+                n_chunks=self.n_chunks, n_flush=50)
+
+        prior_variances -= torch.einsum("ij,jk,ik->i",
+                self.pushfwd, self.inversion_operator, self.pushfwd)
+
+        return prior_variances
+
     def sample_posterior(self, G, y, data_std):
         """ Sample from the posterior.
         
