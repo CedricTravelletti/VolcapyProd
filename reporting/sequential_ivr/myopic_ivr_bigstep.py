@@ -17,14 +17,20 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-output_path = "/home/ubuntu/Dev/VolcapyProd/reporting/sequential_ivr/results/myopic_173018_bigstep"
 data_folder = "/home/ubuntu/Dev/VolcapyProd/data/InversionDatas/stromboli_173018_cells"
+
 
 # Indices of the data points that are along the coast.
 from volcapy.data_preparation.paths import coast_data_inds
 
 
-def main():
+def main(sample_nr):
+    post_sample_path = os.path.join(data_folder,
+            "post_samples/post_sample_{}.npy".format(sample_nr))
+    post_data_sample_path = os.path.join(data_folder,
+            "post_data_samples/post_data_sample_{}.npy".format(sample_nr))
+    output_path = "/home/ubuntu/Dev/VolcapyProd/reporting/sequential_ivr/results/myopic_173018_bigstep/sample_{}".format(sample_nr)
+
     os.makedirs(output_path, exist_ok=True)
 
     # Load
@@ -38,45 +44,20 @@ def main():
             np.load(os.path.join(data_folder,"surface_data_coords.npy"))).float()
 
     ground_truth = torch.from_numpy(
-            np.load(os.path.join(data_folder, "post_sample.npy")))
+            np.load(post_sample_path))
     data_values = torch.from_numpy(
-            np.load(os.path.join(data_folder, "post_data_sample.npy")))
+            np.load(post_data_sample_path))
 
     # Dictionary between the original Niklas data and our discretization.
     niklas_data_inds = torch.from_numpy(
             np.load(os.path.join(data_folder, "niklas_data_inds_insurf.npy"))).long()
     niklas_coords = data_coords[niklas_data_inds].numpy()
 
-    # PATHS ON THE VOLCANO.
-    from volcapy.data_preparation.paths import paths as paths_niklas
-    # Convert to indices in the full dataset.
-    paths = []
-    for path in paths_niklas:
-        paths.append(niklas_data_inds[path].long())
-
     # --------------------------------
     # DEFINITION OF THE EXCURSION SET.
     # --------------------------------
     THRESHOLD_low = 700.0
     excursion_inds = (ground_truth >= THRESHOLD_low).nonzero()[:, 0]
-
-    # Plot situation.
-    plt.scatter(data_coords[:, 0], data_coords[:, 1], c="k", alpha=0.1)
-
-    plt.scatter(
-            volcano_coords[excursion_inds, 0],
-            volcano_coords[excursion_inds, 1], c="r", alpha=0.07)
-
-    plt.scatter(niklas_coords[:, 0], niklas_coords[:, 1],
-            c=niklas_coords[:, 2])
-    plt.scatter(niklas_coords[coast_data_inds, 0], niklas_coords[coast_data_inds, 1], c="r")
-
-    for i, path in enumerate(paths):
-        for x, y in zip(data_coords[path, 0], data_coords[path, 1]):
-                plt.text(x, y, str(i), color="black", fontsize=6)
-
-    plt.title("Paths on the Stromboli, location of coastal data and excursion set.")
-    plt.show()
 
     # Coast data.
     coast_data_inds_infull = niklas_data_inds[coast_data_inds]
@@ -104,15 +85,16 @@ def main():
     visited_inds, observed_data, ivrs = strategy.run(
             start_ind, n_steps=2000, data_std=0.1,
             output_folder=output_path, save_coverage=True,
-            max_step = 210.0)
+            max_step = 260.0)
 
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
 
-    np.save("visited_inds.npy", visited_inds)
-    np.save("observed_data.npy", observed_data)
-    np.save("ivrs.npy", ivrs)
+    np.save(os.path.join(output_path, "visited_inds.npy"), visited_inds)
+    np.save(os.path.join(output_path, "observed_data.npy"), observed_data)
+    np.save(os.path.join(output_path, "ivrs.npy"), ivrs)
 
 
 if __name__ == "__main__":
-    main()
+    for i in range(3, 10):
+        main(i)
