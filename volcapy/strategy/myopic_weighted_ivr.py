@@ -105,7 +105,7 @@ class MyopicStrategy:
 
     def run(self, start_ind, n_steps, data_std,
             output_folder, save_plugin=False, save_coverage=False,
-            max_step=None):
+            save_gp_state_path=None, max_step=None):
         """ Run the myopic acquisition strategy for the weighted IVR
         criterion.
 
@@ -124,6 +124,8 @@ class MyopicStrategy:
         save_coverage: bool, default = False
             If true, then save the coverage function at
             every step.
+        save_gp_state_path: string, default = None
+            If provided, save the state of the updatable gp each 10 steps.
         max_step: float
             If provided, then instead of only walking to neighbors at each
             step, can go to any cell within distance max_step.
