@@ -30,8 +30,8 @@ def main(sample_nr):
     post_data_sample_path = os.path.join(data_folder,
             "post_data_samples/post_data_sample_{}.npy".format(sample_nr))
     output_path = "/home/ubuntu/Dev/VolcapyProd/reporting/sequential_ivr/results/myopic_173018_bigstep/sample_{}".format(sample_nr)
-
     os.makedirs(output_path, exist_ok=True)
+    save_gp_state_path = os.path.join(output_path, "gp_state.pkl")
 
     # Load
     F = torch.from_numpy(
@@ -79,13 +79,16 @@ def main(sample_nr):
     from volcapy.strategy.myopic_weighted_ivr import MyopicStrategy
     strategy = MyopicStrategy(updatable_gp, data_coords,
             F, data_feed,
-            lower=THRESHOLD_low, upper=None)
+            lower=THRESHOLD_low, upper=None,
+            )
 
     start = timer()
     visited_inds, observed_data, ivrs = strategy.run(
             start_ind, n_steps=2000, data_std=0.1,
             output_folder=output_path, save_coverage=True,
-            max_step = 260.0)
+            max_step = 310.0,
+            save_gp_state_path=save_gp_state_path
+            )
 
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
@@ -96,5 +99,4 @@ def main(sample_nr):
 
 
 if __name__ == "__main__":
-    for i in range(3, 10):
-        main(i)
+    main(4)

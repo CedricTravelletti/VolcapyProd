@@ -171,6 +171,11 @@ class MyopicStrategy:
                             "plugin_est_inds_{}.npy".format(i)),
                     plugin_est_inds)
 
+            # Save GP state every 10 iterations.
+            if i % 10 == 0:
+                if save_gp_state_path is not None:
+                    self.gp.save(save_gp_state_path)
+
             # Evaluate criterion on neighbors.
             neighbors_inds = get_neighbors(current_ind)
             neighbors_ivrs = []
