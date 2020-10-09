@@ -18,6 +18,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 data_folder = "/home/ubuntu/Dev/VolcapyProd/data/InversionDatas/stromboli_173018_cells"
+ground_truth_folder = "/home/ubuntu/Dev/VolcapyProd/data/AISTATS_results/"
+output_folder = "/home/ubuntu/Dev/VolcapyProd/data/AISTATS_results/"
 
 
 # Indices of the data points that are along the coast.
@@ -25,11 +27,12 @@ from volcapy.data_preparation.paths import coast_data_inds
 
 
 def main(sample_nr):
-    post_sample_path = os.path.join(data_folder,
+    post_sample_path = os.path.join(ground_truth_folder,
             "post_samples/post_sample_{}.npy".format(sample_nr))
-    post_data_sample_path = os.path.join(data_folder,
+    post_data_sample_path = os.path.join(ground_truth_folder,
             "post_data_samples/post_data_sample_{}.npy".format(sample_nr))
-    output_path = "/home/ubuntu/Dev/VolcapyProd/reporting/sequential_ivr/results/myopic_173018_bigstep/sample_{}".format(sample_nr)
+
+    output_path = os.path.join(output_folder, "wIVR_results/sample_{}".format(sample_nr))
     os.makedirs(output_path, exist_ok=True)
     save_gp_state_path = os.path.join(output_path, "gp_state.pkl")
 
