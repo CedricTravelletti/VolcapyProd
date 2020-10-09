@@ -130,6 +130,16 @@ def main():
     mismatches_myopic = np.array(mismatches_myopic)
     mismatches_static = np.array(mismatches_static)
 
+    plt.plot(list(range(1, n_static)), mismatches_static[:,0],
+            label="false positives, static strategy",
+            color="blue", linestyle="dashed")
+    plt.plot(list(range(1, n_static)), mismatches_static[:,1],
+            label="false negatives, static strategy",
+            color="red", linestyle="dashed")
+    plt.plot(list(range(1, n_static)), mismatches_static[:,2],
+            label="correct prediction, static strategy",
+            color="green", linestyle="dashed")
+
     plt.plot(list(range(1, visited_inds.shape[0])), mismatches_myopic[:,0],
             label="false positives, myopic strategy",
             color="cornflowerblue", linestyle="solid")
