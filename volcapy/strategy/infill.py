@@ -175,16 +175,6 @@ class InfillStrategy:
                 if save_gp_state_path is not None:
                     self.gp.save(save_gp_state_path)
 
-            # Evaluate criterion on neighbors.
-            neighbors_inds = get_neighbors(current_ind)
-            neighbors_ivrs = []
-            for ind in neighbors_inds:
-                # Observation operator for candidate location.
-                candidate_G = self.G[ind,:].reshape(1, -1)
-
-                ivr = self.gp.IVR(candidate_G, data_std)
-                neighbors_ivrs.append(ivr)
-
             # Go to next cell.
             current_ind = x
             print("Go to cell {}.".format(current_ind))
