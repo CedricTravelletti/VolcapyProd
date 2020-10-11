@@ -137,7 +137,8 @@ class InfillStrategy:
         ivrs = []
 
         # Loop over all available locations in random order.
-        for i, x in enumerate(np.random.permutation(self.candidates)):
+        candidate_inds = list(range(self.candidates.shape[0]))
+        for i, cand in enumerate(np.random.permutation(candidate_inds)):
             # Observe and update model.
             y = self.data_feed(current_ind)
             G = self.G[current_ind,:].reshape(1, -1)
@@ -176,7 +177,7 @@ class InfillStrategy:
                     self.gp.save(save_gp_state_path)
 
             # Go to next cell.
-            current_ind = x
+            current_ind = cand
             print("Go to cell {}.".format(current_ind))
 
             np.save(os.path.join(output_folder, "visited_inds.npy"), visited_inds)
