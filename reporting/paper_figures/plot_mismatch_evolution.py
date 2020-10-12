@@ -29,13 +29,19 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+sample_nr = 5
+
+
 data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_173018"
-# results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/latest_coverage/"
-# results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/october_06/"
-results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/sample_4/"
+results_folder_IVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/IVR_results/sample_{}/".format(sample_nr)
+results_folder_wIVR =
+"/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/wIVR_results/sample_{}/".format(sample_nr)
+
+infill_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/INFILL_results/sample_{}/".format(sample_nr)
+
 static_results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/static/"
 
-ground_truth_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/post_samples/post_sample_4.npy"
+ground_truth_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/post_samples/post_sample_{}.npy".format(sample_nr)
 
 # Indices of the data points that are along the coast.
 from volcapy.data_preparation.paths import coast_data_inds
@@ -68,11 +74,10 @@ def main():
     excursion_inds = (ground_truth >= THRESHOLD_low).nonzero()[:, 0]
 
     # Load results.
-    # visited_inds = np.load("visited_inds.npy")
-    # visited_inds = np.load("./results_aws/visited_inds.npy")
-    visited_inds = np.load(os.path.join(
-            results_folder, "visited_inds.npy"))
-    # observed_data = np.load("observed_data.npy")
+    visited_inds_IVR = np.load(os.path.join(
+            results_folder_IVR, "visited_inds.npy"))
+    visited_inds_wIVR = np.load(os.path.join(
+            results_folder_wIVR, "visited_inds.npy"))
 
     def compute_mismatch(coverage):
         # -------------------------------------------------
@@ -107,7 +112,8 @@ def main():
 
         return (p_false_pos, p_false_neg, p_correct)
 
-    mismatches_myopic = []
+    mismatches_IVR = []
+    mismatches_wIVR = []
     mismatches_static = []
 
     # Number of static datapoints.
@@ -119,31 +125,48 @@ def main():
                         "coverage_{}.npy".format(i)))
         mismatches_static.append(compute_mismatch(coverage_static))
 
-    # Remaining part.
-    for i in range(1, visited_inds.shape[0]):
-        coverage_myopic = np.load(
+    for i in range(1, visited_inds_IVR.shape[0]):
+        coverage_IVR = np.load(
                 os.path.join(
-                        results_folder,
+                        results_folder_IVR,
                         "coverage_{}.npy".format(i)))
-        mismatches_myopic.append(compute_mismatch(coverage_myopic))
+        mismatches_IVR.append(compute_mismatch(coverage_IVR))
 
-    mismatches_myopic = np.array(mismatches_myopic)
+    for i in range(1, visited_inds_wIVR.shape[0]):
+        coverage_wIVR = np.load(
+                os.path.join(
+                        results_folder_wIVR,
+                        "coverage_{}.npy".format(i)))
+        mismatches_wIVR.append(compute_mismatch(coverage_wIVR))
+
+    mismatches_IVR = np.array(mismatches_IVR)
+    mismatches_wIVR = np.array(mismatches_wIVR)
     mismatches_static = np.array(mismatches_static)
 
-    plt.plot(list(range(1, visited_inds.shape[0])), mismatches_myopic[:,0],
-            label="false positives, myopic strategy",
+    plt.plot(list(range(1, visited_inds_IVR.shape[0])), mismatches_IVR[:,0],
+            label="false positives, IVR strategy",
+            color="blue", linestyle="dashed")
+    plt.plot(list(range(1, visited_inds_IVR.shape[0])), mismatches_IVR[:,1],
+            label="false negatives, IVR strategy",
+            color="red", linestyle="dashed")
+    plt.plot(list(range(1, visited_inds_IVR.shape[0])), mismatches_IVR[:,2],
+            label="correct prediction, IVR strategy",
+            color="green", linestyle="dashed")
+
+    plt.plot(list(range(1, visited_inds_wIVR.shape[0])), mismatches_wIVR[:,0],
+            label="false positives, weighted IVR strategy",
             color="cornflowerblue", linestyle="solid")
-    plt.plot(list(range(1, visited_inds.shape[0])), mismatches_myopic[:,1],
-            label="false negatives, myopic strategy",
+    plt.plot(list(range(1, visited_inds_wIVR.shape[0])), mismatches_wIVR[:,1],
+            label="false negatives, weighted IVR strategy",
             color="lightcoral", linestyle="solid")
-    plt.plot(list(range(1, visited_inds.shape[0])), mismatches_myopic[:,2],
-            label="correct prediction, myopic strategy",
+    plt.plot(list(range(1, visited_inds_wIVR.shape[0])), mismatches_wIVR[:,2],
+            label="correct prediction, weighted IVR strategy",
             color="lightgreen", linestyle="solid") 
 
     # Add the surface fill coverage.
     coverage_fill = np.load(os.path.join(
-            results_folder, "../coverage_surface_fill.npy"))
-    mismatch_fill = compute_mismatch(coverage_myopic)
+            infill_folder, "coverage_surface_fill.npy"))
+    mismatch_fill = compute_mismatch(coverage_fill)
 
     # Size of the limiting horizontal line corresponding to the infill
     # strategy.
