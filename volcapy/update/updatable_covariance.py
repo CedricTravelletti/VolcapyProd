@@ -84,6 +84,9 @@ class UpdatableCovariance:
         self.cov_module = cov_module
         self.lambda0 = lambda0
         self.sigma0 = sigma0
+        
+        if not torch.is_tensor(cells_coords):
+            cells_coords = torch.from_numpy(cells_coords)
         self.cells_coords = cells_coords
         self.n_cells = cells_coords.shape[0]
         self.n_chunks = n_chunks
@@ -402,6 +405,75 @@ class UpdatableMean:
                 }
         return state_dict
 
+
+class UpdatableRealizations:
+    """ Posterior conditional realization that can be sequentially updated.
+
+    This class uses residual kriging to produce a sample from the posterior,
+    which may be updated to reflect updates to the posterior distribution.
+    Residual kriging provides a conditional realzation as a sum of the
+    conditional mean, plus a correction that contains a conditional mean,
+    conditional on *simulated* data that comes from a prior realization.
+
+    """
+    def __init__(self, prior_realization, cov_module):
+        """ Build an updatable realization.
+
+        Params
+        ------
+        prior_realization: (n_cells, 1) Tensor
+            Vector defining the prior realization at the model points.
+            We require the number of points to be the same as in the updatable
+            covariance module. Note that we want a column vector.
+        gp_module: UpdatableGP
+
+        """
+        prior_realization = _make_column_vector(prior_realization)
+
+        self.prior_realization = realization
+        self.conditional_mean = UpdatableMean(prior, gp_module.cov_module)
+
+        self.n_cells = prior_realization.shape[0]
+        self.gp_module = gp_module
+        
+        if not (self.n_cells == self.gp_module.n_cells):
+            raise ValueError(
+                "Model size for mean: {} does not agree with "\
+                "model size for covariance {}.".format(
+                        self.n_cells, self.gp_module.n_cells))
+        
+    # TODO: Find a better design patter. This subtlety of having to make sure
+    # that the covariance_module has been updated first is dangerous. Maybe an
+    # observer pattern on something like that.
+    def update(self, G):
+        """ Updates the realization.
+        WARNING: should only be used after the covariance module has been
+        updated, since it depends on it having computed the latest quantities.
+
+        Params
+        ------
+        y: Tensor
+            Data vector.
+        G: Tensor
+            Measurement matrix.
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
+
+        """
+        # Compute simulated data.
+        noise = torch.normal(mean=0.0, std=data_std, size=(G.shape[0], 1))
+        y = G @ self.prior_realization + noise
+
+        self.conditional_mean.update()
+
+    def __dict__(self):
+        state_dict = {
+                'realization': self.realization.cpu().numpy()
+                }
+        return state_dict
+
+
 class UpdatableGP():
     """ Bundles the two above classes into an updatable Gaussian process.
 
@@ -613,3 +685,47 @@ class UpdatableGP():
         with open(path, 'wb') as f:
             pickle.dump(self.__dict__(), f)
             f.close()
+
+    @classmethod
+    def load(cls, path):
+        """ Restore the state of an updatable GP from file.
+
+        Parameters
+        ----------
+        path: string
+            Path to file where state is saved.
+
+        Returns
+        -------
+        UpdatableGP
+            An UpdatableGP with state restored from file, i.e. we do not need
+            to recompute the intermediate quantities and directrly has access
+            to the conditional GP.
+
+        """
+        with open(path, 'rb') as f:
+            state_dict = pickle.load(f)
+            f.close()
+
+        # Load the correct kernel module.
+        import importlib
+        cov_module = importlib.import_module(
+                "volcapy.covariance.{}".format(state_dict['covariance']['kernel_family']))
+
+        # Create the bare GP.
+        gp = cls(cov_module,
+                state_dict['covariance']['lambda0'],
+                state_dict['covariance']['sigma0'],
+                # TODO: This is not clean. Fix it.
+                state_dict['mean']['prior'][0].item(),
+                state_dict['covariance']['cells_coords'],
+                state_dict['covariance']['n_chunks'])
+
+        # Restore the GP mean and covariance module.
+        gp.covariance.pushforwards = [torch.from_numpy(x) for x in
+                state_dict['covariance']['pushforwards']]
+        gp.covariance.inversion_ops = [torch.from_numpy(x) for x in
+                state_dict['covariance']['inversion_ops']]
+        gp.mean.m = torch.from_numpy(state_dict['mean']['m'])
+
+        return gp
