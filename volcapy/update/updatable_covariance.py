@@ -31,6 +31,9 @@ TODO
 Implement some shape getter.
 Implement computation of the diagonal.
 
+REFACTOR USING OBSERVER PATTERN: UpdatableMean, Realizations and so on register
+themselves to the cov module.
+
 """
 import torch
 import numpy as np
@@ -328,6 +331,51 @@ class UpdatableCovariance:
             VR[inds] = V.diag()
         return VR
 
+    def condition_fantasy_data(self, prior, stacked_G, fantasy_ys):
+        """ Compute the posterior mean that would result from observing other
+        data than the one which was assimilated.
+        
+        The main use of this method is to compute conditional realizations
+        using residual kriging.
+
+        Note that this method uses the pre-computed intermediate inversion
+        operators, hence each datapoint should correspond to one of the
+        observation operators used in the update and the noise level should be
+        the same (since it enters the computation of the inversion operators).
+
+        Parameters
+        ----------
+        prior: (n_cells, 1) Tensor
+            Vector defining the prior mean at the model points.
+        stacked_G: (d, n_cells) Tensor
+            Observation operators at each step (stacked). Assumed to correspond
+            to the ones used to update the GP.
+            WARNING: Will only work if the GP has been updated with one observation at a time.
+        fantasy_ys: (len(self.pushforwards)) Tensor
+            Vector of observed data values. The n-element should correspond to
+            the n-th updating operation which was performed, hence to the n-th
+            observation operator.
+            Note this is a bit awkward, since currentlry the
+            UpdatableCovariance module does not inform the user about which
+            observation operator was used at stage n.
+            Moreover, this procedure currently only allows for 1-datapoint
+            observations.
+
+        Returns
+        -------
+        conditional_mean: (self.n_cells, 1) Tensor
+            Conditional mean, conditional on the provided data.
+
+        """
+        conditional_mean = prior
+        for i, y in enumerate(fantasy_ys):
+            y = _make_column_vector(y)
+            K_dash = self.pushforwards[i]
+            R = self.inversion_ops[i]
+            conditional_mean = conditional_mean + K_dash @ R @ (y -
+                    stacked_G[i, :] @ conditional_mean)
+        return conditional_mean
+
     def __dict__(self):
         state_dict = {
                 'kernel_family': self.cov_module.KERNEL_FAMILY,
@@ -406,7 +454,8 @@ class UpdatableMean:
         return state_dict
 
 
-class UpdatableRealizations:
+# TODO: Should it just inherit from UpdatableMean?
+class UpdatableRealization:
     """ Posterior conditional realization that can be sequentially updated.
 
     This class uses residual kriging to produce a sample from the posterior,
@@ -416,7 +465,7 @@ class UpdatableRealizations:
     conditional on *simulated* data that comes from a prior realization.
 
     """
-    def __init__(self, prior_realization, cov_module):
+    def __init__(self, prior_realization, gp_module):
         """ Build an updatable realization.
 
         Params
@@ -430,8 +479,9 @@ class UpdatableRealizations:
         """
         prior_realization = _make_column_vector(prior_realization)
 
-        self.prior_realization = realization
-        self.conditional_mean = UpdatableMean(prior, gp_module.cov_module)
+        self.prior_realization = prior_realization
+        self.conditional_mean = UpdatableMean(prior_realization,
+                gp_module.covariance)
 
         self.n_cells = prior_realization.shape[0]
         self.gp_module = gp_module
@@ -441,11 +491,66 @@ class UpdatableRealizations:
                 "Model size for mean: {} does not agree with "\
                 "model size for covariance {}.".format(
                         self.n_cells, self.gp_module.n_cells))
+    @property
+    def _realization(self):
+        """" The actual conditional realization.
+
+        Returns
+        -------
+        conditional_realization: (n_cells, 1) Tensor
+
+        """
+        return (self.gp_module.mean.m
+                + (self.prior_realization - self.conditional_mean.m))
+
+
+    @classmethod
+    def bootstrap(cls, prior_realization, stacked_G, data_std, gp_module):
+        """ Bootstrap an UpdatableRealization diretly to some posterior state.
+        I.e. given a GP module that has already assimilated some data,
+        we directly update the realization to that state.
+
+        Parameters
+        ----------
+        prior_realization: (n_cells, 1) Tensor
+            Vector defining the prior realization at the model points.
+            We require the number of points to be the same as in the updatable
+            covariance module. Note that we want a column vector.
+        stacked_G: (d, n_cells) Tensor
+            Observation operators at each step (stacked). Assumed to correspond
+            to the ones used to update the GP.
+            WARNING: Will only work if the GP has been updated with one observation at a time.
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
+        gp_module: UpdatableGP
+
+        Returns
+        -------
+        UpdatableRealization
+            A conditional realization at the current state of the covariance
+            module.
+
+        """
+        # Create a non-conditioned realization.
+        updatable_realization = cls(prior_realization, gp_module)
+
+        # Bootstrap the unperformed updates.
+        noise = torch.normal(mean=0.0, std=data_std, size=(stacked_G.shape[0], 1))
+        fantasy_ys = stacked_G @ prior_realization + noise
+        updatable_realization.set_conditional_mean(
+                gp_module.covariance.condition_fantasy_data(prior_realization,
+                        stacked_G, fantasy_ys))
+        return updatable_realization
         
+    def set_conditional_mean(self, conditional_mean):
+        self.conditional_mean.m = conditional_mean
+
     # TODO: Find a better design patter. This subtlety of having to make sure
     # that the covariance_module has been updated first is dangerous. Maybe an
-    # observer pattern on something like that.
-    def update(self, G):
+    # observer pattern or something like that.
+    # WARNING: NOIT FINISHED.
+    def update(self, G, data_std):
         """ Updates the realization.
         WARNING: should only be used after the covariance module has been
         updated, since it depends on it having computed the latest quantities.
@@ -465,6 +570,7 @@ class UpdatableRealizations:
         noise = torch.normal(mean=0.0, std=data_std, size=(G.shape[0], 1))
         y = G @ self.prior_realization + noise
 
+        # TODO: finish.
         self.conditional_mean.update()
 
     def __dict__(self):
