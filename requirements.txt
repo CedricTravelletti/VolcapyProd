@@ -3,5 +3,6 @@ numpy
 torch
 h5py
 scikit-image
-vtk <= 8.1.2
+vtk
 rpy2
+pandas

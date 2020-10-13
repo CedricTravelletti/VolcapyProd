@@ -87,7 +87,7 @@ def main(sample_nr):
 
     start = timer()
     visited_inds, observed_data, ivrs = strategy.run(
-            start_ind, n_steps=2000, data_std=0.1,
+            start_ind, n_steps=91, data_std=0.1,
             output_folder=output_path, save_coverage=True,
             max_step = 310.0,
             save_gp_state_path=save_gp_state_path
@@ -102,4 +102,4 @@ def main(sample_nr):
 
 
 if __name__ == "__main__":
-    main(4)
+    main(5)

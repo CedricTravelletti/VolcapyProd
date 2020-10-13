@@ -1,4 +1,5 @@
-""" Run myopic excursion set reconstruction strategy using weighted IVR.
+""" Run myopic excursion set reconstruction strategy using weighted IVR. This
+version only jumps by one cell.
 
 """
 import os
@@ -32,7 +33,7 @@ def main(sample_nr):
     post_data_sample_path = os.path.join(ground_truth_folder,
             "post_data_samples/post_data_sample_{}.npy".format(sample_nr))
 
-    output_path = os.path.join(output_folder, "IVR_results/sample_{}".format(sample_nr))
+    output_path = os.path.join(output_folder, "wIVR_smallstep_results/sample_{}".format(sample_nr))
     os.makedirs(output_path, exist_ok=True)
     save_gp_state_path = os.path.join(output_path, "gp_state.pkl")
 
@@ -79,7 +80,7 @@ def main(sample_nr):
     data_feed = lambda x: data_values[x]
     updatable_gp = UpdatableGP(cl, lambda0, sigma0, m0, volcano_coords,
             n_chunks=80)
-    from volcapy.strategy.myopic_ivr import MyopicStrategy
+    from volcapy.strategy.myopic_weighted_ivr import MyopicStrategy
     strategy = MyopicStrategy(updatable_gp, data_coords,
             F, data_feed,
             lower=THRESHOLD_low, upper=None,
@@ -89,7 +90,7 @@ def main(sample_nr):
     visited_inds, observed_data, ivrs = strategy.run(
             start_ind, n_steps=91, data_std=0.1,
             output_folder=output_path, save_coverage=True,
-            max_step = 310.0,
+            max_step = 75.0,
             save_gp_state_path=save_gp_state_path
             )
 
