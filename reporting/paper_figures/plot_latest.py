@@ -29,23 +29,27 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-sample_nr = 5
+sample_nr = 4
 
 
 data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_173018"
-results_folder_IVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/IVR_results/sample_{}/".format(sample_nr)
-results_folder_wIVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/wIVR_results/sample_{}/".format(sample_nr)
-
-results_folder_wIVR_smallstep = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/wIVR_smallstep_results/sample_{}/".format(sample_nr)
-
-infill_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/INFILL_results/sample_{}/".format(sample_nr)
 
 static_results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/static/"
 
-ground_truth_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/post_samples/post_sample_{}.npy".format(sample_nr)
 
 
-def main():
+def process_sample(sample_nr):
+
+    results_folder_IVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/IVR_results/sample_{}/".format(sample_nr)
+    results_folder_wIVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/wIVR_results/sample_{}/".format(sample_nr)
+    
+    results_folder_wIVR_smallstep = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/wIVR_smallstep_results/sample_{}/".format(sample_nr)
+    
+    results_folder_INFILL = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/INFILL_results/sample_{}/".format(sample_nr)
+    
+    ground_truth_path = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/post_samples/post_sample_{}.npy".format(sample_nr)
+
+
     # Load
     F = torch.from_numpy(
             np.load(os.path.join(data_folder, "F_full_surface.npy"))).float().detach()
@@ -77,10 +81,8 @@ def main():
             results_folder_wIVR, "visited_inds.npy"))
     visited_inds_wIVR_smallstep = np.load(os.path.join(
             results_folder_wIVR_smallstep, "visited_inds.npy"))
-    """
     visited_inds_INFILL = np.load(os.path.join(
-            infill_folder, "visited_inds.npy"))
-    """
+            results_folder_INFILL, "visited_inds.npy"))
 
     def compute_mismatch(coverage):
         # -------------------------------------------------
@@ -120,7 +122,7 @@ def main():
         # Find the Vorob'ev threshold.
         vorobev_volume = np.sum(coverage)
         def f(x):
-            return np.sum(coverage > x) - vorobev_volume)
+            return np.sum(coverage > x) - vorobev_volume
 
         from scipy.optimize import brentq
         vorobev_threshold = brentq(f, 0.0, 1.0)
@@ -137,15 +139,6 @@ def main():
     mismatches_wIVR = []
     mismatches_wIVR_smallstep = []
     mismatches_INFILL = []
-
-    """
-    for i in range(1, visited_inds_INFILL):
-        coverage_INFILL = np.load(
-                os.path.join(
-                        infill_folder,
-                        "coverage_{}.npy".format(i)))
-        mismatches_INFILL.append(compute_mismatch(coverage_INFILL))
-    """
 
     for i in range(1, visited_inds_IVR.shape[0]):
         coverage_IVR = np.load(
@@ -167,6 +160,13 @@ def main():
                         results_folder_wIVR_smallstep,
                         "coverage_{}.npy".format(i)))
         mismatches_wIVR_smallstep.append(compute_mismatch(coverage_wIVR_smallstep))
+
+    for i in range(1, visited_inds_INFILL.shape[0]):
+        coverage_INFILL = np.load(
+                os.path.join(
+                        results_folder_INFILL,
+                        "coverage_{}.npy".format(i)))
+        mismatches_INFILL.append(compute_mismatch(coverage_INFILL))
 
     # Save the last estimate.
     # vorobev_est_INFILL = compute_vorobev(coverage_INFILL)
@@ -193,52 +193,47 @@ def main():
     mismatches_IVR = np.array(mismatches_IVR)
     mismatches_wIVR = np.array(mismatches_wIVR)
     mismatches_wIVR_smallstep = np.array(mismatches_wIVR_smallstep)
-    # mismatches_INFILL = np.array(mismatches_INFILL)
+    mismatches_INFILL = np.array(mismatches_INFILL)
 
-    """
-    plt.plot(list(range(1, visited_inds_INFILL.shape[0])), mismatches_INFILL[:,0],
-            label="false positives, infill strategy",
-            color="blue", linestyle="dotted")
-    plt.plot(list(range(1, visited_inds_INFILL.shape[0])), mismatches_INFILL[:,1],
-            label="false negatives, infill strategy",
-            color="red", linestyle="dotted")
-    plt.plot(list(range(1, visited_inds_INFILL.shape[0])), mismatches_INFILL[:,2],
-            label="correct prediction, infill strategy",
-            color="green", linestyle="dotted")
-    """
-    plt.plot(list(range(1, visited_inds_IVR.shape[0])), mismatches_IVR[:,2],
-            label="correct prediction, IVR strategy",
-            color="red", linestyle="dashed")
-    plt.plot(list(range(1, visited_inds_wIVR.shape[0])), mismatches_wIVR[:,2],
-            label="correct prediction, weighted IVR strategy",
-            color="blue", linestyle="solid") 
-    plt.plot(list(range(1, visited_inds_wIVR_smallstep.shape[0])),
-            mismatches_wIVR_smallstep[:,2],
-            label="correct prediction, myopic weighted IVR strategy",
-            color="green", linestyle="solid") 
-
-    """
-    # Add the surface fill coverage.
-    coverage_fill = np.load(os.path.join(
-            infill_folder, "coverage_surface_fill.npy"))
-    mismatch_fill = compute_mismatch(coverage_fill)
+    X_IVR = list(range(1, visited_inds_IVR.shape[0]))
+    X_wIVR = list(range(1, visited_inds_wIVR.shape[0]))
+    X_wIVR_smallstep = list(range(1, visited_inds_wIVR_smallstep.shape[0]))
+    X_INFILL = list(range(1, visited_inds_INFILL.shape[0]))
 
     # Size of the limiting horizontal line corresponding to the infill
     # strategy.
     n = 600
+    X_INFILL_last = list(range(1, n))
+    INFILL_last = np.repeat(mismatches_INFILL[-1, 2], n-1)
 
-    plt.plot(list(range(1, n)), np.repeat(mismatch_fill[0], n-1),
+    return (X_IVR, mismatches_IVR, X_wIVR, mismatches_wIVR, X_wIVR_smallstep,
+            mismatches_wIVR_smallstep, X_INFILL, mismatches_INFILL,
+            X_INFILL_last, INFILL_last)
+
+def plot(X_IVR, mismatches_IVR, X_wIVR, mismatches_wIVR, X_wIVR_smallstep,
+            mismatches_wIVR_smallstep, X_INFILL, mismatches_INFILL,
+            X_INFILL_last, INFILL_last):
+
+    plt.plot(X_IVR, mismatches_IVR[:,2],
+            label="correct prediction, IVR strategy",
+            color="red", linestyle="dashed")
+    plt.plot(X_wIVR, mismatches_wIVR[:,2],
+            label="correct prediction, weighted IVR strategy",
+            color="blue", linestyle="solid") 
+    plt.plot(X_wIVR_smallstep,
+            mismatches_wIVR_smallstep[:,2],
+            label="correct prediction, myopic weighted IVR strategy",
+            color="green", linestyle="solid") 
+    plt.plot(X_INFILL,
+            mismatches_INFILL[:,2],
+            label="correct prediction, Infill strategy",
+            color="yellow", linestyle="solid") 
+
+    plt.plot(X_INFILL_last, INFILL_last,
             label="false positives, surface fill",
             color="cornflowerblue", linestyle="dotted")
-    plt.plot(list(range(1, n)), np.repeat(mismatch_fill[1], n-1),
-            label="false negatives, surface fill",
-            color="lightcoral", linestyle="dotted")
-    plt.plot(list(range(1, n)), np.repeat(mismatch_fill[2], n-1),
-            label="correct prediction, surface fill",
-            color="lightgreen", linestyle="dotted") 
-    """
     
-    plt.xlim([1, 500]) 
+    # plt.xlim([1, 500]) 
     plt.legend()
     plt.xlabel("Number of observations")
     plt.ylabel("Size in percent of true excursion size")
@@ -246,4 +241,5 @@ def main():
     plt.show()
 
 if __name__ == "__main__":
-    main()
+    dat = process_sample(4)
+    plot(*dat)
