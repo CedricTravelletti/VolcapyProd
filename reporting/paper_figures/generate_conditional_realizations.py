@@ -91,10 +91,15 @@ def main():
                         "prior_sample_{}.npy".format(reskrig_sample_nr))))
         myReal = UpdatableRealization.bootstrap(prior_realization, G_stacked_wIVR,
                 data_std=0.1, gp_module=gpwIVR)
+        np.save(
+                os.path.join(results_folder_wIVR,
+                    "Cond_Reals/conditional_real_{}.npy".format(reskrig_sample_nr)),
+                myReal._realization.detach().cpu().numpy())
+
         irregular_array_to_point_cloud(volcano_coords.numpy(),
                 myReal._realization.detach().cpu().numpy(),
                 os.path.join(results_folder_wIVR,
-                        "conditional_real_{}.vtk".format(reskrig_sample_nr)), fill_nan_val=-20000.0)
+                        "Cond_Reals/conditional_real_{}.vtk".format(reskrig_sample_nr)), fill_nan_val=-20000.0)
 
     irregular_array_to_point_cloud(volcano_coords.numpy(),
             ground_truth.cpu().numpy(),

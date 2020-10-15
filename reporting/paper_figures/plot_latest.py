@@ -4,6 +4,7 @@
 import os
 import torch
 import numpy as np
+import pandas as pd
 import volcapy.covariance.exponential as cl
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.update.updatable_covariance import UpdatableGP
@@ -83,6 +84,12 @@ def process_sample(sample_nr):
             results_folder_wIVR_smallstep, "visited_inds.npy"))
     visited_inds_INFILL = np.load(os.path.join(
             results_folder_INFILL, "visited_inds.npy"))
+
+    visited_inds_IVR = visited_inds_IVR[:90]
+    visited_inds_wIVR = visited_inds_wIVR[:90]
+    visited_inds_wIVR_smallstep = visited_inds_wIVR_smallstep[:90]
+    # Cut after 2000 observations.
+    visited_inds_INFILL = visited_inds_INFILL[:2000]
 
     def compute_mismatch(coverage):
         # -------------------------------------------------
@@ -195,45 +202,78 @@ def process_sample(sample_nr):
     mismatches_wIVR_smallstep = np.array(mismatches_wIVR_smallstep)
     mismatches_INFILL = np.array(mismatches_INFILL)
 
-    X_IVR = list(range(1, visited_inds_IVR.shape[0]))
-    X_wIVR = list(range(1, visited_inds_wIVR.shape[0]))
-    X_wIVR_smallstep = list(range(1, visited_inds_wIVR_smallstep.shape[0]))
-    X_INFILL = list(range(1, visited_inds_INFILL.shape[0]))
+    X_IVR = np.array(list(range(1, visited_inds_IVR.shape[0])))
+    X_wIVR = np.array(list(range(1, visited_inds_wIVR.shape[0])))
+    X_wIVR_smallstep = np.array(list(range(1,
+            visited_inds_wIVR_smallstep.shape[0])))
+    X_INFILL = np.array(list(range(1,
+            visited_inds_INFILL.shape[0])))
 
     # Size of the limiting horizontal line corresponding to the infill
     # strategy.
     n = 600
-    X_INFILL_last = list(range(1, n))
-    INFILL_last = np.repeat(mismatches_INFILL[-1, 2], n-1)
+    X_INFILL_last = np.array(list(range(1, n)))
+    mismatches_INFILL_last = np.repeat(mismatches_INFILL[-1, :].reshape(1, -1), n-1,
+            axis=0)
 
-    return (X_IVR, mismatches_IVR, X_wIVR, mismatches_wIVR, X_wIVR_smallstep,
-            mismatches_wIVR_smallstep, X_INFILL, mismatches_INFILL,
-            X_INFILL_last, INFILL_last)
+    df1 = pd.DataFrame({'X': X_IVR, 'false positives': mismatches_IVR[:, 0],
+            'false negatives': mismatches_IVR[:, 1], 'correct': mismatches_IVR[:,2],
+            'strategy': 'IVR, long range'})
 
-def plot(X_IVR, mismatches_IVR, X_wIVR, mismatches_wIVR, X_wIVR_smallstep,
-            mismatches_wIVR_smallstep, X_INFILL, mismatches_INFILL,
-            X_INFILL_last, INFILL_last):
+    df2 = pd.DataFrame({'X': X_wIVR, 'false positives': mismatches_wIVR[:, 0],
+            'false negatives': mismatches_wIVR[:, 1], 'correct':
+            mismatches_wIVR[:,2],
+            'strategy': 'weighted IVR, long range'})
 
-    plt.plot(X_IVR, mismatches_IVR[:,2],
-            label="correct prediction, IVR strategy",
-            color="red", linestyle="dashed")
-    plt.plot(X_wIVR, mismatches_wIVR[:,2],
-            label="correct prediction, weighted IVR strategy",
+    df3 = pd.DataFrame({'X': X_wIVR_smallstep, 'false positives':
+            mismatches_wIVR_smallstep[:, 0],
+            'false negatives': mismatches_wIVR_smallstep[:, 1], 'correct':
+            mismatches_wIVR_smallstep[:,2],
+            'strategy': 'weighted IVR, nearest neighbors'})
+
+    """
+    df4 = pd.DataFrame({'X': X_INFILL, 'false positives':
+            mismatches_INFILL[:, 0],
+            'false negatives': mismatches_INFILL[:, 1], 'correct':
+            mismatches_INFILL[:,2],
+            'strategy': 'infill'})
+    """
+
+    df5 = pd.DataFrame({'X': X_INFILL_last, 'false positives':
+            mismatches_INFILL_last[:, 0],
+            'false negatives': mismatches_INFILL_last[:, 1], 'correct':
+            mismatches_INFILL_last[:,2],
+            'strategy': 'limiting distribution'})
+
+    # df = pd.concat([df1, df2, df3, df4, df5])
+    df = pd.concat([df1, df2, df3, df5])
+
+    return df
+
+def plot(X_IVR, X_wIVR, X_wIVR_smallstep, X_INFILL, X_INFILL_last,
+            mismatches_IVR, mismatches_wIVR,
+            mismatches_wIVR_smallstep, mismatches_INFILL,
+            INFILL_last):
+
+    plt.plot(X_IVR, mismatches_IVR,
+            label="correct prediction, IVR strategy, long range")
+    plt.plot(X_wIVR, mismatches_wIVR,
+            label="correct prediction, weighted IVR strategy, long range",
             color="blue", linestyle="solid") 
     plt.plot(X_wIVR_smallstep,
-            mismatches_wIVR_smallstep[:,2],
-            label="correct prediction, myopic weighted IVR strategy",
+            mismatches_wIVR_smallstep,
+            label="correct prediction, weighted IVR strategy, short range",
             color="green", linestyle="solid") 
     plt.plot(X_INFILL,
-            mismatches_INFILL[:,2],
+            mismatches_INFILL,
             label="correct prediction, Infill strategy",
             color="yellow", linestyle="solid") 
 
     plt.plot(X_INFILL_last, INFILL_last,
-            label="false positives, surface fill",
+            label="correct prediction, limiting distribution",
             color="cornflowerblue", linestyle="dotted")
     
-    # plt.xlim([1, 500]) 
+    plt.xlim([1, 90]) 
     plt.legend()
     plt.xlabel("Number of observations")
     plt.ylabel("Size in percent of true excursion size")
@@ -241,5 +281,24 @@ def plot(X_IVR, mismatches_IVR, X_wIVR, mismatches_wIVR, X_wIVR_smallstep,
     plt.show()
 
 if __name__ == "__main__":
-    dat = process_sample(4)
-    plot(*dat)
+    df = process_sample(4)
+    """
+    for sample_nr in range(6,7):
+        tmp = process_sample(sample_nr)
+        df = pd.concat([df, tmp])
+    sns.lineplot(data=df, x="X", y="correct", hue="strategy")
+    plt.xlim([1, 90]) 
+    plt.legend()
+    plt.xlabel("Number of observations")
+    plt.ylabel("Size in percent of true excursion size")
+    plt.savefig("mismatch_evolution_bigstep", bbox_inches="tight", pad_inches=0.1, dpi=600)
+    plt.show()
+    """
+    sns.lineplot(data=df, x='X', y='correct', hue='strategy', style='strategy',
+            n_boot=10000, legend=False)
+    plt.legend(loc='upper left',
+        labels=['IVR, long range', 'weighted IVR, long range', 'weighted IVR, nearest neighbors',
+                'limiting distribution'])
+    plt.xlim([1, 90]) 
+    plt.savefig("mismatch_evolution_bigstep", bbox_inches="tight", pad_inches=0.1, dpi=600)
+    plt.show()
