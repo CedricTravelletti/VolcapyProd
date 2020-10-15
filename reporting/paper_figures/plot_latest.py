@@ -19,7 +19,7 @@ plot_params = {
         'font.size': 12, 'font.style': 'oblique',
         'axes.labelsize': 'small',
         'axes.titlesize':'small',
-        'legend.fontsize': 'xx-small'
+        'legend.fontsize': 'small'
         }
 plt.rcParams.update(plot_params)
 
@@ -231,13 +231,11 @@ def process_sample(sample_nr):
             mismatches_wIVR_smallstep[:,2],
             'strategy': 'weighted IVR, nearest neighbors'})
 
-    """
     df4 = pd.DataFrame({'X': X_INFILL, 'false positives':
             mismatches_INFILL[:, 0],
             'false negatives': mismatches_INFILL[:, 1], 'correct':
             mismatches_INFILL[:,2],
             'strategy': 'infill'})
-    """
 
     df5 = pd.DataFrame({'X': X_INFILL_last, 'false positives':
             mismatches_INFILL_last[:, 0],
@@ -245,8 +243,8 @@ def process_sample(sample_nr):
             mismatches_INFILL_last[:,2],
             'strategy': 'limiting distribution'})
 
-    # df = pd.concat([df1, df2, df3, df4, df5])
-    df = pd.concat([df1, df2, df3, df5])
+    df = pd.concat([df1, df2, df3, df4, df5])
+    # df = pd.concat([df1, df2, df3, df5])
 
     return df
 
@@ -282,10 +280,22 @@ def plot(X_IVR, X_wIVR, X_wIVR_smallstep, X_INFILL, X_INFILL_last,
 
 if __name__ == "__main__":
     df = process_sample(4)
-    """
-    for sample_nr in range(6,7):
+    for sample_nr in range(5,8):
         tmp = process_sample(sample_nr)
         df = pd.concat([df, tmp])
+    sns.lineplot(data=df, x='X', y='correct', hue='strategy', style='strategy',
+            n_boot=10000, legend=False)
+    plt.legend(loc='upper left',
+        labels=['IVR, long range', 'weighted IVR, long range', 'weighted IVR, nearest neighbors',
+                'infill', 'limiting distribution'])
+    plt.xlim([1, 90]) 
+
+    plt.xlabel("Number of observations")
+    plt.ylabel("Correct detection in percent of true volume.")
+
+    plt.savefig("mismatch_evolution_bigstep", bbox_inches="tight", pad_inches=0.1, dpi=600)
+
+    """
     sns.lineplot(data=df, x="X", y="correct", hue="strategy")
     plt.xlim([1, 90]) 
     plt.legend()
@@ -293,12 +303,5 @@ if __name__ == "__main__":
     plt.ylabel("Size in percent of true excursion size")
     plt.savefig("mismatch_evolution_bigstep", bbox_inches="tight", pad_inches=0.1, dpi=600)
     plt.show()
-    """
-    sns.lineplot(data=df, x='X', y='correct', hue='strategy', style='strategy',
-            n_boot=10000, legend=False)
-    plt.legend(loc='upper left',
-        labels=['IVR, long range', 'weighted IVR, long range', 'weighted IVR, nearest neighbors',
-                'limiting distribution'])
-    plt.xlim([1, 90]) 
-    plt.savefig("mismatch_evolution_bigstep", bbox_inches="tight", pad_inches=0.1, dpi=600)
     plt.show()
+    """
