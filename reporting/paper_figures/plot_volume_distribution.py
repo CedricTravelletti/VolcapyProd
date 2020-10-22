@@ -17,7 +17,7 @@ plot_params = {
         'font.size': 12, 'font.style': 'oblique',
         'axes.labelsize': 'small',
         'axes.titlesize':'small',
-        'legend.fontsize': 'xx-small'
+        'legend.fontsize': 'small'
         }
 plt.rcParams.update(plot_params)
 
@@ -37,7 +37,7 @@ static_results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_i
 
 
 
-def process_sample(sample_nr):
+def main(sample_nr):
 
     results_folder_wIVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/wIVR_results/sample_{}/".format(sample_nr)
     
@@ -68,27 +68,57 @@ def process_sample(sample_nr):
     excursion_inds = (ground_truth >= THRESHOLD_low).nonzero()[:, 0]
     excu_size = excursion_inds.shape[0] + 1
 
-    excu_sizes = []
-    for i in range(200, 300):
+    excu_sizes_wIVR = []
+    for i in range(200, 400):
         cond_real = np.load(
                 os.path.join(
                         results_folder_wIVR,
                         "Cond_Reals/conditional_real_{}.npy".format(i)))
-        excu_sizes.append(np.sum(cond_real >= THRESHOLD_low))
+        excu_sizes_wIVR.append(np.sum(cond_real >= THRESHOLD_low))
+
+    excu_sizes_interm45 = []
+    for i in range(200, 400):
+        cond_real = np.load(
+                os.path.join(
+                        results_folder_wIVR,
+                        "Cond_Reals_Interm45/conditional_real_{}.npy".format(i)))
+        excu_sizes_interm45.append(np.sum(cond_real >= THRESHOLD_low))
+
+    excu_sizes_prior = []
+    for i in range(200, 400):
+        cond_real = np.load(
+                os.path.join(
+                        data_folder,
+                        "reskrig_samples/prior_sample_{}.npy".format(i)))
+        excu_sizes_prior.append(np.sum(cond_real >= THRESHOLD_low))
+
+    excu_sizes_LIMIT = []
+    for i in range(200, 360):
+        cond_real = np.load(
+                os.path.join(
+                        results_folder_wIVR,
+                        "Cond_Reals_Infill/conditional_real_{}.npy".format(i)))
+        excu_sizes_LIMIT.append(np.sum(cond_real >= THRESHOLD_low))
+
+    sequential_colors = sns.color_palette("RdPu", 10)
+    sns.set_palette("RdPu")
+
+    plt.hist(excu_sizes_prior, # color="pink",
+            alpha=0.6)
+    plt.hist(excu_sizes_interm45, # color="hotpink",
+            alpha=0.6)
+    plt.hist(excu_sizes_wIVR, # color="palevioletred",
+            alpha=0.6)
+    plt.hist(excu_sizes_LIMIT, # color="mediumvioletred",
+            alpha=0.6)
+
+    # Vertical line at true volume.
+    plt.axvline(x=excu_size, color="black", linestyle="--")
+
+    plt.legend(["true volume", "prior", "weighted IVR, 45 observations",
+    "weighted IVR, 90 observations", "limiting distribution"])
+    plt.savefig("volume_histogram", bbox_inches="tight", pad_inches=0.1, dpi=600)
+    plt.show()
 
 if __name__ == "__main__":
-    df = process_sample(4)
-    """
-    for sample_nr in range(6,7):
-        tmp = process_sample(sample_nr)
-        df = pd.concat([df, tmp])
-    sns.lineplot(data=df, x="X", y="correct", hue="strategy")
-    plt.xlim([1, 90]) 
-    plt.legend()
-    plt.xlabel("Number of observations")
-    plt.ylabel("Size in percent of true excursion size")
-    plt.savefig("mismatch_evolution_bigstep", bbox_inches="tight", pad_inches=0.1, dpi=600)
-    plt.show()
-    """
-    plt.legend(['IVR, long range', 'weighted IVR, long range', 'weighted
-    IVR, nearest neighbors', 'limiting distribution'])
+    main(4)
