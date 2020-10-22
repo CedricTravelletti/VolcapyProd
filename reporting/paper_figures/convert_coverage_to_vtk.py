@@ -29,9 +29,34 @@ def main(sample_nr):
                     "grid.pickle"))
     volcano_coords = torch.from_numpy(grid.cells).float().detach()
 
+    ground_truth = np.load(ground_truth_path)
+
     # Load coverage at the end of the process.
     final_coverage_wIVR = np.load(os.path.join(
             results_folder_wIVR, "coverage_90.npy"))
+
+    # Find Vorob'ev
+    # Find the Vorob'ev threshold.
+    coverage = final_coverage_wIVR
+    vorobev_volume = np.sum(coverage)
+    def f(x):
+        return np.sum(coverage > x) - vorobev_volume
+
+    from scipy.optimize import brentq
+    vorobev_threshold = brentq(f, 0.0, 1.0)
+
+    # Plot estimated excursion set using coverage function.
+    est_excursion_inds = coverage > vorobev_threshold
+
+    # Save in array.
+    vorobev_est = np.zeros(volcano_coords.shape[0])
+    vorobev_est[est_excursion_inds] = 1
+
+    irregular_array_to_point_cloud(volcano_coords.numpy(),
+            final_coverage_wIVR,
+            os.path.join(results_folder_wIVR,
+                    "vorobev_{}.vtk".format(sample_nr)),
+            fill_nan_val=-20000.0)
 
     irregular_array_to_point_cloud(volcano_coords.numpy(),
             final_coverage_wIVR,
@@ -39,5 +64,11 @@ def main(sample_nr):
                     "final_coverage_wIVR_{}.vtk".format(sample_nr)),
             fill_nan_val=-20000.0)
 
+    irregular_array_to_point_cloud(volcano_coords.numpy(),
+            ground_truth,
+            os.path.join(results_folder_wIVR,
+                    "ground_truth_{}.vtk".format(sample_nr)),
+            fill_nan_val=-20000.0)
+
 if __name__ == "__main__":
-    main(6)
+    main(8)
