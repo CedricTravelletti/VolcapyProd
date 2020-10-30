@@ -38,6 +38,10 @@ def sample(kernel, sigma0, lambda0, m0, cells):
     if torch.is_tensor(cells):
         cells = cells.detach().cpu().numpy()
 
+    # WARNING: The convention used by rflib is different 
+    # than the usual one, at least for the Materns.
+    scale = 1/lambda0
+
     # Create the model.
     if kernel.KERNEL_FAMILY == "exponential":
         model = rflib.RMexp(var=sigma0**2,
@@ -47,10 +51,10 @@ def sample(kernel, sigma0, lambda0, m0, cells):
                 scale=lambda0)
     elif kernel.KERNEL_FAMILY == "matern32":
         model = rflib.RMmatern(nu=1.5, var=sigma0**2,
-                scale=lambda0)
+                scale=scale)
     elif kernel.KERNEL_FAMILY == "matern52":
         model = rflib.RMmatern(nu=2.5, var=sigma0**2,
-                scale=lambda0)
+                scale=scale)
     else: raise ValueError("Kernel type not recognized.")
 
         # Sample.
