@@ -66,7 +66,8 @@ class UpdatableCovariance:
         The inversion operators corresponding to each conditioning step.
 
     """
-    def __init__(self, cov_module, lambda0, sigma0, cells_coords, n_chunks):
+    def __init__(self, cov_module, lambda0, sigma0, cells_coords,
+            n_chunks=200, n_flush=50):
         """ Build an updatable covariance from a traditional covariance module.
 
         Parameters
@@ -82,6 +83,10 @@ class UpdatableCovariance:
         n_chunks: int
             Number of chunks to break the covariane matrix in.
             Increase if computations do not fit in memory.
+        n_flush: int
+            Synchronize threads and flush GPU cache every *n_flush* iterations.
+            This is necessary to avoid OOM errors.
+            Default is 50.
 
         """
         self.cov_module = cov_module
@@ -92,7 +97,9 @@ class UpdatableCovariance:
             cells_coords = torch.from_numpy(cells_coords)
         self.cells_coords = cells_coords
         self.n_cells = cells_coords.shape[0]
+
         self.n_chunks = n_chunks
+        self.n_flush = n_flush
 
         self.pushforwards = []
         self.inversion_ops = []
@@ -169,30 +176,29 @@ class UpdatableCovariance:
         """
         self.pushforwards.append(self.mul_right(G.t()))
 
-        # Get inversion op by Cholesky.
-        R = G @ self.pushforwards[-1]
+        # Get inversion op.
+        R = G.double() @ self.pushforwards[-1].double()
+        inversion_op, _ = self._inversion_helper(R, data_std)
 
-        L, _ = self._cholesky_helper(R, data_std)
-
-        inversion_op = torch.cholesky_inverse(L)
         self.inversion_ops.append(inversion_op)
 
-    def _cholesky_helper(self, R, data_std):
+    def _inversion_helper(self, R, data_std):
         data_std_orig = data_std
-        # Try to Cholesky.
+        # Try to invert.
         MAX_ATTEMPTS = 200
         for attempt in range(MAX_ATTEMPTS):
             try:
-                L = torch.cholesky(R + data_std**2 * torch.eye(R.shape[0]))
+                inversion_op = torch.inverse(R + data_std**2 *
+                        torch.eye(R.shape[0], dtype=torch.float64))
             except RuntimeError:
-                print("Cholesky failed: Singular Matrix.")
+                print("Inversion failed: Singular Matrix.")
                 # Increase noise in steps of 5%.
                 data_std += 0.05 * data_std
                 print(
                         "Increasing data std from original {} to {} and retrying.".format(
                         data_std_orig, data_std))
             else:
-                return L, data_std
+                return inversion_op, data_std
         # If didnt manage to invert.
         raise ValueError(
             "Impossible to invert matrix, even at noise std {}".format(self.data_std))
@@ -214,7 +220,7 @@ class UpdatableCovariance:
         pushfwd = self.sigma0**2 * self.cov_module.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
-                n_flush=50)
+                n_flush=self.n_flush)
         return pushfwd
 
     def extract_variance(self):
@@ -270,23 +276,21 @@ class UpdatableCovariance:
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
 
-        # Get inversion op by Cholesky.
-        R = G @ G_dash
 
-        L, _ = self._cholesky_helper(R, data_std)
-
-        inversion_op = torch.cholesky_inverse(L)
+        # Get inversion op.
+        R = G.double() @ G_dash.double()
+        inversion_op, _ = self._inversion_helper(R, data_std)
 
         IVR = 0
         if weights is None:
             for inds in chunked_indices:
                 G_part = G_dash[inds,:]
-                V = G_part @ inversion_op @ G_part.t()
+                V = G_part @ inversion_op.float() @ G_part.t()
                 IVR += torch.sum(V.diag())
         else:
             for inds in chunked_indices:
                 G_part = G_dash[inds,:]
-                V = G_part @ inversion_op @ G_part.t()
+                V = G_part @ inversion_op.float() @ G_part.t()
                 IVR += torch.sum(V.diag() * weights[inds])
         return IVR.item()
 
@@ -316,18 +320,14 @@ class UpdatableCovariance:
         # Compute the current pushforward.
         G_dash = self.mul_right(G.t())
 
-        # Get inversion op by Cholesky.
-        R = G @ G_dash + data_std**2 * torch.eye(G.shape[0])
-        try:
-            L = torch.cholesky(R)
-        except RuntimeError:
-            print("Error inverting.")
-        inversion_op = torch.cholesky_inverse(L)
+        # Get inversion op.
+        R = G @ G_dash
+        inversion_op, _ = self._inversion_helper(R, data_std)
 
         VR = torch.zeros(self.n_cells)
         for inds in chunked_indices:
             G_part = G_dash[inds,:]
-            V = G_part @ inversion_op @ G_part.t()
+            V = G_part @ inversion_op.float() @ G_part.t()
             VR[inds] = V.diag()
         return VR
 
@@ -372,9 +372,10 @@ class UpdatableCovariance:
             y = _make_column_vector(y)
             K_dash = self.pushforwards[i]
             R = self.inversion_ops[i]
-            conditional_mean = conditional_mean + K_dash @ R @ (y -
-                    stacked_G[i, :] @ conditional_mean)
-        return conditional_mean
+            conditional_mean = (
+                    conditional_mean.double()
+                    + K_dash.double() @ R @ (y - stacked_G[i, :] @ conditional_mean).double())
+        return conditional_mean.float()
 
     def __dict__(self):
         state_dict = {
@@ -444,7 +445,17 @@ class UpdatableMean:
         # Get the latest conditioning operators.
         K_dash = self.cov_module.pushforwards[-1]
         R = self.cov_module.inversion_ops[-1]
-        self.m = self.m + K_dash @ R @ (y - G @ self.m)
+        self.m = (self.m.double() + K_dash.double() @ R.double() @ (y - G @
+                self.m).double()).float()
+
+        # ----
+        # TEMP
+        # ----
+        weights = R @ (y - G @ self.m)
+        torch.save(weights, "update_weights.pt")
+        torch.save(K_dash, "update_pushfwd.pt")
+        torch.save(R, "update_inversion_op.pt")
+        # ----
 
     def __dict__(self):
         state_dict = {
@@ -835,3 +846,13 @@ class UpdatableGP():
         gp.mean.m = torch.from_numpy(state_dict['mean']['m'])
 
         return gp
+
+    # TO implement.
+    def rewind(self, step):
+        """ Go back to a certain step.
+        
+        """
+        self.covariance.pushforwards = self.covariance.pushforwards[:step]
+        self.covariance.inversion_ops = self.covariance.inversion_ops[:step]
+
+        # self.mean.m = 

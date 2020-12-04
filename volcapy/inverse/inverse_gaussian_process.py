@@ -185,7 +185,7 @@ class InverseGaussianProcess(torch.nn.Module):
         self.pushfwd = self.kernel.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords,
                 n_chunks=self.n_chunks, n_flush=self.n_flush)
-        self.K_d = G @ self.pushfwd
+        self.K_d = G.double() @ self.pushfwd.double()
 
     def condition_data(self, G, y, data_std, concentrate=False,
             is_precomp_pushfwd=False, device=None):
@@ -236,9 +236,8 @@ class InverseGaussianProcess(torch.nn.Module):
 
         y = _make_column_vector(y)
 
-        # Get Cholesky factor (lower triangular) of the inversion operator.
-        self.inv_op_L, data_std = self.get_inversion_op_cholesky(self.K_d, data_std)
-        self.inversion_operator = torch.cholesky_inverse(self.inv_op_L)
+        # Get inversion operator.
+        self.inversion_operator, data_std = self.get_inversion_op(self.K_d, data_std)
             
         if concentrate:
             # Determine m0 (on the model side) from sigma0 by concentration of the Ll.
@@ -248,15 +247,15 @@ class InverseGaussianProcess(torch.nn.Module):
         mu0_d_stripped = (G @ torch.ones((self.n_model, 1),
                 dtype=torch.float32, device=device))
         mu0_d = self.m0 * mu0_d_stripped
-        prior_misfit = y - mu0_d
+        prior_misfit = y.double() - mu0_d.double()
 
-        self.weights = self.inv_op_vector_mult(prior_misfit)
+        self.weights = self.inversion_operator @ prior_misfit
 
         m_post_d = mu0_d + torch.mm(self.sigma0**2 * self.K_d, self.weights)
 
         nll = self.neg_log_likelihood(y, G, self.m0)
 
-        return m_post_d, nll, data_std
+        return m_post_d.float(), nll.float(), data_std
 
     def neg_log_likelihood(self, y, G, m0, device=None):
         """ Computes the negative log-likelihood of the current state of the
@@ -288,12 +287,12 @@ class InverseGaussianProcess(torch.nn.Module):
 
         # WARNING!!! determinant is not linear! Taking constants outside adds
         # power to them.
-        log_det = torch.logdet(self.R)
+        log_det = torch.logdet(self.R).double()
 
-        mu0_d_stripped = torch.mm(G, torch.ones((self.n_model, 1),
-                dtype=torch.float32, device=device))
+        mu0_d_stripped = torch.mm(G.double(), torch.ones((self.n_model, 1),
+                dtype=torch.float64, device=device))
         mu0_d = m0 * mu0_d_stripped
-        prior_misfit = y - mu0_d
+        prior_misfit = y.double() - mu0_d.double()
 
         nll = log_det + torch.mm(prior_misfit.t(), self.weights)
 
@@ -313,9 +312,9 @@ class InverseGaussianProcess(torch.nn.Module):
 
         # Prior mean (vector) on the data side.
         mu0_d_stripped = torch.mm(G, torch.ones((self.n_model, 1),
-                dtype=torch.float32))
+                dtype=torch.float64))
         # Compute R^(-1) * G * I_m.
-        tmp = self.inv_op_vector_mult(mu0_d_stripped)
+        tmp = self.inversion_operator @ mu0_d_stripped
         conc_m0 = (y.t() @ tmp) / (mu0_d_stripped.t() @ tmp)
 
         return conc_m0
@@ -376,10 +375,10 @@ class InverseGaussianProcess(torch.nn.Module):
         else: m0 = self.m0
 
         m_post_m = (
-                m0 * torch.ones((self.n_model, 1))
-                + (self.sigma0**2 * self.pushfwd @ self.weights))
+                m0 * torch.ones((self.n_model, 1), dtype=torch.float64)
+                + (self.sigma0.double()**2 * self.pushfwd.double() @ self.weights))
 
-        return m_post_m, m_post_d
+        return m_post_m.float(), m_post_d.float()
 
     def train_fixed_lambda(self, lambda0, G, y, data_std,
             device=None,
@@ -513,7 +512,58 @@ class InverseGaussianProcess(torch.nn.Module):
         end = timer()
         print("Training done in {} minutes.".format((end-start)/60))
 
+    def get_inversion_op(self, K_d, data_std):
+        """ Compute the Cholesky decomposition of the inverse of the inversion operator.
+        Increases noise level if necessary to make matrix invertible.
 
+        Note that this method updates the noise level if necessary.
+
+        Parameters
+        ----------
+        K_d: Tensor
+            The (pushforwarded from model) data covariance matrix (stripped
+            from sigma0). Should be double.
+        sigma0: Tensor
+            The (model side) standard deviation.
+
+        Returns
+        -------
+        Tensor
+            Inversion operator R^-1
+        float
+            When noise has to be increased to make matrices invertible, this
+            gives the new value of the noise standard deviation.
+        """
+        data_std_orig = data_std
+        n_data = K_d.shape[0]
+        data_ones = torch.eye(n_data, dtype=torch.float64, device=self.device)
+        self.R = (data_std**2) * data_ones + self.sigma0**2 * K_d
+
+        # Check condition number if debug mode on.
+        if not __debug__:
+            self.logger.info(
+                    "Condition number of (inverse) inversion operator: {}".format(
+                    np.linalg.cond(self.R.cpu().detach().numpy())))
+
+        # Try to invert.
+        for attempt in range(50):
+            try:
+                inversion_op = torch.inverse(self.R)
+            except RuntimeError:
+                print("Inversion failed: Singular Matrix.")
+                # Increase noise in steps of 5%.
+                data_std += 0.05 * data_std
+                self.R = (data_std**2) * data_ones + self.sigma0**2 * K_d
+                print("Increasing data std from original {} to {} and retrying.".format(
+                        data_std_orig, data_std))
+            else:
+                return inversion_op, data_std
+        # If didnt manage to invert.
+        raise ValueError(
+            "Impossible to invert matrix, even at noise std {}".format(self.data_std))
+        return -1, data_std
+
+    # TODO: DEPRECATED.
     def get_inversion_op_cholesky(self, K_d, data_std):
         """ Compute the Cholesky decomposition of the inverse of the inversion operator.
         Increases noise level if necessary to make matrix invertible.
@@ -536,6 +586,8 @@ class InverseGaussianProcess(torch.nn.Module):
             When noise has to be increased to make matrices invertible, this
             gives the new value of the noise standard deviation.
         """
+        raise ValueError("Warning, this is deprecated since we stopped using Cholesky for inversion.")
+
         data_std_orig = data_std
         n_data = K_d.shape[0]
         data_ones = torch.eye(n_data, dtype=torch.float32, device=self.device)
@@ -565,6 +617,7 @@ class InverseGaussianProcess(torch.nn.Module):
             "Impossible to invert matrix, even at noise std {}".format(self.data_std))
         return -1, data_std
     
+    # TODO: DEPRECATED since deprecation of Cholesky.
     def inv_op_vector_mult(self, x):
         """ Multiply a vector by the inversion operator, using Cholesky
         approach (numerically more stable than computing inverse).
@@ -580,6 +633,8 @@ class InverseGaussianProcess(torch.nn.Module):
             Multiplied vector R^(-1) * x.
 
         """
+        raise ValueError("Warning, this is deprecated since we stopped using Cholesky for inversion.")
+
         z, _ = torch.triangular_solve(x, self.inv_op_L, upper=False)
         y, _ = torch.triangular_solve(z, self.inv_op_L.t(), upper=True)
         return y
