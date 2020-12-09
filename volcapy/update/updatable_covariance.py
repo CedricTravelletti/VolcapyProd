@@ -177,18 +177,18 @@ class UpdatableCovariance:
         self.pushforwards.append(self.mul_right(G.t()))
 
         # Get inversion op.
-        R = G.double() @ self.pushforwards[-1].double()
-        inversion_op, _ = self._inversion_helper(R, data_std)
+        K_d = G.double() @ self.pushforwards[-1].double()
+        inversion_op, _ = self._inversion_helper(K_d, , data_std)
 
         self.inversion_ops.append(inversion_op)
 
-    def _inversion_helper(self, R, data_std):
+    def _inversion_helper(self, K_d, data_std):
         data_std_orig = data_std
         # Try to invert.
         MAX_ATTEMPTS = 200
         for attempt in range(MAX_ATTEMPTS):
             try:
-                inversion_op = torch.inverse(R + data_std**2 *
+                inversion_op = torch.inverse(self.sigma0**2 * K_d + data_std**2 *
                         torch.eye(R.shape[0], dtype=torch.float64))
             except RuntimeError:
                 print("Inversion failed: Singular Matrix.")
