@@ -145,7 +145,9 @@ class InverseGaussianProcess(torch.nn.Module):
         self.device = torch.device("cpu")
 
         self.m0 = torch.tensor(m0, requires_grad=False)
-        self.sigma0 = torch.nn.Parameter(torch.tensor(sigma0))
+        # TODO: Fix.
+        # self.sigma0 = torch.nn.Parameter(torch.tensor(sigma0))
+        self.sigma0 = torch.tensor(sigma0, requires_grad=False)
         self.lambda0 = lambda0
 
         self.cells_coords = cells_coords
