@@ -104,15 +104,22 @@ class UpdatableCovariance:
         self.pushforwards = []
         self.inversion_ops = []
 
-    def mul_right(self, A):
+    def mul_right(self, A, strip=False):
         """ Multiply covariance matrix from the right.
         Note that the matrix with which we multiply should map to a smaller
         dimensional space.
+
+        Also provides a stripped version, where the sigma0**2 factor is removed
+        (can be used to improve numerical precision).
+
+        Note that results are returned in double precision.
 
         Parameters
         ----------
         A: Tensor
             Matrix with which to multiply.
+        strip: bool, defaults to False
+            If true, then will return 1/sigma0**2 K * A.
 
         Returns
         -------
@@ -124,16 +131,23 @@ class UpdatableCovariance:
         # Warning: the original covariance pushforward method was used to
         # comput K G^T, taking G as an argument, i.e. it does transposing in
         # the background. We hence have to feed it A.t.
-        cov_pushfwd_0 = self.compute_prior_pushfwd(A.t())
+        cov_pushfwd_0 = self.compute_prior_pushfwd(A.t()).double()
+
+        temp = torch.zeros(cov_pushfwd_0.shape, dtype=torch.float64)
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
-            cov_pushfwd_0 -= p @ (r @ (p.t() @ A))
+            temp -= p.double() @ (r @ (p.double().t() @ A.double()))
 
         # Note the first term (the one with C_0 alone) only has one sigma0**2
         # factor associated with it, whereas all other terms in the updating
         # have two one.
-        return cov_pushfwd_0
+        if strip:
+            return cov_pushfwd_0 + self.sigma0**2 * temp
+        else:
+            return (self.sigma0**2 * (
+                cov_pushfwd_0 + self.sigma0**2 * temp))
 
+    # TODO: DEPRECATED. Not adapted to new stripped pushforwards.
     # TODO: Is this ever used?
     def sandwich(self, A):
         """ Sandwich the covariance matrix on both sides.
@@ -174,11 +188,14 @@ class UpdatableCovariance:
             Standard deviation of data noise, assumed to be iid centered gaussian.
 
         """
-        self.pushforwards.append(self.mul_right(G.t()))
+        # Pushforwards are big, so store in single precision.
+        # But keep in double for the inversion operator.
+        current_pushfwd = self.mul_right(G.t(), strip=True)
+        self.pushforwards.append(current_pushfwd.float())
 
         # Get inversion op.
-        K_d = G.double() @ self.pushforwards[-1].double()
-        inversion_op, _ = self._inversion_helper(K_d, , data_std)
+        K_d = G.double() @ current_pushfwd
+        inversion_op, _ = self._inversion_helper(K_d, data_std)
 
         self.inversion_ops.append(inversion_op)
 
@@ -189,7 +206,7 @@ class UpdatableCovariance:
         for attempt in range(MAX_ATTEMPTS):
             try:
                 inversion_op = torch.inverse(self.sigma0**2 * K_d + data_std**2 *
-                        torch.eye(R.shape[0], dtype=torch.float64))
+                        torch.eye(K_d.shape[0], dtype=torch.float64))
             except RuntimeError:
                 print("Inversion failed: Singular Matrix.")
                 # Increase noise in steps of 5%.
@@ -217,7 +234,7 @@ class UpdatableCovariance:
         pushfwd: (self.n_cells, n_data) Tensor
 
         """
-        pushfwd = self.sigma0**2 * self.cov_module.compute_cov_pushforward(
+        pushfwd = self.cov_module.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
                 n_flush=self.n_flush)
@@ -445,14 +462,13 @@ class UpdatableMean:
         # Get the latest conditioning operators.
         K_dash = self.cov_module.pushforwards[-1]
         R = self.cov_module.inversion_ops[-1]
-        self.m = (self.m.double() + K_dash.double() @ R.double() @ (y - G @
+        self.m = (self.m.double() 
+                + self.cov_module.sigma0**2 * K_dash.double() @ R.double() @ (y - G @
                 self.m).double()).float()
 
         # ----
         # TEMP
         # ----
-        weights = R @ (y - G @ self.m)
-        torch.save(weights, "update_weights.pt")
         torch.save(K_dash, "update_pushfwd.pt")
         torch.save(R, "update_inversion_op.pt")
         # ----
