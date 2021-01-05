@@ -38,9 +38,7 @@ def sample(kernel, sigma0, lambda0, m0, cells):
     if torch.is_tensor(cells):
         cells = cells.detach().cpu().numpy()
 
-    # WARNING: The convention used by rflib is different 
-    # than the usual one, at least for the Materns.
-    scale = 1/lambda0
+    scale = lambda0
 
     # Create the model.
     if kernel.KERNEL_FAMILY == "exponential":
