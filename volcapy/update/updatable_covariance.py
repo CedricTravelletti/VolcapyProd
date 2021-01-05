@@ -307,7 +307,7 @@ class UpdatableCovariance:
         else:
             for inds in chunked_indices:
                 G_part = G_dash[inds,:]
-                V = G_part @ inversion_op.float() @ G_part.t()
+                V = G_part.float() @ inversion_op.float() @ G_part.t().float()
                 IVR += torch.sum(V.diag() * weights[inds])
         return IVR.item()
 
