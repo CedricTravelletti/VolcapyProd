@@ -4,7 +4,7 @@ The grid will have the same xy resolution as the dsm.
 
 """
 import numpy as np
-# import meshio
+import meshio
 import pickle
 
 
@@ -58,6 +58,51 @@ class Grid():
     def surface(self):
         return self.cells[self.surface_inds]
 
+    def get_cell_hexahedron(self, cell_ind):
+        """ Returns the coordinates of the corners of the hexahedron definint
+        the current cells.
+
+        """
+        centroid_coord = self.__getitem__(cell_ind)
+        corner_1 = centroid_coord + 1.0
+
+    def generate_mesh_data(self, cell_data=None):
+        """ Converts grid to a VTK UnstructuredGrid.
+
+        """
+        # Arrays of shape (self.n_cell, 3) containin the coords of the corners
+        # of the corresponding hexahedron for each cells.
+        bottom_front_left = self.cells + np.array([-self.res_x , -self.res_y, -self.res_z])
+        bottom_front_right = self.cells + np.array([+self.res_x , -self.res_y, -self.res_z])
+
+        bottom_back_left = self.cells + np.array([-self.res_x , +self.res_y, -self.res_z])
+        bottom_back_right = self.cells + np.array([+self.res_x , +self.res_y, -self.res_z])
+
+        top_front_left = self.cells + np.array([-self.res_x , -self.res_y, +self.res_z])
+        top_front_right = self.cells + np.array([+self.res_x , -self.res_y, +self.res_z])
+
+        top_back_left = self.cells + np.array([-self.res_x , +self.res_y, +self.res_z])
+        top_back_right = self.cells + np.array([+self.res_x , +self.res_y, +self.res_z])
+
+        points = np.hstack([bottom_front_left, bottom_front_right,
+                bottom_back_left, bottom_back_right,
+                top_front_left, top_front_right,
+                top_back_left, top_back_right])
+        # Black magic to put in correct order.
+        points = points.reshape(1, -1).reshape(-1, 3)
+        topology = np.array(list(range(points.shape[0])))
+        topology = topology.reshape(-1, 8)
+
+        """
+        hex_mesh = meshio.Mesh(
+                points,
+                {"hexahedron": topology},
+                cell_data=cell_data)
+
+        # meshio.write("out.vtk", hex_mesh)
+        """
+        return points, topology
+
 
 def build_grid_below_dsm(dsm_x, dsm_y, dsm_z, z_low, z_step):
     """ Given a dsm, discretize the space below it in cubic cells, down to some
@@ -95,47 +140,3 @@ def build_grid_below_dsm(dsm_x, dsm_y, dsm_z, z_low, z_step):
     return (np.asarray(cells, dtype=np.float32),
             np.asarray(cells_roof, dtype=np.float32),
             np.asarray(surface_inds, dtype=np.int))
-
-    def get_cell_hexahedron(self, cell_ind):
-        """ Returns the coordinates of the corners of the hexahedron definint
-        the current cells.
-
-        """
-        centroid_coord = self.__getitem__(cell_ind)
-        corner_1 = centroid_coord + 1.0
-
-    def to_vtk(self):
-        """ Converts grid to a VTK UnstructuredGrid.
-
-        """
-        """
-        # Arrays of shape (self.n_cell, 3) containin the coords of the corners
-        # of the corresponding hexahedron for each cells.
-        bottom_front_left = self.cells + np.array([-self.res_x , -self.res_y, -self.res_z])
-        bottom_front_right = self.cells + np.array([+self.res_x , -self.res_y, -self.res_z])
-
-        bottom_back_left = self.cells + np.array([-self.res_x , +self.res_y, -self.res_z])
-        bottom_back_right = self.cells + np.array([+self.res_x , +self.res_y, -self.res_z])
-
-        top_front_left = self.cells + np.array([-self.res_x , -self.res_y, +self.res_z])
-        top_front_right = self.cells + np.array([+self.res_x , -self.res_y, +self.res_z])
-
-        top_back_left = self.cells + np.array([-self.res_x , +self.res_y, +self.res_z])
-        top_back_right = self.cells + np.array([+self.res_x , +self.res_y, +self.res_z])
-
-        points = np.hstack([bottom_front_left, bottom_front_right,
-                bottom_back_left, bottom_back_right,
-                top_front_left, top_front_right,
-                top_back_left, top_back_right])
-        # Black magic to put in correct order.
-        points = points.reshape(1, -1).reshape(-1, 3)
-        topology = np.array(list(range(points.shape[0])))
-        topology = topology.reshape(-1, 6)
-
-
-        hex_mesh = meshio.Mesh(
-                points,
-                {"hexahedron": topology},)
-
-        meshio.write("out.vtk", hex_mesh)
-        """
