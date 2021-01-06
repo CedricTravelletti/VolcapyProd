@@ -254,7 +254,7 @@ class UpdatableCovariance:
                 n_chunks=self.n_chunks, n_flush=50)
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
-            prior_variances -= torch.einsum("ij,jk,ik->i",p,r,p)
+            prior_variances -= torch.einsum("ij,jk,ik->i",p,r.float(),p)
 
         return prior_variances
 
@@ -302,7 +302,7 @@ class UpdatableCovariance:
         if weights is None:
             for inds in chunked_indices:
                 G_part = G_dash[inds,:]
-                V = G_part @ inversion_op.float() @ G_part.t()
+                V = G_part.float() @ inversion_op.float() @ G_part.t().float()
                 IVR += torch.sum(V.diag())
         else:
             for inds in chunked_indices:
