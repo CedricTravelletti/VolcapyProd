@@ -27,7 +27,7 @@ cpu = torch.device('cpu')
 
 
 def prepare_groundtruth(input_path, n_realizations):
-    output_path = os.path.join(input_path, "prior_samples/")
+    output_path = os.path.join(input_path, "prior_samples_v2/")
     os.makedirs(output_path, exist_ok=True)
 
     # Load
