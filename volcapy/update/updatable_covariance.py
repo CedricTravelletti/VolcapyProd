@@ -25,6 +25,10 @@ with the *big data* settting.
 
 Testing scripts may be found in Volcano/tests/test_update.py.
 
+DTYPE
+-----
+We store inversion operators in double.
+
 TODO
 ----
 
@@ -33,6 +37,7 @@ Implement computation of the diagonal.
 
 REFACTOR USING OBSERVER PATTERN: UpdatableMean, Realizations and so on register
 themselves to the cov module.
+
 
 """
 import torch
@@ -215,7 +220,7 @@ class UpdatableCovariance:
                         "Increasing data std from original {} to {} and retrying.".format(
                         data_std_orig, data_std))
             else:
-                return inversion_op, data_std
+                return inversion_op.double(), data_std
         # If didnt manage to invert.
         raise ValueError(
             "Impossible to invert matrix, even at noise std {}".format(self.data_std))
@@ -384,14 +389,14 @@ class UpdatableCovariance:
             Conditional mean, conditional on the provided data.
 
         """
-        conditional_mean = prior
+        conditional_mean = prior.double()
         for i, y in enumerate(fantasy_ys):
-            y = _make_column_vector(y)
-            K_dash = self.pushforwards[i]
+            y = _make_column_vector(y).double()
+            K_dash = self.pushforwards[i].double()
             R = self.inversion_ops[i]
             conditional_mean = (
                     conditional_mean.double()
-                    + K_dash.double() @ R @ (y - stacked_G[i, :] @ conditional_mean).double())
+                    + K_dash @ R @ (y - stacked_G[i, :].double() @ conditional_mean).double())
         return conditional_mean.float()
 
     def __dict__(self):
