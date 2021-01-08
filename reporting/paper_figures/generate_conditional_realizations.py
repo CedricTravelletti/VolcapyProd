@@ -10,33 +10,19 @@ from volcapy.grid.grid_from_dsm import Grid
 from volcapy.update.updatable_covariance import UpdatableGP, UpdatableRealization
 from volcapy.plotting.vtkutils import irregular_array_to_point_cloud, _array_to_point_cloud
 from volcapy.plotting.vtkutils import array_to_vector_cloud
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set()
-sns.set_style("whitegrid")
-plt.rcParams["font.family"] = "Times New Roman"
-plot_params = {
-        'font.size': 12, 'font.style': 'oblique',
-        'axes.labelsize': 'small',
-        'axes.titlesize':'small',
-        'legend.fontsize': 'xx-small'
-        }
-plt.rcParams.update(plot_params)
 
 
 from timeit import default_timer as timer
 
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-sample_nr = 4
+sample_nr = 8
 
 data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_173018"
 results_folder_IVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/IVR_results/sample_{}/".format(sample_nr)
 results_folder_wIVR = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/wIVR_results/sample_{}/".format(sample_nr)
 
 infill_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/INFILL_results/sample_{}/".format(sample_nr)
+results_folder_INFILL = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/INFILL_results/sample_{}/".format(sample_nr)
 
 static_results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/sequential_ivr/results_aws/static/"
 
@@ -82,29 +68,21 @@ def main():
 
     # Reload the GPs.
     # gpIVR = UpdatableGP.load(os.path.join(results_folder_IVR, "gp_state.pkl"))
-    gpwIVR = UpdatableGP.load(os.path.join(results_folder_wIVR, "gp_state.pkl"))
+    # gpwIVR = UpdatableGP.load(os.path.join(results_folder_wIVR, "gp_state.pkl"))
+    gpINFILL = UpdatableGP.load(os.path.join(results_folder_INFILL, "gp_state.pkl"))
 
     # Produce posterior realization.
-    for reskrig_sample_nr in range(200, 300):
+    for reskrig_sample_nr in range(300, 400):
         prior_realization = torch.from_numpy(np.load(
                 os.path.join(reskrig_samples_folder,
                         "prior_sample_{}.npy".format(reskrig_sample_nr))))
         myReal = UpdatableRealization.bootstrap(prior_realization, G_stacked_wIVR,
-                data_std=0.1, gp_module=gpwIVR)
+                data_std=0.1, gp_module=gpINFILL)
         np.save(
                 os.path.join(results_folder_wIVR,
-                    "Cond_Reals/conditional_real_{}.npy".format(reskrig_sample_nr)),
+                    "Cond_Reals_Infill/conditional_real_{}.npy".format(reskrig_sample_nr)),
                 myReal._realization.detach().cpu().numpy())
 
-        irregular_array_to_point_cloud(volcano_coords.numpy(),
-                myReal._realization.detach().cpu().numpy(),
-                os.path.join(results_folder_wIVR,
-                        "Cond_Reals/conditional_real_{}.vtk".format(reskrig_sample_nr)), fill_nan_val=-20000.0)
-
-    irregular_array_to_point_cloud(volcano_coords.numpy(),
-            ground_truth.cpu().numpy(),
-            os.path.join(results_folder_wIVR,
-                    "ground_truth.vtk".format(reskrig_sample_nr)), fill_nan_val=-20000.0)
 
 if __name__ == "__main__":
     main()
