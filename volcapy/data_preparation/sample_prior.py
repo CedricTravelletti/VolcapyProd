@@ -1,7 +1,6 @@
 """ Prepare ground truth for article experiments by samling from Niklas
 posterior. We here use a small discretization.
 """
-from volcapy.inverse.inverse_problem import InverseProblem
 from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
 import volcapy.covariance.matern52 as kernel
 from volcapy.grid.grid_from_dsm import Grid
@@ -10,9 +9,6 @@ import sys
 
 from timeit import default_timer as timer
 
-import logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 import numpy as np
 import os

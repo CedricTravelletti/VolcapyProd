@@ -3,7 +3,6 @@ posterior. We here use a small discretization.
 
 AWS Version: we just update prior samples generated offline.
 """
-from volcapy.inverse.inverse_problem import InverseProblem
 from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
 import volcapy.covariance.matern52 as kernel
 from volcapy.grid.grid_from_dsm import Grid
