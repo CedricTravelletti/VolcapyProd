@@ -6,7 +6,7 @@ import numpy as np
 import os
 import sys
 from volcapy.grid.grid_from_dsm import Grid
-from volcapy.forward import compute_forward
+from volcapy.forward.gravimetry import compute_forward
 from scipy.spatial import KDTree
 
 
