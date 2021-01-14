@@ -378,7 +378,7 @@ class UpdatableCovariance:
             Vector of observed data values. The n-element should correspond to
             the n-th updating operation which was performed, hence to the n-th
             observation operator.
-            Note this is a bit awkward, since currentlry the
+            Note this is a bit awkward, since currently the
             UpdatableCovariance module does not inform the user about which
             observation operator was used at stage n.
             Moreover, this procedure currently only allows for 1-datapoint
@@ -397,7 +397,8 @@ class UpdatableCovariance:
             R = self.inversion_ops[i]
             conditional_mean = (
                     conditional_mean.double()
-                    + K_dash @ R @ (y - stacked_G[i, :].double() @ conditional_mean).double())
+                    + self.sigma0**2 * K_dash @ R @ 
+                    (y - stacked_G[i, :].double() @ conditional_mean).double())
         return conditional_mean.float()
 
     def __dict__(self):
