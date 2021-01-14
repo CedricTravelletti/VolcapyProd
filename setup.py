@@ -40,6 +40,7 @@ ext_modules = [
     # "volcapy/kernels/squared_exponential.pyx",
     # "volcapy/kernels/exponential.pyx",
     "volcapy/niklas/banerjee.pyx",
+    "volcapy/niklas/banerjee2d.pyx",
     "volcapy/grid/covariance_tools.pyx",
 ]
 

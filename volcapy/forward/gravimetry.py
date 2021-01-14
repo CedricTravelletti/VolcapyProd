@@ -1,6 +1,13 @@
-""" Compute forward operator for a given geometry.
+""" Compute gravimetric forward operator for a given geometry.
 
 """
+# TODO: All the parallelization stuff should be centralized in a single class
+# for all the different type of forwards.
+# The only difficulty that preventss us from doing it now is that different
+# types of forward may take different arguments and thus have different number
+# of arguments and variable names for the worker fun.
+# We should try to find a solution in which we only redefine the compute column
+# function for the different forwards and the argument handling is automatized.
 import numpy as np
 from multiprocessing import Pool, RawArray
 from volcapy.niklas.banerjee import banerjee
