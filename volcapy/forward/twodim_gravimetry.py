@@ -4,11 +4,6 @@ operators can constrain the solution.
 It is meant to be used with the simple geometries provided by volcapy.grid.square_grid.
 
 """
-
-
-
-def single_cell_fwd(data_coords, cell_coords, 
-
 import numpy as np
 from multiprocessing import Pool, RawArray
 from volcapy.niklas.banerjee2d import banerjee
@@ -23,12 +18,11 @@ G = 6.67e-6       #Transformation factor to get result in mGal
 # A global dictionary storing the variables passed from the initializer.
 var_dict = {}
 def init_worker(F, F_shape, coords, coords_shape,
-        roofs, roofs_shape, data, data_shape, meta):
+        data, data_shape, meta):
     var_dict['F'] = F
     var_dict['F_shape'] = F_shape
     var_dict['coords'] = coords
     var_dict['coords_shape'] = coords_shape
-    var_dict['roofs'] = roofs
     var_dict['data_coords'] = data
     var_dict['data_coords_shape'] = data_shape
     var_dict['meta'] = meta
@@ -131,7 +125,7 @@ def _compute_forward_column(cell, res_x, res_y, data_coords):
         yh = cell[1] + res_y / 2.0
         yl = cell[1] - res_y / 2.0
 
-        F_column[j] = float(G * banerjee2d(
+        F_column[j] = float(G * banerjee(
                 xh, xl, yh, yl,
                 data[0],  data[1]))
     return F_column
