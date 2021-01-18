@@ -37,12 +37,12 @@ def banerjee(double xh, double xl, double yh, double yl,
     cdef double B = 0
     for i, dx in enumerate(deltas_x):
         for j, dy in enumerate(deltas_y):
-            sign = (-1)**(i + j)
+            sign = (-1)**i * (-1)**j
             B += _banerjee(dx, dy, sign)
     return B
 
 cdef double _banerjee(double x, double y, int sign):
     """ Helper function for readability.
     """
-    cdef double R = sqrt(x**2 + y**2)
-    return(sign*x * log((R + y) / (R - y)) + sign*y * log((R + x) / (R - x)))
+    cdef double R = x**2 + y**2
+    return(1/2 * (sign*y * log(R) - sign*2*y + sign*2*x * np.arctan(y / x)))
