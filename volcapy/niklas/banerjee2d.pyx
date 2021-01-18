@@ -45,4 +45,4 @@ cdef double _banerjee(double x, double y, int sign):
     """ Helper function for readability.
     """
     cdef double R = x**2 + y**2
-    return(1/2 * (sign*y * log(R) - sign*2*y + sign*2*x * np.arctan(y / x)))
+    return(1/2 * (sign*y * log(R) - sign*2*y + sign*2*x * atan(y / x)))
