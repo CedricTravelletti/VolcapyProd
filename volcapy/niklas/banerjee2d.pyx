@@ -5,6 +5,7 @@
 from libc.math cimport log, atan, sqrt
 from cpython cimport array
 
+
 def banerjee(double xh, double xl, double yh, double yl,
         double x_data, double y_data):
     """ Returns the gravity field (measured at a data point) produced by a
@@ -45,4 +46,4 @@ cdef double _banerjee(double x, double y, int sign):
     """ Helper function for readability.
     """
     cdef double R = x**2 + y**2
-    return(1/2 * (sign*y * log(R) - sign*2*y + sign*2*x * atan(y / x)))
+    return(1/2.0 * (sign*y * log(R) - sign*2*y + sign*2*x * atan(y / x)))

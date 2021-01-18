@@ -125,7 +125,7 @@ def _compute_forward_column(cell, res_x, res_y, data_coords):
         yh = cell[1] + res_y / 2.0
         yl = cell[1] - res_y / 2.0
 
-        F_column[j] = float(G * banerjee(
+        F_column[j] = float(banerjee(
                 xh, xl, yh, yl,
                 data[0],  data[1]))
     return F_column
