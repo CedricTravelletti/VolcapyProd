@@ -34,7 +34,7 @@ data_std = 0.005
 
 n_reals = 20
 
-for i in range(1,25):
+for i in range(1,25, 4):
     print(i)
     subset_inds = list(range(0, my_problem.data_coords_full.shape[0], i))
     n_data = len(subset_inds)
@@ -58,7 +58,7 @@ for i in range(1,25):
         torch.save(cond_real, "cond_real_n_{}_data_{}.pt".format(j, n_data))
     """
 
-for i in [50, 100, 200, 400, 1000]:
+for i in [50, 100, 200, 300, 400, 600, 1000, 1500, 2000, 4000]:
     print(i)
     subset_inds = list(range(0, my_problem.data_coords_full.shape[0], i))
     n_data = len(subset_inds)
