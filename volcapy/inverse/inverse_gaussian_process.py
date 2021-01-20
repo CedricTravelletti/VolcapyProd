@@ -668,14 +668,35 @@ class InverseGaussianProcess(torch.nn.Module):
             Variance at each point.
 
         """
-        prior_variances = self.sigma0**2 * self.kernel.compute_diagonal(
+        prior_variances = self.kernel.compute_diagonal(
                 self.lambda0, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks, n_flush=50)
 
-        prior_variances -= torch.einsum("ij,jk,ik->i",
-                self.pushfwd, self.inversion_operator, self.pushfwd)
+        prior_variances -= self.sigma0**2 * torch.einsum("ij,jk,ik->i",
+                self.pushfwd.double(), self.inversion_operator,
+                self.pushfwd.double())
 
-        return prior_variances
+        return self.sigma0**2 * prior_variances
+
+    def posterior_covariance(self):
+        """ Computes posterior covariance matrix.
+        WARNING: needs pushforward and inversion operator to be only computed,
+        hence, only call after having conditioned the model.
+
+        Returns
+        -------
+        cov_mat: (self.cells_coords.n_cells, self.cells_coords.n_cells) Tensor
+            Posterior covariance matrix.
+
+        """
+        prior_covariance = self.kernel.compute_covariance(
+                self.lambda0, self.cells_coords, DEVICE,
+                n_chunks=self.n_chunks, n_flush=50)
+
+        prior_covariance -= self.sigma0**2 * (self.pushfwd.double() @ self.inversion_operator 
+                @ self.pushfwd.double().t())
+
+        return self.sigma0**2 * prior_covariance
 
     def sample_posterior(self, G, y, data_std):
         """ Sample from the posterior using residual kriging.
