@@ -696,7 +696,7 @@ class UpdatableGP():
         sample = torch.from_numpy(
                 np.asarray(simu.slots['data']).astype(np.float32)[:, None])
 
-        return sample + self.mean.m
+        return sample + self.mean.prior
 
     # TODO: Finish implementation.
     def sample_conditional(self, G, y, data_std):
