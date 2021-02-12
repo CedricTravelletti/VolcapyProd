@@ -11,11 +11,15 @@ cells will be n_cells_1d^(n_dims).
 
 """
 import numpy as np
+import scipy.interpolate
+import matplotlib.pyplot as plt
 
 
 class Grid():
     def __init__(self, n_dims, n_cells_1d):
+        self.n_dims = n_dims
         self.res = 2.0 / n_cells_1d
+        self.n_cells_1d = n_cells_1d
         n_cells = n_cells_1d**n_dims
 
         coords_1d = np.arange(-1 + self.res / 2, 1, self.res).reshape(-1, 1)
@@ -54,3 +58,40 @@ class Grid():
     @property
     def shape(self):
         return self.cells.shape
+
+    def plot_values(self, vals, cmap=None, vmin=None, vmax=None, outfile=None):
+        """ Plot a dataset over the grid. The values should be an array
+        defininf the value of the data at each grid point.
+
+        Parameters
+        ----------
+        vals: (n_cells) array
+
+        """
+        if self.n_dims == 2:
+            # Generate regular gridding over which to plot.
+            min_x = np.min(self.cells[:, 0])
+            max_x = np.max(self.cells[:, 0])
+            min_y = np.min(self.cells[:, 1])
+            max_y = np.max(self.cells[:, 1])
+    
+            grid_x, grid_y = np.mgrid[min_x:max_x:self.n_cells_1d*(1j),
+                    min_y:max_y:self.n_cells_1d*(1j)]
+    
+            gridded_data = scipy.interpolate.griddata(
+                    self.cells, vals.reshape(-1), (grid_x, grid_y), method='cubic')
+    
+            plt.imshow(gridded_data.T, extent=(min_x,max_x,min_y,max_y),
+                    origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
+        if self.n_dims == 1:
+            # Generate regular gridding over which to plot.
+            min_x = np.min(self.cells[:])
+            max_x = np.max(self.cells[:])
+    
+            plt.plot(self.cells, vals)
+            plt.xlim([min_x, max_x])
+
+        if outfile is not None:
+            plt.savefig(outfile, bbox_inches='tight', pad_inches=0, dpi=400)
+            plt.close()
+        else: plt.show()
