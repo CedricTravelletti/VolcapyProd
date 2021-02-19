@@ -354,7 +354,8 @@ class UpdatableCovariance:
             VR[inds] = V.diag()
         return VR
 
-    def condition_fantasy_data(self, prior, stacked_G, fantasy_ys):
+    def condition_fantasy_data(self, prior, stacked_G, fantasy_ys,
+            splitted_inds):
         """ Compute the posterior mean that would result from observing other
         data than the one which was assimilated.
         
@@ -391,14 +392,14 @@ class UpdatableCovariance:
 
         """
         conditional_mean = prior.double()
-        for i, y in enumerate(fantasy_ys):
-            y = _make_column_vector(y).double()
+        for i, inds in enumerate(splitted_inds):
+            y = _make_column_vector(fantasy_ys[inds]).double()
             K_dash = self.pushforwards[i].double()
             R = self.inversion_ops[i]
             conditional_mean = (
                     conditional_mean.double()
                     + self.sigma0**2 * K_dash @ R @ 
-                    (y - stacked_G[i, :].double() @ conditional_mean).double())
+                    (y - stacked_G[inds, :].double() @ conditional_mean).double())
         return conditional_mean.float()
 
     def __dict__(self):
@@ -498,6 +499,9 @@ class UpdatableRealization:
     conditional mean, plus a correction that contains a conditional mean,
     conditional on *simulated* data that comes from a prior realization.
 
+    Hence, the module will use the (already computed) conditional mean of some
+    UpdatableGP and then *replay* the updates onto a sample from the prior.
+
     """
     def __init__(self, prior_realization, gp_module):
         """ Build an updatable realization.
@@ -539,7 +543,8 @@ class UpdatableRealization:
 
 
     @classmethod
-    def bootstrap(cls, prior_realization, stacked_G, data_std, gp_module):
+    def bootstrap(cls, prior_realization, stacked_G, data_std, gp_module,
+            splitted_inds):
         """ Bootstrap an UpdatableRealization diretly to some posterior state.
         I.e. given a GP module that has already assimilated some data,
         we directly update the realization to that state.
@@ -574,7 +579,8 @@ class UpdatableRealization:
         fantasy_ys = stacked_G @ prior_realization + noise
         updatable_realization.set_conditional_mean(
                 gp_module.covariance.condition_fantasy_data(prior_realization,
-                        stacked_G, fantasy_ys))
+                        stacked_G, fantasy_ys,
+                        splitted_inds))
         return updatable_realization
         
     def set_conditional_mean(self, conditional_mean):
