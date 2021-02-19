@@ -4,7 +4,6 @@ The grid will have the same xy resolution as the dsm.
 
 """
 import numpy as np
-import meshio
 import pickle
 
 
@@ -58,14 +57,7 @@ class Grid():
     def surface(self):
         return self.cells[self.surface_inds]
 
-    def get_cell_hexahedron(self, cell_ind):
-        """ Returns the coordinates of the corners of the hexahedron definint
-        the current cells.
-
-        """
-        centroid_coord = self.__getitem__(cell_ind)
-        corner_1 = centroid_coord + 1.0
-
+    # TODO: Unused. Check and remove.
     def generate_mesh_data(self, cell_data=None):
         """ Converts grid to a VTK UnstructuredGrid.
 
@@ -88,19 +80,12 @@ class Grid():
                 bottom_back_left, bottom_back_right,
                 top_front_left, top_front_right,
                 top_back_left, top_back_right])
+
         # Black magic to put in correct order.
         points = points.reshape(1, -1).reshape(-1, 3)
         topology = np.array(list(range(points.shape[0])))
         topology = topology.reshape(-1, 8)
 
-        """
-        hex_mesh = meshio.Mesh(
-                points,
-                {"hexahedron": topology},
-                cell_data=cell_data)
-
-        # meshio.write("out.vtk", hex_mesh)
-        """
         return points, topology
 
 
