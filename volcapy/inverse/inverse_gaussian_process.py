@@ -172,16 +172,8 @@ class InverseGaussianProcess(torch.nn.Module):
 
     def compute_pushfwd(self, G):
         """ Given a measurement operator, compute the associated covariance
-        pushforward K G^T.
+        pushforward K G^T (without the sigma0^2 prefactor).
 
-        """
-        """
-        # Check if GPU available.
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        if not G.device == device:
-            self.logger.info("Moving to GPU.")
-            G = G.to(device)
         """
         # Compute the compute_covariance_pushforward and data-side covariance matrix
         self.pushfwd = self.kernel.compute_cov_pushforward(
