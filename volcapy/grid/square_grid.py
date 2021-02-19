@@ -18,10 +18,19 @@ import matplotlib.pyplot as plt
 class Grid():
     def __init__(self, n_dims, n_cells_1d):
         self.n_dims = n_dims
-        self.res = 2.0 / n_cells_1d
+        self.res = 2.0 / (n_cells_1d - 1)
         self.n_cells_1d = n_cells_1d
         n_cells = n_cells_1d**n_dims
 
+        if n_dims == 1:
+            self.x = np.mgrid[-1.0:1.0:n_cells_1d*(1j)]
+            self.cells = x
+        elif n_dims == 2:
+            self.x, self.y = np.mgrid[-1.0:1.0:n_cells_1d*(1j),
+                    -1.0:1.0:n_cells_1d*(1j)]
+            self.cells = np.vstack([self.x.ravel(), self.y.ravel()]).T
+
+        """
         coords_1d = np.arange(-1 + self.res / 2, 1, self.res).reshape(-1, 1)
         cells = coords_1d
 
@@ -36,7 +45,7 @@ class Grid():
             for j in range(1, n_cells_1d):
                 cells = np.vstack(
                         [cells, np.hstack([old_cells, np.roll(new_dim_1d_coords, j)])])
-        self.cells = cells
+        """
 
     @classmethod
     def load(cls, path):
