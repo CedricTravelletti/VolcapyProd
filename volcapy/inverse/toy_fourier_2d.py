@@ -27,7 +27,7 @@ class ToyFourier2d():
         self.n_cells_1d = n_cells_1d
 
     @classmethod
-    def build_problem(cls, n_cells_1d):
+    def build_problem(cls, n_cells_1d, forward_cutoff=None):
         """ Prepare data for a square geometry [-1,1] x [-1, 1] with
         observations consisting of coefficients of the DFT.
     
@@ -36,6 +36,11 @@ class ToyFourier2d():
         n_cells_1d: int
             Number of cells along one dimension of the grid.
             Total number of cells will be this number squared.
+        forward_cutoff: int, optional
+            If specified, only compute the forward for the coefficients up to
+            the cutoff (ordered along square filling sequence).
+            This is useful when building large-grid problems, where the full
+            Fourier operator would be quadratic in the number of cells.
     
         """
         # Build the grid.
@@ -44,7 +49,8 @@ class ToyFourier2d():
         # Compute the forward.
         M = n_cells_1d
         N = n_cells_1d
-        G_re, G_im = compute_forward(grid.cells, M, N, n_procs=4)
+        G_re, G_im = compute_forward(grid.cells, M, N, n_procs=4,
+                forward_cutoff=forward_cutoff)
         
         return cls(grid, G_re, G_im, n_cells_1d)
 

@@ -10,11 +10,13 @@ import numpy as np
 import torch
 
 
-output_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/Toy2dProblems/Fourier/results_fill/"
+output_folder = "/home/cedric/PHD/Dev/VolcapySIAM/reporting/Toy2dProblems/Fourier/results_fill_big/"
 
-n_cells_1d = 50
+n_cells_1d = 400
 
-my_problem = ToyFourier2d.build_problem(n_cells_1d)
+forward_cutoff = 200 # Only make 200 observations (Fourier and pointwise).
+
+my_problem = ToyFourier2d.build_problem(n_cells_1d, forward_cutoff)
 np.save("G_re.npy", my_problem.G_re)
 np.save("G_im.npy", my_problem.G_im)
 
@@ -33,25 +35,30 @@ my_problem.grid.plot_values(ground_truth, cmap='jet')
 data_values_re = my_problem.G_re @ ground_truth
 data_values_im = my_problem.G_im @ ground_truth
 
-# Pointwise observations.
-G_pt = np.eye(my_problem.grid.cells.shape[0], dtype=np.float32)
-data_values_pt = G_pt @ ground_truth
-
 # Put 0.5% noise.
 data_std = 0.005 * np.std(data_values_im)
 data_std_pt = 0.01
 
 
-# Learn more Fourier coefficients each time, along an R-sequence.
+# Make pointwise observations along a space-filling sequence.
 from volcapy.utils import r_sequence
 fill_sequence = r_sequence(my_problem.G_re.shape[0], 2, my_problem.n_cells_1d)
 
 # Convert to 1D index.
 fill_sequence = np.array(
     [my_problem.index_to_1d(ind[0], ind[1]) for ind in fill_sequence])
+# Only keep a subset.
+fill_sequence = fill_sequence[:forward_cutoff]
 np.save(
         os.path.join(output_folder, "fill_sequence.npy"),
         fill_sequence)
+
+# Pointwise observations.
+G_pt = np.zeros((fill_sequence.shape[0], my_problem.grid.cells.shape[0]), dtype=np.float32)
+for i, ind in enumerate(fill_sequence):
+    G_pt[i, ind] = 1.0
+data_values_pt = G_pt @ ground_truth
+
 
 # Generate the square filling sequence.
 fourier_inds = []
@@ -72,11 +79,11 @@ for k in range(1, fill_sequence.shape[0] + 1):
     # part.
     G_re = my_problem.G_re[fourier_inds[:k], :]
     G_im = my_problem.G_im[fourier_inds[:k], :]
-    G_pt_sub = G_pt[fill_sequence[:k], :]
+    G_pt_sub = G_pt[:k, :]
 
     d_re = data_values_re[fourier_inds[:k]]
     d_im = data_values_im[fourier_inds[:k]]
-    d_pt = data_values_pt[fill_sequence[:k]]
+    d_pt = data_values_pt[:k]
 
     if k == 1:
         G_pt_sub = G_pt_sub.reshape(1, -1)
