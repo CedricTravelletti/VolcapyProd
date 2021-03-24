@@ -22,7 +22,7 @@ np.save("G_im.npy", my_problem.G_im)
 
 m0 = 1.0
 sigma0 = 2.0
-lambda0 = 0.5
+lambda0 = 0.25
 
 myGP = InverseGaussianProcess(m0, sigma0, lambda0,
         torch.tensor(my_problem.grid.cells).float(), kernel)
@@ -30,7 +30,7 @@ myGP = InverseGaussianProcess(m0, sigma0, lambda0,
 # Build some ground truth by sampling.
 ground_truth = myGP.sample_prior().detach().numpy()
 np.save(os.path.join(output_folder, "ground_truth.npy"), ground_truth)
-my_problem.grid.plot_values(ground_truth, cmap='jet')
+my_problem.grid.plot_values(ground_truth, cmap='jet', vmin=-6, vmax=6)
 
 data_values_re = my_problem.G_re @ ground_truth
 data_values_im = my_problem.G_im @ ground_truth
