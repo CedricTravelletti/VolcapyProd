@@ -72,7 +72,6 @@ import torch
 import pandas as pd
 from timeit import default_timer as timer
 from volcapy.utils import _make_column_vector
-import volcapy.covariance.sample as Rinterface
 
 
 # Select gpu if available and fallback to cpu else.
@@ -642,6 +641,7 @@ class InverseGaussianProcess(torch.nn.Module):
             Column vector of sampled values at each cells.
 
         """
+        import volcapy.covariance.sample as Rinterface
         m0 = self.m0.detach().cpu().item()
         sigma0 = self.sigma0.detach().cpu().item()
         lambda0 = self.lambda0
