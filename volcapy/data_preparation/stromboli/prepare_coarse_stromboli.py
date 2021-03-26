@@ -59,6 +59,7 @@ def prepare_stromboli(input_path, output_path, z_step):
     from volcapy.loading import load_niklas
     niklas_data = load_niklas(ORIGINAL_NIKLAS_DATA_PATH)
     niklas_data_coords = np.array(niklas_data["data_coords"])[1:]
+    niklas_data_values = np.array(niklas_data["d"])
 
     # Find the indices of the closest data points to Niklas data.
     # This may be used to mitigate the difference between the two in case there
@@ -84,12 +85,18 @@ def prepare_stromboli(input_path, output_path, z_step):
 
     orientation_data = np.zeros((niklas_data_coords.shape[0], 3))
     orientation_data[:, 2] = -1.0
+    orientation_data_vals = np.zeros((niklas_data_coords.shape[0], 3))
+    orientation_data_vals[:, 2] = niklas_data_values
     array_to_vector_cloud(niklas_data_coords,
             orientation_data,
             os.path.join(output_path, "niklas_data_coords.vtk"))
     array_to_vector_cloud(niklas_data_coords_insurf,
             orientation_data,
             os.path.join(output_path, "niklas_data_coords_insurf.vtk"))
+    array_to_vector_cloud(niklas_data_coords,
+            orientation_data_vals,
+            os.path.join(output_path, "niklas_data_vals.vtk"))
+
     # ----------------------------------------------------------------------
     
     # Compute forward on whole surface.
