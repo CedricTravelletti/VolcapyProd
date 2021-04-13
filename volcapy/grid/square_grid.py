@@ -24,7 +24,7 @@ class Grid():
 
         if n_dims == 1:
             self.x = np.mgrid[-1.0:1.0:n_cells_1d*(1j)]
-            self.cells = x
+            self.cells = self.x[:, None]
         elif n_dims == 2:
             self.x, self.y = np.mgrid[-1.0:1.0:n_cells_1d*(1j),
                     -1.0:1.0:n_cells_1d*(1j)]
@@ -68,7 +68,7 @@ class Grid():
     def shape(self):
         return self.cells.shape
 
-    def plot_values(self, vals, cmap=None, vmin=None, vmax=None, outfile=None):
+    def plot_values(self, vals, cmap=None, vmin=None, vmax=None, colorbar=None, outfile=None):
         """ Plot a dataset over the grid. The values should be an array
         defininf the value of the data at each grid point.
 
@@ -92,6 +92,10 @@ class Grid():
     
             plt.imshow(gridded_data.T, extent=(min_x,max_x,min_y,max_y),
                     origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
+            plt.xticks([])
+            plt.yticks([])
+            if colorbar is not None:
+                plt.colorbar()
         if self.n_dims == 1:
             # Generate regular gridding over which to plot.
             min_x = np.min(self.cells[:])
