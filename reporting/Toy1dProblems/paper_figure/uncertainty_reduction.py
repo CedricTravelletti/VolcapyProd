@@ -17,9 +17,9 @@ n_cells_1d = 1000
 
 my_problem = ToyFourier1d.build_problem(n_cells_1d)
 
-m0 = 1.0
-sigma0 = 2.0
-lambda0 = 0.5
+m0 = 0.0
+sigma0 = np.sqrt(2.0)
+lambda0 = 0.4
 
 myGP = InverseGaussianProcess(m0, sigma0, lambda0,
         torch.tensor(my_problem.grid.cells).float(), kernel)
@@ -57,24 +57,30 @@ def plot_stds(grid, ground_truth, means, sigmas,
     max_x = np.max(grid.cells[:])
 
     fig, ax = plt.subplots(1)
-    ax.plot(grid.cells.reshape(-1), ground_truth, lw=0.8, label='true',
+    ax.plot(grid.cells.reshape(-1), ground_truth, lw=1.8, label='true',
             color='black', linestyle="dashed")
-    ax.plot(grid.cells.reshape(-1), means, lw=1.2, label='mean', color='red')
+    ax.plot(grid.cells.reshape(-1), means, lw=1.6, label='mean',
+            color='steelblue')
 
-    ax.fill_between(grid.cells.reshape(-1), means+sigmas, means-sigmas, facecolor='blue', alpha=0.3)
+    ax.fill_between(grid.cells.reshape(-1), means+2*sigmas, means-2*sigmas,
+            facecolor='steelblue', alpha=0.2)
 
+    """
     ax.fill_between(grid.cells.reshape(-1), means+3*sigmas, means+sigmas,
             facecolor='green', alpha=0.3)
     ax.fill_between(grid.cells.reshape(-1), means-3*sigmas, means-sigmas,
             facecolor='green', alpha=0.3)
+    """
 
-    plt.scatter(pts_x ,pts_y, color="red")
+    plt.scatter(pts_x ,pts_y, color="red", facecolors='none', linewidths=1.5)
     # plt.yticks([1.5, 2.0, 2.5, 3.0, 3.5])
     # plt.yticks([])
 
     # plt.title(title)
     plt.xlim([min_x, max_x])
-    plt.ylim([ymin, ymax])
+    ymin = np.min([-4, ymin])
+    ymax = np.max([4, ymax])
+    plt.ylim([ymin - 0.1, ymax + 0.1])
     if outfile is not None:
         plt.savefig(outfile, bbox_inches='tight', pad_inches=0, dpi=400)
         plt.close()
@@ -165,6 +171,27 @@ d_tot = np.vstack([d_pts,
             data_values_im[1:3, :]])
 
 i = 4
+m_post_m, m_post_d = myGP.condition_model(
+            torch.tensor(G_tot),
+            torch.tensor(d_tot), data_std)
+sigma_post = np.sqrt(myGP.posterior_variance())
+plot_stds(my_problem.grid, ground_truth.reshape(-1),
+        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        pts_x, pts_y,
+        ymin, ymax, title,
+            outfile="./variance_{}.png".format(i))
+
+# 4) Add more Fourier data.
+G_tot = np.vstack([G_pts,
+        my_problem.G_re[0, :].reshape(1, -1), 
+        my_problem.G_re[1:10, :], 
+        my_problem.G_im[1:10, :]])
+d_tot = np.vstack([d_pts,
+            data_values_re[0, :].reshape(1, -1), 
+            data_values_re[1:10, :], 
+            data_values_im[1:10, :]])
+
+i = 5
 m_post_m, m_post_d = myGP.condition_model(
             torch.tensor(G_tot),
             torch.tensor(d_tot), data_std)
