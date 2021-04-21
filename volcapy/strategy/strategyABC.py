@@ -155,6 +155,7 @@ class StrategyABC(ABC):
             self.observed_data = []
             self.n_steps = n_steps
             self.data_std = data_std
+            self.max_step = max_step
         else:
             i = len(self.visited_inds) - 1
             self.visited_inds = np.load(os.path.join(output_folder, "visited_inds.npy"))
@@ -165,7 +166,7 @@ class StrategyABC(ABC):
             metadata = np.load(os.path.join(output_folder, "metadata.npy"),
                     allow_pickle='TRUE').item()
             self.current_ind = metadata['next_ind_to_visit']
-            max_step = metadata['max_step']
+            self.max_step = metadata['max_step']
 
             self.data_std = metadata['data_std']
 
@@ -173,8 +174,8 @@ class StrategyABC(ABC):
             self.n_steps = metadata['remaining_steps']
 
         # Change the get neighbors routine if can jump more that one step.
-        if max_step is not None:
-            get_neighbors = lambda x: self.get_neighbors_bigstep(x, r=max_step)
+        if self.max_step is not None:
+            get_neighbors = lambda x: self.get_neighbors_bigstep(x, r=self.max_step)
         else: get_neighbors = lambda x: self.get_neighbors(x)
 
         for i in range(n_steps):
