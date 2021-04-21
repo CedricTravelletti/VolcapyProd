@@ -73,9 +73,8 @@ def main(sample_nr):
     # Run strategy.
     visited_inds, observed_data = strategy.run(
             start_ind, n_steps=2000, data_std=0.1,
-            output_folder=output_folder, save_coverage=True,
+            output_folder=output_folder,
             max_step = 310.0,
-            save_gp_state_path=save_gp_state_path
             )
 
     end = timer()
