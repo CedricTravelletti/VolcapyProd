@@ -1,4 +1,4 @@
-""" Run the infill strategy.
+""" Run the random walk strategy.
 
 """
 import os
@@ -19,8 +19,8 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 
 def main(sample_nr):
     # Create output directory.
-    output_folder = os.path.join(base_folder, "INFILL_results/sample_{}".format(sample_nr))
-    os.makedirs(output_path, exist_ok=True)
+    output_folder = os.path.join(base_folder, "RANDOMWALK_results/sample_{}".format(sample_nr))
+    os.makedirs(output_folder, exist_ok=True)
 
     # Load static data.
     F = torch.from_numpy(
@@ -63,7 +63,7 @@ def main(sample_nr):
 
     # -------------------------------------
 
-    from volcapy.strategy.infill import InfillStrategy
+    from volcapy.strategy.random_walk import RandomWalkStrategy
     strategy = RandomWalkStrategy(updatable_gp, data_coords,
             F, data_feed,
             lower=THRESHOLD_low, upper=None,
