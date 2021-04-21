@@ -182,7 +182,7 @@ class StrategyABC(ABC):
             self.visited_inds.append(self.current_ind)
             y = self.data_feed(self.current_ind)
             self.observed_data.append(y)
-            G = self.G[current_ind,:].reshape(1, -1)
+            G = self.G[self.current_ind,:].reshape(1, -1)
             self.gp.update(G, y, data_std)
 
             # Extract current coverage function (after observing at current
@@ -191,7 +191,7 @@ class StrategyABC(ABC):
 
             # Now evaluate where to go next.
             next_ind = self.get_next_ind()
-            current_ind = next_ind
+            self.current_ind = next_ind
             print("IVRS at current stage: {}.".format(neighbors_ivrs))
             print("Go to cell {}.".format(self.current_ind))
 
