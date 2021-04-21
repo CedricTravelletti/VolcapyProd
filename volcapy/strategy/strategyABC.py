@@ -154,7 +154,7 @@ class StrategyABC(ABC):
             self.visited_inds = []
             self.observed_data = []
             self.n_steps = n_steps
-            self.data_std
+            self.data_std = data_std
         else:
             i = len(self.visited_inds) - 1
             self.visited_inds = np.load(os.path.join(output_folder, "visited_inds.npy"))
