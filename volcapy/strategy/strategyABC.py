@@ -192,7 +192,6 @@ class StrategyABC(ABC):
             # Now evaluate where to go next.
             next_ind = self.get_next_ind()
             self.current_ind = next_ind
-            print("IVRS at current stage: {}.".format(neighbors_ivrs))
             print("Go to cell {}.".format(self.current_ind))
 
             # Save state every 10 iterations.
