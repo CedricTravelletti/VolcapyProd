@@ -74,7 +74,7 @@ def main(sample_nr):
     # Run strategy.
     visited_inds, observed_data = strategy.run(
             start_ind, n_steps=4000, data_std=0.1,
-            max_step=200.0
+            max_step=200.0,
             output_folder=output_folder
             )
 
