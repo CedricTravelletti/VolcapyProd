@@ -195,13 +195,16 @@ class StrategyABC(ABC):
             self.current_ind = next_ind
             print("Go to cell {}.".format(self.current_ind))
 
-            # Save state every 10 iterations.
+            # Save coverage each iteration.
+            self.save_state(output_folder, coverage_only=True)
+
+            # Save full state every 10 iterations.
             if i % 10 == 0:
                 self.save_state(output_folder)
 
         return visited_inds, observed_data
 
-    def save_state(self, output_folder):
+    def save_state(self, output_folder, coverage_only=False):
         """ Save the current state of the run, so can be re-launched in case of
         interrupt.
 
@@ -209,19 +212,23 @@ class StrategyABC(ABC):
         ----------
         output_folder: string
             Path to folder where to save.
+        coverage_only: bool, defaults to False
+            If True, then only save the current coverage.
 
         """
         i = len(self.visited_inds) - 1
-        np.save(os.path.join(output_folder, "visited_inds.npy"), self.visited_inds)
-        np.save(os.path.join(output_folder, "observed_data.npy"), self.observed_data)
-        self.gp.save(os.path.join(output_folder, "gp_state.pkl"))
-
         np.save(os.path.join(output_folder, "coverage_{}.npy".format(i)),
-                self.current_coverage)
 
-        metadata = {'max_step': self.max_step, 'next_ind_to_visit': self.current_ind,
-                'data_std': self.data_std, 'i': i, 'remaining_steps': self.n_steps - i}
-        np.save(os.path.join(output_folder, "metadata.npy"), metadata)
+        if coverage_only is False:
+            np.save(os.path.join(output_folder, "visited_inds.npy"), self.visited_inds)
+            np.save(os.path.join(output_folder, "observed_data.npy"), self.observed_data)
+            self.gp.save(os.path.join(output_folder, "gp_state.pkl"))
+    
+                    self.current_coverage)
+    
+            metadata = {'max_step': self.max_step, 'next_ind_to_visit': self.current_ind,
+                    'data_std': self.data_std, 'i': i, 'remaining_steps': self.n_steps - i}
+            np.save(os.path.join(output_folder, "metadata.npy"), metadata)
 
         """
             # Save current mean if needed.
