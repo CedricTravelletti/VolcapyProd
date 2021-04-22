@@ -59,7 +59,7 @@ def main(sample_nr):
 
     data_feed = lambda x: data_values[x]
     updatable_gp = UpdatableGP(cl, lambda0, sigma0, m0, volcano_coords,
-            n_chunks=80)
+            n_chunks=200)
 
     # -------------------------------------
 
@@ -72,13 +72,12 @@ def main(sample_nr):
     start = timer()
     # Run strategy.
     visited_inds, observed_data = strategy.run(
-            start_ind, n_steps=2000, data_std=0.1,
-            output_folder=output_folder,
-            max_step = 310.0,
+            start_ind, n_steps=4000, data_std=0.1,
+            output_folder=output_folder
             )
 
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
 
 if __name__ == "__main__":
-    main(5)
+    main(6)
