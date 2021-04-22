@@ -7,7 +7,7 @@ import numpy as np
 
 
 class MyopicWIVRStrategy(StrategyABC):
-    def get_nex_ind(self):
+    def get_next_ind(self):
         # Evaluate criterion on neighbors.
         neighbors_inds = self.get_neighbors(self.current_ind)
         neighbors_ivrs = []
