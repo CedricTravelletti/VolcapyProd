@@ -19,7 +19,8 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 
 def main(sample_nr):
     # Create output directory.
-    output_folder = os.path.join(base_folder, "RANDOMWALK_results/sample_{}".format(sample_nr))
+    output_folder = os.path.join(base_folder,
+            "RANDOMWALK_results/prior_samples_April2021/sample_{}".format(sample_nr))
     os.makedirs(output_folder, exist_ok=True)
 
     # Load static data.
@@ -33,13 +34,9 @@ def main(sample_nr):
 
     # Load generated data.
     post_sample_path = os.path.join(ground_truth_folder,
-            "post_samples/post_sample_{}.npy".format(sample_nr))
-    post_data_sample_path = os.path.join(ground_truth_folder,
-            "post_data_samples/post_data_sample_{}.npy".format(sample_nr))
+            "sample_{}.npy".format(sample_nr))
     ground_truth = torch.from_numpy(
             np.load(post_sample_path))
-    data_values = torch.from_numpy(
-            np.load(post_data_sample_path))
 
     # --------------------------------
     # DEFINITION OF THE EXCURSION SET.
@@ -56,6 +53,10 @@ def main(sample_nr):
     lambda0 = 338.46
     sigma0 = 359.49
     m0 = -114.40
+
+    # Prepare data.
+    data_values = F @ ground_truth + torch.normal(0, data_std,
+            size=(F.shape[0], 1))
 
     data_feed = lambda x: data_values[x]
     updatable_gp = UpdatableGP(cl, lambda0, sigma0, m0, volcano_coords,
