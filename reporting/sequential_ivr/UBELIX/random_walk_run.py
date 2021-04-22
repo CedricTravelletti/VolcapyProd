@@ -20,7 +20,7 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 def main(sample_nr):
     # Create output directory.
     output_folder = os.path.join(base_folder,
-            "RANDOMWALK_results/prior_samples_April2021/prior_sample_{}".format(sample_nr))
+            "RANDOMWALK_results/prior_samples_April2021/sample_{}".format(sample_nr))
     os.makedirs(output_folder, exist_ok=True)
 
     # Load static data.
@@ -34,7 +34,7 @@ def main(sample_nr):
 
     # Load generated data.
     post_sample_path = os.path.join(ground_truth_folder,
-            "sample_{}.npy".format(sample_nr))
+            "prior_sample_{}.npy".format(sample_nr))
     ground_truth = torch.from_numpy(
             np.load(post_sample_path))
 
