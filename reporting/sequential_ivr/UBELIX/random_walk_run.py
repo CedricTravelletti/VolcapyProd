@@ -13,7 +13,7 @@ from timeit import default_timer as timer
 
 
 data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018"
-ground_truth_folder = "/storage/homefs/ct19x463/AISTATS_results/"
+ground_truth_folder = "/storage/homefs/ct19x463/AISTATS_results/prior_samples_April2021"
 base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 
 
