@@ -218,13 +218,12 @@ class StrategyABC(ABC):
         """
         i = len(self.visited_inds) - 1
         np.save(os.path.join(output_folder, "coverage_{}.npy".format(i)),
+                    self.current_coverage)
 
         if coverage_only is False:
             np.save(os.path.join(output_folder, "visited_inds.npy"), self.visited_inds)
             np.save(os.path.join(output_folder, "observed_data.npy"), self.observed_data)
             self.gp.save(os.path.join(output_folder, "gp_state.pkl"))
-    
-                    self.current_coverage)
     
             metadata = {'max_step': self.max_step, 'next_ind_to_visit': self.current_ind,
                     'data_std': self.data_std, 'i': i, 'remaining_steps': self.n_steps - i}
