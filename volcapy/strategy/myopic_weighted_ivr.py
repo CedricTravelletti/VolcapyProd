@@ -16,7 +16,7 @@ class MyopicWIVRStrategy(StrategyABC):
         for ind in neighbors_inds:
             # Observation operator for candidate location.
             candidate_G = self.G[ind,:].reshape(1, -1)
-            ivr = self.gp.IVR(candidate_G, data_std, 
+            ivr = self.gp.IVR(candidate_G, self.data_std, 
                                 weights=self.current_coverage)
             neighbors_ivrs.append(ivr)
 
