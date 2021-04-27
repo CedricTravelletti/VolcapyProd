@@ -7,7 +7,7 @@ import numpy as np
 import volcapy.covariance.matern52 as cl
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.update.updatable_covariance import UpdatableGP
-from volcapy.strategy.random_walk import RandomWalkStrategy
+from volcapy.strategy.myopic_ivr import MyopicIVRStrategy
 
 from timeit import default_timer as timer
 
@@ -20,7 +20,7 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 def main(sample_nr):
     # Create output directory.
     output_folder = os.path.join(base_folder,
-            "RANDOMWALK_results/prior_samples_April2021/sample_{}".format(sample_nr))
+            "IVR_results/prior_samples_April2021/sample_{}".format(sample_nr))
     os.makedirs(output_folder, exist_ok=True)
 
     # Load static data.
@@ -64,8 +64,7 @@ def main(sample_nr):
 
     # -------------------------------------
 
-    from volcapy.strategy.random_walk import RandomWalkStrategy
-    strategy = RandomWalkStrategy(updatable_gp, data_coords,
+    strategy = MyopicIVRStrategy(updatable_gp, data_coords,
             F, data_feed,
             lower=THRESHOLD_low, upper=None,
             )
@@ -74,6 +73,7 @@ def main(sample_nr):
     # Run strategy.
     visited_inds, observed_data = strategy.run(
             start_ind, n_steps=4000, data_std=0.1,
+            max_step=200.0,
             output_folder=output_folder
             )
 
