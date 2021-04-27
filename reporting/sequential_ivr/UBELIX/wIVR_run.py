@@ -41,7 +41,7 @@ def main(sample_nr):
     # --------------------------------
     # DEFINITION OF THE EXCURSION SET.
     # --------------------------------
-    THRESHOLD_low = 700.0
+    THRESHOLD_low = 500.0
 
     # Choose a starting points on the coast.
     start_ind = 4478
@@ -82,4 +82,4 @@ def main(sample_nr):
     print("Run in {} mins.".format((end - start)/60))
 
 if __name__ == "__main__":
-    main(6)
+    main(8)
