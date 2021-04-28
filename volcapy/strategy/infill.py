@@ -34,6 +34,7 @@ class InfillStrategy(StrategyABC):
         self.max_step = 0
         self.current_ind = 0
         self.n_steps = 0
+        self.data_std = data_std
 
         self.visited_inds = []
         self.observed_data = []
