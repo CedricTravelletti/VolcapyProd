@@ -66,7 +66,8 @@ def main(sample_nr):
             )
 
     start = timer()
-    visited_inds, observed_data = strategy.run(data_std, output_folder)
+    visited_inds, observed_data = strategy.run(data_std, output_folder,
+            n_data_splits=100)
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
 

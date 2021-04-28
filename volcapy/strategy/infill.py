@@ -12,7 +12,7 @@ class InfillStrategy(StrategyABC):
         # Need to be implemented since it is an abstact method.
         pass
 
-    def run(self, data_std, output_folder):
+    def run(self, data_std, output_folder, n_data_splits):
         """ Re-implement the run method so we can benefit from all the
         automation implemented in the startegyABC class, in particular the
         saving.
@@ -23,6 +23,10 @@ class InfillStrategy(StrategyABC):
             Standard deviation of observation noise (homoscedactic).
         output_folder: string
             Path to folder where to save results.
+        n_data_splits: int
+            In how many parts we should split the whole data for absorption.
+            Note that this is necessary, since the covariance pushforward for
+            the whole dataset might be too large for memory.
 
         """
         # Those need to be set to arbitrary values for compatibility with
@@ -31,11 +35,17 @@ class InfillStrategy(StrategyABC):
         self.current_ind = 0
         self.n_steps = 0
 
-        self.visited_inds = list(range(self.candidates.shape[0]))
-        y = self.data_feed(self.visited_inds)
+        self.visited_inds = []
+        self.observed_data = []
 
-        self.observed_data = y
-        self.gp.update(self.G, y, data_std)
+        for sub_inds in np.array_split(list(range(self.candidates.shape[0])),
+                n_data_splits):
+            self.visited_inds.append(sub_inds)
+            y = self.data_feed(sub_inds)
+            self.observed_data.append(y)
+
+            G = self.G[sub_inds,:]
+            self.gp.update(G, y, data_std)
 
         # Extract infill covewrage function.
         self.current_coverage = self.gp.coverage(self.lower, self.upper)
