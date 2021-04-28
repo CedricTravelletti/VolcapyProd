@@ -54,4 +54,4 @@ class InfillStrategy(StrategyABC):
         # Save full state.
         self.save_state(output_folder)
 
-        return visited_inds, observed_data
+        return self.visited_inds, self.observed_data
