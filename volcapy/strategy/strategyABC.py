@@ -26,6 +26,8 @@ class StrategyABC(ABC):
             Gaussian process model.
         candidates: (n_candidates, n_dims) Tensor
             Coordinates of candidate observation locations.
+        G: Tensor
+            Forward operator.
         data_feed: function(int)
             Function that gives observations at a given location (defined by
             index in the candidates list.
