@@ -31,10 +31,10 @@ class InfillStrategy(StrategyABC):
         self.current_ind = 0
         self.n_steps = 0
 
-        self.visited_inds.append(range(self.candidates.shape[0]))
+        self.visited_inds = list(range(self.candidates.shape[0]))
         y = self.data_feed(self.visited_inds)
 
-        self.observed_data.append(y)
+        self.observed_data = y
         self.gp.update(self.G, y, data_std)
 
         # Extract infill covewrage function.
