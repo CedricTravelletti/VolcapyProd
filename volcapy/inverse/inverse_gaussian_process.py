@@ -71,6 +71,7 @@ import numpy as np
 import torch
 import pandas as pd
 from timeit import default_timer as timer
+from volcapy.gaussian_cdf import gaussian_cdf
 from volcapy.utils import _make_column_vector
 
 
@@ -371,7 +372,10 @@ class InverseGaussianProcess(torch.nn.Module):
                 m0 * torch.ones((self.n_model, 1), dtype=torch.float64)
                 + (self.sigma0.double()**2 * self.pushfwd.double() @ self.weights))
 
-        return m_post_m.float(), m_post_d.float()
+        # Save in case.
+        self.m_post_m = m_post_m.float()
+
+        return self.m_post_m, m_post_d.float()
 
     def train_fixed_lambda(self, lambda0, G, y, data_std,
             device=None,
@@ -668,7 +672,8 @@ class InverseGaussianProcess(torch.nn.Module):
                 self.pushfwd.double(), self.inversion_operator,
                 self.pushfwd.double())
 
-        return self.sigma0**2 * prior_variances
+        self.post_variance = self.sigma0**2 * prior_variances
+        return self.post_variance
 
     def posterior_covariance(self):
         """ Computes posterior covariance matrix.
@@ -757,3 +762,30 @@ class InverseGaussianProcess(torch.nn.Module):
 
         post_sample = post_mean + prior_sample - mu_prime
         return post_sample
+
+    def coverage(self, lower=None, upper=None):
+        """ Compute (current) coverage function.
+        Parameters
+        ----------
+        lower: float, defaults to None
+            Lower threshold of the excursion set. If None, then infinity will
+            be used.
+        upper: float, defaults to None
+            Upper threshold of the excursion set. If None, then infinity will
+            be used.
+    
+        Returns
+        -------
+        coverage: (self.n_cells, 1) Tensor
+            Value of the covaerage function (i.e. current excursion probability) 
+            at every cell.
+
+        """
+        if lower is not None:
+            lower = torch.tensor([lower])
+        if upper is not None:
+            upper = torch.tensor([upper])
+
+        coverage = gaussian_cdf(self.m_post_m, self.post_variance.reshape(-1, 1),
+                lower=lower, upper=upper)
+        return coverage
