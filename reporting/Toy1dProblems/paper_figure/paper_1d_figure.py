@@ -12,12 +12,12 @@ import torch
 import matplotlib.pyplot as plt
 plt.rcParams["font.family"] = "sans-serif"
 plot_params = {
-        'font.size': 16,
+        'font.size': 18,
         'axes.labelsize': 'small',
         'axes.titlesize':'small',
         'legend.fontsize': 'small',
-        'xtick.labelsize': 'xx-small',
-        'ytick.labelsize': 'xx-small'
+        'xtick.labelsize': 'x-small',
+        'ytick.labelsize': 'x-small'
         }
 plt.rcParams.update(plot_params)
 
@@ -117,6 +117,7 @@ def plot_excu_plugin(grid, ground_truth, means, sigmas,
     max_x = np.max(grid.cells[:])
 
     fig, ax = plt.subplots(1)
+    ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
 
     # Plot true excursion.
     excu_inds_true = np.argwhere(ground_truth >= THRESHOLD)[:, 0]
@@ -153,6 +154,9 @@ def plot_excu_plugin(grid, ground_truth, means, sigmas,
 
     plt.xlim([min_x, max_x])
 
+    ax2.set_ylabel('A', color='white', alpha=0.0)  # we already handled the x-label with
+    ax2.set_yticks([0.0, 0.2])
+    ax2.tick_params(axis='y', labelcolor='white', color='white')
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
 
     plt.savefig("./excu_plugin.png", bbox_inches='tight', pad_inches=0, dpi=400)
