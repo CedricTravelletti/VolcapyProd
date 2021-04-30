@@ -177,6 +177,7 @@ class StrategyABC(ABC):
 
         # Change the get neighbors routine if can jump more that one step.
         if self.max_step is not None:
+            print("BIG STEPS")
             get_neighbors = lambda x: self.get_neighbors_bigstep(x, r=self.max_step)
         else: get_neighbors = lambda x: self.get_neighbors(x)
 
