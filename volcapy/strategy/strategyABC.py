@@ -199,8 +199,8 @@ class StrategyABC(ABC):
             # Save coverage each iteration.
             self.save_state(output_folder, coverage_only=True)
 
-            # Save full state every 10 iterations.
-            if i % 10 == 0:
+            # Save full state every 5 iterations.
+            if i % 5 == 0:
                 self.save_state(output_folder)
 
         return visited_inds, observed_data
