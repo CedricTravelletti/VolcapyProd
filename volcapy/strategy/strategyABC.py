@@ -53,7 +53,7 @@ class StrategyABC(ABC):
         # supposed to have.
         self.n_neighbors = 6
 
-    def get_neighbors(self, ind):
+    def get_nearest_neighbors(self, ind):
         """ Get the neighbors of a candidate.
         
         Parameters
@@ -108,7 +108,6 @@ class StrategyABC(ABC):
         point_coord = self.candidates[ind]
         neighbors_inds = np.array(self.tree.query_ball_point(
                 point_coord, r=r))
-        print(neighbors_inds)
 
         # Remove the point istelf from the list.
         neighbors_inds = neighbors_inds[neighbors_inds != int(ind)]
@@ -177,9 +176,8 @@ class StrategyABC(ABC):
 
         # Change the get neighbors routine if can jump more that one step.
         if self.max_step is not None:
-            print("BIG STEPS")
-            get_neighbors = lambda x: self.get_neighbors_bigstep(x, r=self.max_step)
-        else: get_neighbors = lambda x: self.get_neighbors(x)
+            self.get_neighbors = lambda x: self.get_neighbors_bigstep(x, r=self.max_step)
+        else: self.get_neighbors = lambda x: self.get_nearest_neighbors(x)
 
         for i in range(n_steps):
             # Observe at currennt location and update model.
