@@ -1,4 +1,4 @@
-""" Run the random walk strategy.
+""" Compute coverage when surface is filled with observations (infill).
 
 """
 import os
@@ -7,7 +7,7 @@ import numpy as np
 import volcapy.covariance.matern52 as cl
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.update.updatable_covariance import UpdatableGP
-from volcapy.strategy.myopic_weighted_ivr import MyopicWIVRStrategy
+from volcapy.strategy.infill import InfillStrategy
 
 from timeit import default_timer as timer
 
@@ -20,7 +20,7 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 def main(sample_nr):
     # Create output directory.
     output_folder = os.path.join(base_folder,
-            "wIVR_results_700_nonoise/prior_samples_April2021/sample_{}".format(sample_nr))
+            "INFILL_results_700_nonoise/prior_samples_April2021/sample_{}".format(sample_nr))
     os.makedirs(output_folder, exist_ok=True)
 
     # Load static data.
@@ -43,9 +43,6 @@ def main(sample_nr):
     # --------------------------------
     THRESHOLD_low = 700.0
 
-    # Choose a starting points on the coast.
-    start_ind = 4478
-    
     # -------------------------------------
     # Define GP model.
     # -------------------------------------
@@ -56,29 +53,24 @@ def main(sample_nr):
 
     # Prepare data.
     data_values = F @ ground_truth
-
     data_feed = lambda x: data_values[x]
+
     updatable_gp = UpdatableGP(cl, lambda0, sigma0, m0, volcano_coords,
             n_chunks=200)
 
-    # -------------------------------------
-
-    from volcapy.strategy.random_walk import RandomWalkStrategy
-    strategy = MyopicWIVRStrategy(updatable_gp, data_coords,
+    # Ingest all surface data.
+    strategy = InfillStrategy(updatable_gp, data_coords,
             F, data_feed,
             lower=THRESHOLD_low, upper=None,
             )
 
     start = timer()
-    # Run strategy.
-    visited_inds, observed_data = strategy.run(
-            start_ind, n_steps=4000, data_std=0.1,
-            max_step=200.0,
-            output_folder=output_folder
-            )
-
+    visited_inds, observed_data = strategy.run(data_std, output_folder,
+            n_data_splits=100)
     end = timer()
     print("Run in {} mins.".format((end - start)/60))
+
+    # Save everything.
 
 if __name__ == "__main__":
     main(8)
