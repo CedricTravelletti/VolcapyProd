@@ -158,15 +158,18 @@ class StrategyABC(ABC):
             self.data_std = data_std
             self.max_step = max_step
         else:
+            self.visited_inds = list(np.load(os.path.join(output_folder, "visited_inds.npy")))
             i = len(self.visited_inds) - 1
-            self.visited_inds = np.load(os.path.join(output_folder, "visited_inds.npy"))
-            self.observed_data = np.load(os.path.join(output_folder, "observed_data.npy"))
+            print("Restarting from step {}.".format(i))
+            self.observed_data = list(np.load(os.path.join(output_folder, "observed_data.npy"),
+                    allow_pickle=True))
             self.gp = UpdatableGP.load(os.path.join(output_folder, "gp_state.pkl"))
+            print(self.gp.mean.m)
     
-            metadata = {'next_ind_to_visit': self.current_ind, 'i': i}
             metadata = np.load(os.path.join(output_folder, "metadata.npy"),
                     allow_pickle='TRUE').item()
-            self.current_ind = metadata['next_ind_to_visit']
+            self.current_ind = metadata['next_ind_to_visit'].item()
+            print(self.current_ind)
             self.max_step = metadata['max_step']
 
             self.data_std = metadata['data_std']
@@ -182,8 +185,8 @@ class StrategyABC(ABC):
         for i in range(n_steps):
             # Observe at currennt location and update model.
             self.visited_inds.append(self.current_ind)
-            y = self.data_feed(self.current_ind)
-            self.observed_data.append(y)
+            y = self.data_feed(self.current_ind).detach().float()
+            self.observed_data.append(y.detach().float().numpy())
             G = self.G[self.current_ind,:].reshape(1, -1)
             self.gp.update(G, y, data_std)
 
