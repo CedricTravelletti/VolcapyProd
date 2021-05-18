@@ -19,7 +19,7 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 
 def main(sample_nr):
     output_folder = os.path.join(base_folder,
-            "wIVR_results_700_nonoise_step_310/prior_samples_April2021/sample_{}".format(sample_nr))
+            "wIVR_results_350_nonoise_step_310/prior_samples_April2021/sample_{}".format(sample_nr))
 
     # Load static data.
     F = torch.from_numpy(
@@ -55,6 +55,8 @@ def main(sample_nr):
     data_values = F @ ground_truth
 
     data_feed = lambda x: data_values[x]
+    print("y")
+    print(data_feed(1))
     updatable_gp = UpdatableGP(cl, lambda0, sigma0, m0, volcano_coords,
             n_chunks=200)
 
@@ -69,7 +71,7 @@ def main(sample_nr):
     start = timer()
     # Run strategy.
     visited_inds, observed_data = strategy.run(
-            start_ind, n_steps=4000, data_std=0.1,
+            start_ind=-1, n_steps=4000, data_std=0.1,
             max_step=310.0,
             output_folder=output_folder,
             restart_from_save=output_folder
