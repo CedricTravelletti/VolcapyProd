@@ -48,6 +48,9 @@ class InfillStrategy(StrategyABC):
 
             G = self.G[sub_inds,:]
             self.gp.update(G, y, data_std)
+            
+            # Save full state every few iterations.
+            if i % 10 == 0: self.save_state(output_folder)
 
         # Extract infill coverage function.
         self.current_coverage = self.gp.coverage(self.lower, self.upper)
