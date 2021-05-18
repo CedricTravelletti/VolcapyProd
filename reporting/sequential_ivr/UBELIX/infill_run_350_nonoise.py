@@ -72,9 +72,9 @@ def main(sample_nr):
     start = timer()
     # Run strategy.
     visited_inds, observed_data = strategy.run(
-            start_ind, n_steps=4000, data_std=0.1,
-            max_step=310.0,
-            output_folder=output_folder
+            data_std=0.1,
+            output_folder=output_folder,
+            n_data_splits=200
             )
 
     end = timer()

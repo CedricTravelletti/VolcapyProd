@@ -39,8 +39,9 @@ class InfillStrategy(StrategyABC):
         self.visited_inds = []
         self.observed_data = []
 
-        for sub_inds in np.array_split(list(range(self.candidates.shape[0])),
-                n_data_splits):
+        for i, sub_inds in enumerate(np.array_split(list(range(self.candidates.shape[0])),
+                n_data_splits)):
+            print("Processing split {} / {}.".format(i, n_data_splits))
             self.visited_inds.append(sub_inds)
             y = self.data_feed(sub_inds)
             self.observed_data.append(y)
@@ -48,7 +49,7 @@ class InfillStrategy(StrategyABC):
             G = self.G[sub_inds,:]
             self.gp.update(G, y, data_std)
 
-        # Extract infill covewrage function.
+        # Extract infill coverage function.
         self.current_coverage = self.gp.coverage(self.lower, self.upper)
 
         # Save full state.
