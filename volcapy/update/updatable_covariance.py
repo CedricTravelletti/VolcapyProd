@@ -147,10 +147,9 @@ class UpdatableCovariance:
         # factor associated with it, whereas all other terms in the updating
         # have two one.
         if strip:
-            return cov_pushfwd_0 + self.sigma0**2 * temp
+            return cov_pushfwd_0 + temp
         else:
-            return (self.sigma0**2 * (
-                cov_pushfwd_0 + self.sigma0**2 * temp))
+            return self.sigma0**2 * (cov_pushfwd_0 + temp)
 
     # TODO: DEPRECATED. Not adapted to new stripped pushforwards.
     # TODO: Is this ever used?
@@ -170,6 +169,8 @@ class UpdatableCovariance:
             A^t * C * A
 
         """
+        raise NotImplementedError
+
         # First compute the level 0 pushforward, i.e. K_0 A.
         # Warning: the original covariance pushforward method was used to
         # comput K G^T, taking G as an argument, i.e. it does transposing in
@@ -210,7 +211,7 @@ class UpdatableCovariance:
         MAX_ATTEMPTS = 200
         for attempt in range(MAX_ATTEMPTS):
             try:
-                inversion_op = torch.inverse(self.sigma0**2 * K_d + data_std**2 *
+                inversion_op = torch.inverse(K_d + (data_std / self.sigma0)**2 *
                         torch.eye(K_d.shape[0], dtype=torch.float64))
             except RuntimeError:
                 print("Inversion failed: Singular Matrix.")
@@ -260,7 +261,7 @@ class UpdatableCovariance:
                 n_chunks=self.n_chunks, n_flush=50)
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
-            prior_variances_strip -= self.sigma0**2 * torch.einsum("ij,jk,ik->i",p,r.float(),p)
+            prior_variances_strip -= torch.einsum("ij,jk,ik->i",p,r.float(),p)
 
         return self.sigma0**2 * prior_variances_strip
 
@@ -398,7 +399,7 @@ class UpdatableCovariance:
             R = self.inversion_ops[i]
             conditional_mean = (
                     conditional_mean.double()
-                    + self.sigma0**2 * K_dash @ R @ 
+                    + K_dash @ R @ 
                     (y - stacked_G[inds, :].double() @ conditional_mean).double())
         return conditional_mean.float()
 
