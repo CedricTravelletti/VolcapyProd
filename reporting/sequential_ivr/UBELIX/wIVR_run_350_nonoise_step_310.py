@@ -20,7 +20,7 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 def main(sample_nr):
     # Create output directory.
     output_folder = os.path.join(base_folder,
-            "wIVR_results_700_nonoise_step_310/prior_samples_April2021/sample_{}".format(sample_nr))
+            "wIVR_results_350_nonoise_step_310/prior_samples_April2021/sample_{}".format(sample_nr))
     os.makedirs(output_folder, exist_ok=True)
 
     # Load static data.
@@ -83,4 +83,4 @@ def main(sample_nr):
     print("Run in {} mins.".format((end - start)/60))
 
 if __name__ == "__main__":
-    main(4)
+    main(8)
