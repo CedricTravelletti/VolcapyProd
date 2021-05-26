@@ -19,6 +19,7 @@ def prepare_stromboli(input_path, output_path, z_step):
     dsm_z = np.load(os.path.join(input_path, "dsm_stromboli_z.npy"))
     
     my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-800, z_step=z_step)
+    my_grid.save(os.path.join(output_path, "grid.pickle"))
     print("Grid with {} cells.".format(my_grid.shape[0]))
 
     # Name the output directory with the number of cells.
@@ -99,10 +100,6 @@ def prepare_stromboli(input_path, output_path, z_step):
 
     # ----------------------------------------------------------------------
     
-    # Compute forward on whole surface.
-    F_full_surface = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
-            my_grid.res_y, my_grid.res_z, data_coords, n_procs=4)
-    
     # Also compute forward for Niklas data.
     # TODO: WARNING!!! There is one too many data site. Here remove the first, but
     # maybe its the last who should be removed.
@@ -111,23 +108,31 @@ def prepare_stromboli(input_path, output_path, z_step):
     # TODO: Verify this. According to Niklas, we should subtract the response on
     # the reference station. Assuming this is the first data site, then, from every
     # line, we should subract the first line.
+    F_ref_station = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
+            my_grid.res_y, my_grid.res_z, ref_coords, n_procs=4)
+
     F_niklas = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
             my_grid.res_y, my_grid.res_z, niklas_data_coords, n_procs=4)
     
     # Subtract the first station.
-    F_ref_station = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
-            my_grid.res_y, my_grid.res_z, ref_coords, n_procs=4)
-    
-    F_niklas_corr = F_niklas - F_ref_station
-    
-    # Save everything.
-    np.save(os.path.join(output_path, "surface_data_coords.npy"), data_coords)
-    np.save(os.path.join(output_path, "niklas_data_coords.npy"), niklas_data_coords)
-    np.save(os.path.join(output_path, "niklas_data_obs.npy"), niklas_data['d'])
+    F_niklas_corr = F_niklas - np.repeat(F_ref_station, F_niklas.shape[0],
+            axis=0)
+
     np.save(os.path.join(output_path, "F_niklas.npy"), F_niklas)
-    np.save(os.path.join(output_path, "F_niklas_corr.npy"), F_niklas_corr)
+    np.save(os.path.join(output_path, "F_niklas_corr.npy"), F_niklas_corr[1:])
+    np.save(os.path.join(output_path, "niklas_data_coords.npy"),
+            niklas_data_coords[1:, :])
+    np.save(os.path.join(output_path, "niklas_data_obs.npy"),
+            niklas_data['d'][1:])
+
+    
+    # Compute forward on whole surface.
+    F_full_surface = compute_forward(my_grid.cells, my_grid.cells_roof, my_grid.res_x,
+            my_grid.res_y, my_grid.res_z, data_coords, n_procs=4)
+    
+    # Save everything, but cut first observation.
+    np.save(os.path.join(output_path, "surface_data_coords.npy"), data_coords)
     np.save(os.path.join(output_path, "F_full_surface.npy"), F_full_surface)
-    my_grid.save(os.path.join(output_path, "grid.pickle"))
     
 
 if __name__ == "__main__":
