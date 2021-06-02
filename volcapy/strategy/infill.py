@@ -42,22 +42,29 @@ class InfillStrategy(StrategyABC):
         print(np.random.shuffle(list(range(self.candidates.shape[0]))))
 
         # Split indices in groups or not.
+        # Start by shuffing in place.
+        inds_to_iter = list(range(self.candidates.shape[0]))
+        np.random.shuffle(inds_to_iter)
+
         if n_data_splits is not None:
             inds_to_iter = np.array_split(
-                    np.random.shuffle(list(range(self.candidates.shape[0]))),
+                    inds_to_iter,
                     n_data_splits)
-        else:
-            inds_to_iter = np.random.shuffle(list(range(self.candidates.shape[0])))
 
         for i, sub_inds in enumerate(inds_to_iter):
             print("Processing split {} / {}.".format(i, n_data_splits))
-            print("Split contains sruface inds {}.".format(sub_inds))
+            print("Split contains surface inds {}.".format(sub_inds))
 
             self.visited_inds.append(sub_inds)
             y = self.data_feed(sub_inds)
             self.observed_data.append(y)
-
-            G = self.G[sub_inds,:]
+            
+            # Find the shape of the data we are absorbing.
+            if isinstance(sub_inds, int):
+                data_shape = 1
+            else:
+                data_shape = sub_inds.shape[0]
+            G = self.G[sub_inds,:].reshape(data_shape, -1)
             self.gp.update(G, y, data_std)
             
             # Save full state every few iterations.
