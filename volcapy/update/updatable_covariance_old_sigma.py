@@ -1,6 +1,4 @@
-""" VERSION WHERE WE DO NOT TRY TO OPTIMIZE SIGMA.
-
-Make covariance matrix sequentially updatable.
+""" Make covariance matrix sequentially updatable.
 
 The goal is that, instead of performing a conditioning on lots of measurement
 in one go, we can instead chunk the data and perform several conditioning in
@@ -151,7 +149,7 @@ class UpdatableCovariance:
         if strip:
             return cov_pushfwd_0 + temp
         else:
-            return cov_pushfwd_0 + temp
+            return self.sigma0**2 * (cov_pushfwd_0 + temp)
 
     # TODO: DEPRECATED. Not adapted to new stripped pushforwards.
     # TODO: Is this ever used?
@@ -213,7 +211,7 @@ class UpdatableCovariance:
         MAX_ATTEMPTS = 200
         for attempt in range(MAX_ATTEMPTS):
             try:
-                inversion_op = torch.inverse(K_d + data_std *
+                inversion_op = torch.inverse(K_d + (data_std / self.sigma0)**2 *
                         torch.eye(K_d.shape[0], dtype=torch.float64))
             except RuntimeError:
                 print("Inversion failed: Singular Matrix.")
@@ -246,7 +244,7 @@ class UpdatableCovariance:
                 self.lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
                 n_flush=self.n_flush)
-        return self.sigma0**2 * pushfwd
+        return pushfwd
 
     def extract_variance(self):
         """ Extracts the pointwise variance from an UpdatableCovariane module.
@@ -265,7 +263,7 @@ class UpdatableCovariance:
         for p, r in zip(self.pushforwards, self.inversion_ops):
             prior_variances_strip -= torch.einsum("ij,jk,ik->i",p,r.float(),p)
 
-        return prior_variances_strip
+        return self.sigma0**2 * prior_variances_strip
 
     def IVR(self, G, data_std, integration_inds=None, weights=None):
         """ Compute the (integrated) variance reduction (IVR) that would
@@ -474,7 +472,7 @@ class UpdatableMean:
         K_dash = self.cov_module.pushforwards[-1]
         R = self.cov_module.inversion_ops[-1]
         self.m = (self.m.double() 
-                + K_dash.double() @ R.double() @ (y - G @
+                + self.cov_module.sigma0**2 * K_dash.double() @ R.double() @ (y - G @
                 self.m).double()).float()
 
         # ----
