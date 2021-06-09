@@ -258,14 +258,14 @@ class UpdatableCovariance:
     
         """
         # Without the sigma0 factor.
-        prior_variances_strip = self.cov_module.compute_diagonal(
+        prior_variances = self.sigma0**2 * self.cov_module.compute_diagonal(
                 self.lambda0, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks, n_flush=50)
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
-            prior_variances_strip -= torch.einsum("ij,jk,ik->i",p,r.float(),p)
+            prior_variances -= torch.einsum("ij,jk,ik->i",p,r.float(),p)
 
-        return prior_variances_strip
+        return prior_variances
 
     def IVR(self, G, data_std, integration_inds=None, weights=None):
         """ Compute the (integrated) variance reduction (IVR) that would
