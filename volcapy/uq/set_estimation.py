@@ -2,23 +2,37 @@
 
 """
 import numpy as np
+import torch
+from scipy.optimize import brentq
 
 
 def vorobev_expectation_inds(coverage):
+    """ Compute the Vorob'ev expectation of a random set, given the coverage
+    function (excursion probabilities).
+
+    Parameters
+    ----------
+    coverage: array(n_cells)
+        Array containing the excursion probability for each cell.
+
+    Returns
+    -------
+    excursion_inds: array
+        Array of indices (in the cells list) that correspond to cells belonging
+        to the Vorob'ev expectation.
+
+    """
     # Find the Vorob'ev threshold.
-    coverage = coverage.detach().float().numpy()
+    if torch.is_tensor(coverage):
+        coverage = coverage.detach().float().numpy()
+
     vorobev_volume = np.sum(coverage)
+
     def f(x):
         return np.sum(coverage > x) - vorobev_volume
 
-    from scipy.optimize import brentq
     vorobev_threshold = brentq(f, 0.0, 1.0)
-    print("Vorob'ev threshold: {}.".format(vorobev_threshold))
 
-    # Plot estimated excursion set using coverage function.
     vorobev_excu_inds = coverage > vorobev_threshold
-
-    print("Vorobe'v volume: {}.".format(vorobev_volume))
-    print("Current estimate volume: {}.".format(np.sum(vorobev_excu_inds)))
 
     return vorobev_excu_inds
