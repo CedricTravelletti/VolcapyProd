@@ -12,6 +12,8 @@ class MyopicWIVRStrategy(StrategyABC):
         neighbors_inds = self.get_neighbors(self.current_ind)
         neighbors_ivrs = []
 
+        print("Evaluating criterion among {} candidates.".format(neighbors_inds.shape[0]))
+
         # Compute criterion for each candidate.
         for ind in neighbors_inds:
             # Observation operator for candidate location.

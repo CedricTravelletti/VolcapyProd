@@ -82,7 +82,7 @@ class StrategyABC(ABC):
 
         return neighbors_inds
 
-    def get_neighbors_bigstep(self, ind, r):
+    def get_neighbors_bigstep(self, ind, r, rmin=None):
         """ This is used for stepping a lot.
         It find all neighbors within a given radius.
         Means we can jump by more than one.
@@ -93,6 +93,9 @@ class StrategyABC(ABC):
             Index of the node in the candidates list.
         r: float
             Get all neighbors within that radius.
+        rmin: float
+            If specified, then only consider neighbors that are more than rmin
+            away from the current point.
 
         Returns
         -------
@@ -106,8 +109,14 @@ class StrategyABC(ABC):
         ind_tensor = ind_tensor.long()
 
         point_coord = self.candidates[ind]
-        neighbors_inds = np.array(self.tree.query_ball_point(
-                point_coord, r=r))
+        neighbors_inds = self.tree.query_ball_point(point_coord, r=r)
+
+        # If rmin speficied, remove neighbors that are too close.
+        if rmin is not None:
+            close_neighbors_inds = self.tree.query_ball_point(point_coord, r=rmin)
+            neighbors_inds = list(set(neighbors_inds) - set(close_neighbors_inds))
+
+        neighbors_inds = np.array(neighbors_inds)
 
         # Remove the point istelf from the list.
         neighbors_inds = neighbors_inds[neighbors_inds != int(ind)]
