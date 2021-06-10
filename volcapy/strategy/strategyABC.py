@@ -137,7 +137,7 @@ class StrategyABC(ABC):
         pass
 
     def run(self, start_ind, n_steps, data_std,
-            output_folder, max_step=None, restart_from_save=None):
+            output_folder, max_step=None, min_step=None, restart_from_save=None):
         """ Run the startegy. Note that this works with any criterion to choose
         the next point, the only requirement is that selt.get_next_ind is
         defined before running the strategy.
@@ -154,6 +154,9 @@ class StrategyABC(ABC):
         max_step: float
             If provided, then instead of only walking to neighbors at each
             step, can go to any cell within distance max_step.
+        min_step: float
+            If provided, then only consider neigbors farther away than min_step
+            (must be used in conjunction with max_step).
         restart_from_save: string
             If a path to a folder is provided, then will restart the run from
             the saved data and finish it.
@@ -166,6 +169,7 @@ class StrategyABC(ABC):
             self.n_steps = n_steps
             self.data_std = data_std
             self.max_step = max_step
+            self.min_step = min_step
         else:
             self.visited_inds = list(np.load(os.path.join(output_folder, "visited_inds.npy")))
             i = len(self.visited_inds) - 1
@@ -180,6 +184,10 @@ class StrategyABC(ABC):
             self.current_ind = metadata['next_ind_to_visit'].item()
             print(self.current_ind)
             self.max_step = metadata['max_step']
+            try:
+                self.min_step = metadata['min_step']
+            except:
+                pass
 
             self.data_std = metadata['data_std']
 
@@ -188,7 +196,8 @@ class StrategyABC(ABC):
 
         # Change the get neighbors routine if can jump more that one step.
         if self.max_step is not None:
-            self.get_neighbors = lambda x: self.get_neighbors_bigstep(x, r=self.max_step)
+            self.get_neighbors = lambda x: self.get_neighbors_bigstep(x,
+                    r=self.max_step, rmin=self.min_step)
         else: self.get_neighbors = lambda x: self.get_nearest_neighbors(x)
 
         for i in range(n_steps):
@@ -239,7 +248,8 @@ class StrategyABC(ABC):
             np.save(os.path.join(output_folder, "observed_data.npy"), self.observed_data)
             self.gp.save(os.path.join(output_folder, "gp_state.pkl"))
     
-            metadata = {'max_step': self.max_step, 'next_ind_to_visit': self.current_ind,
+            metadata = {'max_step': self.max_step, 'min_step': self.min_step
+                    'next_ind_to_visit': self.current_ind,
                     'data_std': self.data_std, 'i': i, 'remaining_steps': self.n_steps - i}
             np.save(os.path.join(output_folder, "metadata.npy"), metadata)
 
