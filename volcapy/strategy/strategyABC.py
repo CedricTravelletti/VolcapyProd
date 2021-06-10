@@ -248,7 +248,7 @@ class StrategyABC(ABC):
             np.save(os.path.join(output_folder, "observed_data.npy"), self.observed_data)
             self.gp.save(os.path.join(output_folder, "gp_state.pkl"))
     
-            metadata = {'max_step': self.max_step, 'min_step': self.min_step
+            metadata = {'max_step': self.max_step, 'min_step': self.min_step,
                     'next_ind_to_visit': self.current_ind,
                     'data_std': self.data_std, 'i': i, 'remaining_steps': self.n_steps - i}
             np.save(os.path.join(output_folder, "metadata.npy"), metadata)
