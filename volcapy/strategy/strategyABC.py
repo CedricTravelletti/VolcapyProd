@@ -197,7 +197,8 @@ class StrategyABC(ABC):
             # Now evaluate where to go next.
             next_ind = self.get_next_ind()
             self.current_ind = next_ind
-            print("Go to cell {}.".format(self.current_ind))
+            print("Go to cell {} for step {}.".format(self.current_ind,
+                    len(self.visited_inds)))
 
             # Save coverage each iteration.
             self.save_state(output_folder, coverage_only=True)
