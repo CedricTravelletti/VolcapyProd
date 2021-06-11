@@ -302,16 +302,16 @@ class InverseGaussianProcess(torch.nn.Module):
             # Check if GPU available and otherwise go for CPU.
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        y = _make_column_vector(y)
+        y = _make_column_vector(y).double()
 
         # Prior mean (vector) on the data side.
-        mu0_d_stripped = torch.mm(G, torch.ones((self.n_model, 1),
+        mu0_d_stripped = torch.mm(G.double(), torch.ones((self.n_model, 1),
                 dtype=torch.float64))
         # Compute R^(-1) * G * I_m.
         tmp = self.inversion_operator @ mu0_d_stripped
         conc_m0 = (y.t() @ tmp) / (mu0_d_stripped.t() @ tmp)
 
-        return conc_m0
+        return conc_m0.float()
 
     def condition_model(self, G, y, data_std, concentrate=False,
             is_precomp_pushfwd=False, device=None, hypothetical=False):
