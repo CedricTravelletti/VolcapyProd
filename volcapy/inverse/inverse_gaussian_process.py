@@ -231,7 +231,7 @@ class InverseGaussianProcess(torch.nn.Module):
             self.m0 = self.concentrate_m0(G, y)
 
         # Prior mean (vector) on the data side.
-        mu0_d_stripped = (G @ torch.ones((self.n_model, 1),
+        mu0_d_stripped = (G.to(device) @ torch.ones((self.n_model, 1),
                 dtype=torch.float32, device=device))
         mu0_d = self.m0 * mu0_d_stripped
         prior_misfit = y.double() - mu0_d.double()
