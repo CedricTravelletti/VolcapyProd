@@ -408,7 +408,7 @@ class InverseGaussianProcess(torch.nn.Module):
         if device is None:
             device = self.device
 
-        y = _make_column_vector(y)
+        y = _make_column_vector(y).to(device)
 
         # Compute the pushforward once and for all, since it only depends on
         # lambda0 and G.
