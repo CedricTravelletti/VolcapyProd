@@ -276,7 +276,7 @@ class InverseGaussianProcess(torch.nn.Module):
         # power to them.
         log_det = torch.logdet(self.R).double()
 
-        mu0_d_stripped = torch.mm(G.double(), torch.ones((self.n_model, 1),
+        mu0_d_stripped = torch.mm(G.double().to(device), torch.ones((self.n_model, 1),
                 dtype=torch.float64, device=device))
         mu0_d = m0 * mu0_d_stripped
         prior_misfit = y.double() - mu0_d.double()
