@@ -298,7 +298,7 @@ class InverseGaussianProcess(torch.nn.Module):
         y = _make_column_vector(y).double().to(device)
 
         # Prior mean (vector) on the data side.
-        mu0_d_stripped = torch.mm(G.double(), torch.ones((self.n_model, 1),
+        mu0_d_stripped = torch.mm(G.double().to(device), torch.ones((self.n_model, 1),
                 dtype=torch.float64, device=device))
         # Compute R^(-1) * G * I_m.
         tmp = self.inversion_operator @ mu0_d_stripped
