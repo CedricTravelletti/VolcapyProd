@@ -293,7 +293,7 @@ class InverseGaussianProcess(torch.nn.Module):
         """
         if device is None:
             # Check if GPU available and otherwise go for CPU.
-            device = self.device()
+            device = self.device
 
         y = _make_column_vector(y).double().to(device)
 
