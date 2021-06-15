@@ -75,10 +75,6 @@ from volcapy.gaussian_cdf import gaussian_cdf
 from volcapy.utils import _make_column_vector
 
 
-# Select gpu if available and fallback to cpu else.
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
 class InverseGaussianProcess(torch.nn.Module):
     """
 
@@ -107,7 +103,7 @@ class InverseGaussianProcess(torch.nn.Module):
     def __init__(self, m0, sigma0, lambda0,
             cells_coords, cov_module,
             n_chunks=200, n_flush=50,
-            output_device=None,
+            device=None,
             logger=None):
         """
 
@@ -135,17 +131,13 @@ class InverseGaussianProcess(torch.nn.Module):
         """
         super(InverseGaussianProcess, self).__init__()
         
-        """
         # Get GPUS.
-        if output_device is None:
+        if device is None:
             # Check if GPU available and otherwise go for CPU.
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        """
-        # self.device = device
-        self.device = torch.device("cpu")
+        self.device = device
 
         self.m0 = torch.tensor(m0, requires_grad=False)
-        # TODO: Fix.
         self.sigma0 = torch.tensor(sigma0, requires_grad=True)
         self.sigma0 = torch.nn.Parameter(self.sigma0)
         self.lambda0 = lambda0
@@ -178,9 +170,9 @@ class InverseGaussianProcess(torch.nn.Module):
         # Compute the compute_covariance_pushforward and data-side covariance matrix
         self.pushfwd = self.kernel.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords,
-                device=DEVICE,
+                device=self.device,
                 n_chunks=self.n_chunks, n_flush=self.n_flush)
-        self.K_d = G.double() @ self.pushfwd.double()
+        self.K_d = G.to(self.device).double() @ self.pushfwd.double()
 
     def condition_data(self, G, y, data_std, concentrate=False,
             is_precomp_pushfwd=False, device=None):
@@ -229,7 +221,7 @@ class InverseGaussianProcess(torch.nn.Module):
         if not is_precomp_pushfwd:
             self.compute_pushfwd(G)
 
-        y = _make_column_vector(y)
+        y = _make_column_vector(y).to(device)
 
         # Get inversion operator.
         self.inversion_operator, data_std = self.get_inversion_op(self.K_d, data_std)
