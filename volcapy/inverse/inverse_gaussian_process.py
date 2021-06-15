@@ -178,6 +178,7 @@ class InverseGaussianProcess(torch.nn.Module):
         # Compute the compute_covariance_pushforward and data-side covariance matrix
         self.pushfwd = self.kernel.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords,
+                device=DEVICE,
                 n_chunks=self.n_chunks, n_flush=self.n_flush)
         self.K_d = G.double() @ self.pushfwd.double()
 
