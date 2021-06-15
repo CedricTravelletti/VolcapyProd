@@ -158,11 +158,6 @@ def compute_cov(lambda0, cells_coords, i, j):
 
     # Euclidean distance.
     d = torch.sqrt(torch.pow(
-    lambda0 = torch.tensor(lambda0, requires_grad=False)
-    inv_lambda2 = - np.sqrt(3) / lambda0
-
-    # Euclidean distance.
-    d = torch.sqrt(torch.pow(
             cells_coords[i, :] - cells_coords[j, :]
             , 2).sum())
 
