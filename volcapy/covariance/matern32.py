@@ -14,7 +14,7 @@ from timeit import default_timer as timer
 KERNEL_FAMILY = "matern32"
 
 
-def compute_cov_pushforward(lambda0, F, cells_coords, device, n_chunks=200,
+def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         n_flush=50):
     """ Compute the covariance pushforward.
 
@@ -47,12 +47,13 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device, n_chunks=200,
     Tensor
         n_model * n_data covariance pushforward K F^t.
     """
-    start = timer()
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Transfer everything to device.
     lambda0 = torch.tensor(lambda0, requires_grad=False).to(device)
-    F = F.to(device)
-    cells_coords = cells_coords.to(device)
+    F = F.detach().to(device)
+    cells_coords = cells_coords.detach().to(device)
 
     # Flush to make sure everything clean.
     if torch.cuda.is_available():
@@ -158,8 +159,7 @@ def compute_cov(lambda0, cells_coords, i, j):
 
     # Euclidean distance.
     d = torch.sqrt(torch.pow(
-            cells_coords[i, :] - cells_coords[j, :]
-            , 2).sum())
+            cells_coords[i, :] - cells_coords[j, :], 2).sum())
 
     return (1 - inv_lambda2 * d) * torch.exp(inv_lambda2 * d)
 
