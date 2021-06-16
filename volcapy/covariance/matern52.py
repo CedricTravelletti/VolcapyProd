@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from multiprocessing import Pool, RawArray
 
 # General torch settings and devices.
 torch.set_num_threads(8)
@@ -104,7 +105,7 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
     end = timer()
     print(end - start)
 
-    return tot.detach().cpu()
+    return tot.detach()
 
 def compute_diagonal(lambda0, cells_coords, device=None, n_chunks=200,
         n_flush=50):

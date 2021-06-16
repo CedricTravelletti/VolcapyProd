@@ -34,6 +34,8 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         n_cells * n_dims: cells coordinates
     device: toch.Device
         Device to perform the computation on, CPU or GPU.
+        Defaults to None, in which case first tries gpu and falls back to cpu
+        if unavailable.
     n_chunks: int
         Number of chunks to split the matrix into.
         Default is 200. Increase if get OOM errors.
@@ -47,6 +49,8 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
     Tensor
         n_model * n_data covariance pushforward K F^t.
     """
+    start = timer()
+
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -61,7 +65,7 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         torch.cuda.empty_cache()
 
     inv_lambda2 = - np.sqrt(3) / lambda0
-    n_dims = 3
+    n_dims = cells_coords.shape[1]
     n_model = F.shape[1]
 
     # Array to hold the results. We will compute line by line and concatenate.
@@ -96,8 +100,9 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         torch.cuda.empty_cache()
 
     end = timer()
+    print(end - start)
 
-    return tot
+    return tot.detach()
 
 def compute_diagonal(lambda0, cells_coords, device=None, n_chunks=200,
         n_flush=50):
