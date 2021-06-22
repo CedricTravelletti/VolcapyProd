@@ -28,20 +28,6 @@ def main():
     data_values = torch.from_numpy(
             np.load(os.path.join(data_folder,"niklas_data_obs_corrected_final.npy"))).float()
 
-    # Create a random shuffle of the data.
-    shuffled_inds = list(range(data_values.shape[0]))
-    np.random.shuffle(shuffled_inds)
-    F_shuffled = F[shuffled_inds, :]
-    data_values_shuffled = data_values[shuffled_inds]
-
-    # Test/Train split.
-    n_train = 300
-    F_train = F_shuffled[:n_train, :]
-    data_values_train = data_values_shuffled[:n_train]
-    F_test = F_shuffled[n_train:, :]
-    data_values_test = data_values_shuffled[n_train:]
-
-
     # HYPERPARAMETERS
     data_std = 0.1
 
@@ -66,26 +52,40 @@ def main():
             lambda0_matern52,
             volcano_coords, matern52_kernel)
 
-    # Condition on training data.
-    m_post_m_exp, _  = gp_exp.condition_model(F_train, data_values_train, data_std)
-    m_post_m_matern32, _  = gp_matern32.condition_model(F_train, data_values_train, data_std)
-    m_post_m_matern52, _  = gp_matern52.condition_model(F_train, data_values_train, data_std)
+    df = pd.DataFrame(columns=['kernel', 'Test set size', 'repetition',
+            'Test RMSE'])
 
-    # Predict test data.
-    data_values_pred_exp = (F_test @ m_post_m_exp.cpu()).reshape(-1)
-    data_values_pred_matern32 = (F_test @ m_post_m_matern32.cpu()).reshape(-1)
-    data_values_pred_matern52 = (F_test @ m_post_m_matern52.cpu()).reshape(-1)
+    # Loop over hold-out length:
+    gps = [gp_exp, gp_matern32, gp_matern52]
+    n_trains = [50, 100, 200, 300, 400, 500, 520]
+    n_repetitions = 5
+    for n_train in n_trains:
+        for repetition in range(n_repetitions):
+            # Create a random shuffle of the data.
+            shuffled_inds = list(range(data_values.shape[0]))
+            np.random.shuffle(shuffled_inds)
+            F_shuffled = F[shuffled_inds, :]
+            data_values_shuffled = data_values[shuffled_inds]
+        
+            # Test/Train split.
+            F_train = F_shuffled[:n_train, :]
+            data_values_train = data_values_shuffled[:n_train]
+            F_test = F_shuffled[n_train:, :]
+            data_values_test = data_values_shuffled[n_train:]
+            for gp in gps:
+                # Condition on training data.
+                m_post_m, _  = gp.condition_model(F_train, data_values_train, data_std)
+                # Predict test data.
+                data_values_pred = (F_test @ m_post_m.cpu()).reshape(-1)
+                test_rmse = torch.sqrt(
+                        torch.mean((data_values_test - data_values_pred)**2))
 
-    test_rmse_exp = torch.sqrt(torch.mean((data_values_test -
-            data_values_pred_exp)**2))
-    test_rmse_matern32 = torch.sqrt(torch.mean((data_values_test -
-            data_values_pred_matern32)**2))
-    test_rmse_matern52 = torch.sqrt(torch.mean((data_values_test -
-            data_values_pred_matern52)**2))
-
-    print("Test RMSE exponential: {}".format(test_rmse_exp.item()))
-    print("Test RMSE Matern 3/2: {}".format(test_rmse_matern32.item()))
-    print("Test RMSE Matern 5/2: {}".format(test_rmse_matern52.item()))
+                df = df.append({'kernel': gp.kernel.KERNEL_FAMILY,
+                        'Test set size': F.shape[0] - n_train,
+                        'repetition': repetition,
+                        'Test RMSE': test_rmse}, ignore_index=True)
+        # Save after each train set size.
+        df.to_pickle("test_set_results.pkl")
 
 
 if __name__ == "__main__":
