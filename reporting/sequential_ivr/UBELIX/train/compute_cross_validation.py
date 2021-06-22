@@ -3,7 +3,11 @@
 import os
 import torch
 import numpy as np
-import volcapy.covariance.squared_exponential as kernel
+
+import volcapy.covariance.exponential as exponential_kernel
+import volcapy.covariance.matern32 as matern32_kernel
+import volcapy.covariance.matern52 as matern52_kernel
+
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
 
