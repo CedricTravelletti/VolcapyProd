@@ -13,7 +13,6 @@ from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
 
 
 data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018"
-base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 
 
 def main():
@@ -30,8 +29,8 @@ def main():
             np.load(os.path.join(data_folder,"niklas_data_obs_corrected_final.npy"))).float()
 
     # Create a random shuffle of the data.
-    inds_to_iter = list(range(data_values.shape[0]))
-    shuffled_inds = np.random.shuffle(inds_to_iter)
+    shuffled_inds = list(range(data_values.shape[0]))
+    np.random.shuffle(shuffled_inds)
     F_shuffled = F[shuffled_inds, :]
     data_values_shuffled = data_values[shuffled_inds]
 
