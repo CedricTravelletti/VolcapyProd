@@ -72,9 +72,9 @@ def main():
     m_post_m_matern52, _  = gp_matern52.condition_model(F_train, data_values_train, data_std)
 
     # Predict test data.
-    data_values_pred_exp = F_test @ m_post_m_exp.cpu()
-    data_values_pred_matern32 = F_test @ m_post_m_matern32.cpu()
-    data_values_pred_matern52 = F_test @ m_post_m_matern52.cpu()
+    data_values_pred_exp = (F_test @ m_post_m_exp.cpu()).reshape(-1)
+    data_values_pred_matern32 = (F_test @ m_post_m_matern32.cpu()).reshape(-1)
+    data_values_pred_matern52 = (F_test @ m_post_m_matern52.cpu()).reshape(-1)
 
     test_rmse_exp = torch.sqrt(torch.mean((data_values_test -
             data_values_pred_exp)**2))
