@@ -47,57 +47,58 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
     Tensor
         n_model * n_data covariance pushforward K F^t.
     """
-    start = timer()
-
-    if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    # Transfer everything to device.
-    lambda0 = torch.tensor(lambda0, requires_grad=False).to(device)
-    F = F.to(device)
-    cells_coords = cells_coords.to(device)
-
-    # Flush to make sure everything clean.
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-        torch.cuda.empty_cache()
-
-    inv_lambda2 = - 1 / (2 * lambda0**2)
-    n_dims = 3
-    n_model = F.shape[1]
-
-    # Array to hold the results. We will compute line by line and concatenate.
-    tot = torch.Tensor().to(device)
-
-    # Compute K * F^T chunk by chunk.
-    # That is, of all the cell couples, we compute the distance between some
-    # cells (here x) and ALL other cells. Then repeat for other chunk and
-    # concatenate.
-    for i, x in enumerate(torch.chunk(cells_coords, chunks=n_chunks, dim=0)):
-        # Empty cache every so often. Otherwise we get out of memory errors.
-        if i % n_flush == 0 and torch.cuda.is_available():
+    with torch.no_grad():
+        start = timer()
+    
+        if device is None:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+        # Transfer everything to device.
+        lambda0 = torch.tensor(lambda0, requires_grad=False).to(device)
+        F = F.to(device)
+        cells_coords = cells_coords.to(device)
+    
+        # Flush to make sure everything clean.
+        if torch.cuda.is_available():
             torch.cuda.synchronize()
             torch.cuda.empty_cache()
-
-        # Squared euclidean distance.
-        d_2 = torch.pow(
-            x.unsqueeze(1).expand(x.shape[0], n_model, n_dims)
-            - cells_coords.unsqueeze(0).expand(x.shape[0], n_model, n_dims)
-            , 2).sum(2)
-        tot = torch.cat((
-                tot,
-                torch.matmul(
-                    torch.exp(inv_lambda2 * d_2)
-                    , F.t())))
-
-    # Wait for all threads to complete.
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-        torch.cuda.empty_cache()
-
-    end = timer()
-
-    return tot
+    
+        inv_lambda2 = - 1 / (2 * lambda0**2)
+        n_dims = 3
+        n_model = F.shape[1]
+    
+        # Array to hold the results. We will compute line by line and concatenate.
+        tot = torch.Tensor().to(device)
+    
+        # Compute K * F^T chunk by chunk.
+        # That is, of all the cell couples, we compute the distance between some
+        # cells (here x) and ALL other cells. Then repeat for other chunk and
+        # concatenate.
+        for i, x in enumerate(torch.chunk(cells_coords, chunks=n_chunks, dim=0)):
+            # Empty cache every so often. Otherwise we get out of memory errors.
+            if i % n_flush == 0 and torch.cuda.is_available():
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+    
+            # Squared euclidean distance.
+            d_2 = torch.pow(
+                x.unsqueeze(1).expand(x.shape[0], n_model, n_dims)
+                - cells_coords.unsqueeze(0).expand(x.shape[0], n_model, n_dims)
+                , 2).sum(2)
+            tot = torch.cat((
+                    tot,
+                    torch.matmul(
+                        torch.exp(inv_lambda2 * d_2)
+                        , F.t())))
+    
+        # Wait for all threads to complete.
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+    
+        end = timer()
+    
+        return tot.detach()
 
 def compute_diagonal(lambda0, cells_coords, device=None, n_chunks=200,
         n_flush=50):
