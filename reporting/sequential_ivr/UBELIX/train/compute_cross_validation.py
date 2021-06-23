@@ -3,6 +3,7 @@
 import os
 import torch
 import numpy as np
+import pandas as pd
 
 import volcapy.covariance.exponential as exponential_kernel
 import volcapy.covariance.matern32 as matern32_kernel
