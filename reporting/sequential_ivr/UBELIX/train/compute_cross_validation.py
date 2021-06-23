@@ -83,7 +83,7 @@ def main():
                 df = df.append({'kernel': gp.kernel.KERNEL_FAMILY,
                         'Test set size': F.shape[0] - n_train,
                         'repetition': repetition,
-                        'Test RMSE': test_rmse}, ignore_index=True)
+                        'Test RMSE': test_rmse.detach().item()}, ignore_index=True)
         # Save after each train set size.
         df.to_pickle("test_set_results.pkl")
 
