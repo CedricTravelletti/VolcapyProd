@@ -14,6 +14,14 @@ from timeit import default_timer as timer
 KERNEL_FAMILY = "matern52"
 
 
+def compute_cov_dist(d, lambda0):
+    """ Compute covariance at a given distance.
+
+    """
+    return (1 + np.sqrt(5)*(d / lambda0) + (5/3) * (d**2 / lambda0**2)) * np.exp(- np.sqrt(5) * (d / lambda0))
+
+
+
 def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         n_flush=50):
     """ Compute the covariance pushforward.

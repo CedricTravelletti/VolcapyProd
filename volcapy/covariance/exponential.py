@@ -13,6 +13,14 @@ from timeit import default_timer as timer
 KERNEL_FAMILY = "exponential"
 
 
+
+def compute_cov_dist(d, lambda0):
+    """ Compute covariance at a given distance.
+
+    """
+    return np.exp(-(d / lambda0))
+
+
 def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         n_flush=50):
     """ Compute the covariance pushforward.
