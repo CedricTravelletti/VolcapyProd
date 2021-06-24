@@ -28,13 +28,13 @@ base_results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/AISTATS_results_v2/
 
 
 def main():
-    thresholds = [0.0, 100.0, 350.0, 600.0]
+    thresholds = [500.0, 800.0, 1000, 1250]
     df = pd.DataFrame()
     for threshold in thresholds:
         excursion_sizes = []
-        for i in range(1, 300):
+        for i in range(1, 400):
             ground_truth_path = os.path.join(base_results_folder,
-                    "prior_samples_merged/prior_sample_{}.npy".format(i))
+                    "final_samples_matern32/prior_sample_{}.npy".format(i))
             ground_truth = torch.from_numpy(np.load(ground_truth_path))
     
             true_excursion_inds = (ground_truth >= threshold).nonzero()[:, 0]
