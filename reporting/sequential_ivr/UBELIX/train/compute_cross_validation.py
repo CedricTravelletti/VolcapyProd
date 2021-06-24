@@ -17,6 +17,7 @@ data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018"
 
 
 def main():
+    print("Main")
     # Load static data.
     F = torch.from_numpy(
             np.load(os.path.join(data_folder, "F_corrected_final.npy"))).float().detach()
@@ -45,23 +46,31 @@ def main():
     lambda0_matern52 = 436.206
 
     gp_exp = InverseGaussianProcess(m0_exp, sigma0_exp, lambda0_exp,
-            volcano_coords, exponential_kernel)
+            volcano_coords, exponential_kernel,
+            n_chunks=500,
+            )
     gp_matern32 = InverseGaussianProcess(m0_matern32, sigma0_matern32,
             lambda0_matern32,
-            volcano_coords, matern32_kernel)
+            volcano_coords, matern32_kernel,
+            n_chunks=500)
     gp_matern52 = InverseGaussianProcess(m0_matern52, sigma0_matern52,
             lambda0_matern52,
-            volcano_coords, matern52_kernel)
+            volcano_coords, matern52_kernel,
+            n_chunks=500)
 
     df = pd.DataFrame(columns=['kernel', 'Test set size', 'repetition',
             'Test RMSE'])
 
     # Loop over hold-out length:
     gps = [gp_exp, gp_matern32, gp_matern52]
-    n_trains = [50, 100, 200, 300, 400, 500, 520]
-    n_repetitions = 5
+    n_trains = [150, 200, 250, 300, 350, 400, 450, 500, 510, 520, 530]
+    n_repetitions = 15
+
+    print("Go")
     for n_train in n_trains:
+        print("Train: {}".format(n_train))
         for repetition in range(n_repetitions):
+            print("Repetition {}.".format(repetition))
             # Create a random shuffle of the data.
             shuffled_inds = list(range(data_values.shape[0]))
             np.random.shuffle(shuffled_inds)
@@ -74,6 +83,7 @@ def main():
             F_test = F_shuffled[n_train:, :]
             data_values_test = data_values_shuffled[n_train:]
             for gp in gps:
+                torch.cuda.empty_cache()
                 # Condition on training data.
                 m_post_m, _  = gp.condition_model(F_train, data_values_train, data_std)
                 # Predict test data.
