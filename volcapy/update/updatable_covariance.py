@@ -245,7 +245,7 @@ class UpdatableCovariance:
         pushfwd = self.cov_module.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
-                n_flush=self.n_flush)
+                n_flush=self.n_flush).cpu()
         return self.sigma0**2 * pushfwd
 
     def extract_variance(self):
