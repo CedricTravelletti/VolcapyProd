@@ -9,10 +9,11 @@ sns.set()
 sns.set_style("white")
 plt.rcParams["font.family"] = "Times New Roman"
 plot_params = {
-        'font.size': 16, 'font.style': 'oblique',
+        'font.size': 20, 'font.style': 'oblique',
         'axes.labelsize': 'small',
         'axes.titlesize':'small',
-        'legend.fontsize': 'small'
+        'legend.fontsize': 'small',
+        'legend.title_fontsize': 'x-small'
         }
 plt.rcParams.update(plot_params)
 
@@ -107,5 +108,8 @@ ax = sns.lineplot('practical range', 'train_RMSE', ci=None, hue='kernel', data=d
 ax.set_xlabel("practical range [m]")
 ax.set_ylabel("RMSE on train set [mGal]")
 ax.set_xlim([0, 4500])
+ax.tick_params(axis='both', which='major', labelsize=12)
+ax.tick_params(axis='both', which='minor', labelsize=12)
+
 plt.savefig("train_evolution_rmse", bbox_inches="tight", pad_inches=0.1, dpi=400)
 plt.show()
