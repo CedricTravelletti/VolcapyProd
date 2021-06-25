@@ -171,7 +171,7 @@ def plot_excu_profile_with_data(volcano_coords, data_coords_niklas,
     plt.savefig(out_file_path, bbox_inches="tight", pad_inches=0.1, dpi=400)
 
 def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas, 
-        visited_coords,
+        visited_coords, coast_coords,
         ground_truth, threshold, out_file_path):
     """ Plot the x, y and z profile of the excursion set and the points visited
     by the strategy. Also plot Niklas data.
@@ -198,8 +198,19 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
     X_niklas_centred = 111*1e3 * (1e-5 * (X_niklas - np.min(volcano_coords[:, 0])))
     Y_niklas_centred = 111*1e3 * (1e-5 * (Y_niklas - np.min(volcano_coords[:, 1])))
 
+    X_coast_centred = 111*1e3 * (1e-5 * (coast_coords[:, 0] - np.min(volcano_coords[:, 0])))
+    Y_coast_centred = 111*1e3 * (1e-5 * (coast_coords[:, 1] - np.min(volcano_coords[:, 1])))
+
     X_visited_centred = 111*1e3 * (1e-5 * (X_visited - np.min(volcano_coords[:, 0])))
     Y_visited_centred = 111*1e3 * (1e-5 * (Y_visited - np.min(volcano_coords[:, 1])))
+
+    # Get volcano bounding box in centred coordinates.
+    min_x = 0.0
+    max_x = 111*1e3 * (1e-5 * (np.max(volcano_coords[:, 0]) - np.min(volcano_coords[:, 0])))
+    min_y = 0.0
+    max_y = 111*1e3 * (1e-5 * (np.max(volcano_coords[:, 1]) - np.min(volcano_coords[:, 1])))
+    min_z = np.min(volcano_coords[:, 2])
+    max_z = np.max(volcano_coords[:, 2])
 
     true_excursion_inds = (ground_truth >= threshold).nonzero()[:, 0]
     true_excursion_coords = volcano_coords[true_excursion_inds]
@@ -214,6 +225,8 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
     gs = fig.add_gridspec(ncols=2, nrows=4, width_ratios=widths,
                                       height_ratios=heights)
 
+    gs.update(wspace=0.001)
+
     f_ax1 = fig.add_subplot(gs[:, 0])
     f_ax2 = fig.add_subplot(gs[1:2, 1])
     f_ax3 = fig.add_subplot(gs[2:3, 1])
@@ -224,7 +237,14 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
             s=2.8,
             marker="h",
             alpha=0.15, edgecolors='none')
+
+    """
     f_ax1.scatter(X_niklas_centred, Y_niklas_centred, c="black", linewidth=0.2, s=0.1,
+            alpha=1.0)
+    """
+
+    # Add the coast
+    f_ax1.scatter(X_coast_centred, Y_coast_centred, c="blue", linewidth=0.2, s=0.1,
             alpha=1.0)
 
     f_ax1.plot(X_visited_centred, Y_visited_centred,
@@ -242,6 +262,9 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
 
     f_ax1.set_aspect('equal')
     f_ax1.tick_params(axis='both', which='major', pad=0.1)
+
+    f_ax1.set_xlim([min_x, max_x])
+    f_ax1.set_ylim([min_y, max_y])
 
 
     f_ax2.scatter(volcano_X[true_excursion_inds],
@@ -268,6 +291,9 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
     f_ax2.set_aspect(1.5)
     f_ax2.tick_params(axis='both', which='major', pad=0.1)
 
+    f_ax2.set_xlim([min_x, max_x])
+    f_ax2.set_ylim([min_z, max_z + 280.0])
+
     f_ax3.scatter(volcano_Y[true_excursion_inds],
             volcano_Z[true_excursion_inds], c=true_excu_densities,
             cmap=cmap,
@@ -292,4 +318,37 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
     f_ax3.set_aspect(1.5)
     f_ax3.tick_params(axis='both', which='major', pad=0.1)
 
+    f_ax3.set_xlim([min_y, max_y])
+    f_ax3.set_ylim([min_z, max_z + 280.0])
+
     plt.savefig(out_file_path, bbox_inches="tight", pad_inches=0.1, dpi=400)
+
+def get_coast_coordinates(grid):
+    """ Returns the coordinates of the coastal points of the Stromboli island.
+
+    """
+    # Manually define the coast to avoid double coastlines.
+    tmp_surface_coords = grid[grid.surface_inds]
+    tmp_surface_roofs = grid.cells_roof[grid.surface_inds]
+
+    coast_2 = tmp_surface_coords[(tmp_surface_roofs > 0.0) & 
+            (tmp_surface_roofs < 2.7) & (tmp_surface_coords[:, 0] > 520500.0)]
+    coast_4 = tmp_surface_coords[(tmp_surface_roofs > 0.0) & 
+            (tmp_surface_roofs < 12) & (tmp_surface_coords[:, 0] < 520500.0) & 
+            (tmp_surface_coords[:, 0] > 519700.0) &
+            (tmp_surface_coords[:, 1] > 4.294 * 1e6)]
+
+    coast_5 = tmp_surface_coords[(tmp_surface_roofs > 0.0) & 
+            (tmp_surface_roofs < 12) & (tmp_surface_coords[:, 0] < 520500.0) & 
+            (tmp_surface_coords[:, 0] > 519700.0) &
+            (tmp_surface_coords[:, 1] < 4.294 * 1e6)]
+
+
+    coast_1 = tmp_surface_coords[(tmp_surface_roofs > 0.0) & 
+            (tmp_surface_roofs < 25) & (tmp_surface_coords[:, 0] < 519700.0) & 
+            (tmp_surface_coords[:, 1] > 4.2917 * 1e6)]
+    coast_3 = tmp_surface_coords[(tmp_surface_roofs > 0.0) & 
+            (tmp_surface_roofs < 7) & (tmp_surface_coords[:, 0] < 520000.0) & 
+            (tmp_surface_coords[:, 1] <= 4.2917 * 1e6)]
+    coast = np.concatenate([coast_1, coast_2, coast_3, coast_4, coast_5])
+    return coast
