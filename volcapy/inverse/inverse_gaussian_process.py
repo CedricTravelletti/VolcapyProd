@@ -659,7 +659,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         """
         prior_variances = self.kernel.compute_diagonal(
-                self.lambda0, self.cells_coords, DEVICE,
+                self.lambda0, self.cells_coords, self.device,
                 n_chunks=self.n_chunks, n_flush=50)
 
         prior_variances -= self.sigma0**2 * torch.einsum("ij,jk,ik->i",
@@ -681,7 +681,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         """
         prior_covariance = self.kernel.compute_covariance(
-                self.lambda0, self.cells_coords, DEVICE,
+                self.lambda0, self.cells_coords, self.device,
                 n_chunks=self.n_chunks, n_flush=50)
 
         prior_covariance -= self.sigma0**2 * (self.pushfwd.double() @ self.inversion_operator 
