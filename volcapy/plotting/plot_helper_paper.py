@@ -5,7 +5,7 @@ import os
 import torch
 import numpy as np
 import pandas as pd
-from volcapy.uq.set_estimation import vorobev_expectation_inds
+from volcapy.uq.set_estimation import vorobev_expectation_inds, vorobev_quantile_inds
 from volcapy.grid.grid_from_dsm import Grid
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -71,6 +71,73 @@ def compute_mismatches(ground_truth, coverages, n_datapoints, threshold_low, sta
     def compute_mismatch(coverage):
         # Plot estimated excursion set using coverage function.
         est_excursion_inds = vorobev_expectation_inds(coverage)
+
+        # Compute mismatch.
+        mismatch = np.zeros(volcano_coords.shape[0])
+        mismatch[est_excursion_inds] = 1
+        tmp = np.zeros(volcano_coords.shape[0])
+        tmp[true_excursion_inds] = 2
+        mismatch = mismatch + tmp
+
+        excu_size = true_excursion_inds.shape[0] + 1
+        p_false_pos = 100 * np.sum(mismatch == 1) / excu_size
+        p_false_neg = 100 * np.sum(mismatch == 2) / excu_size
+        p_correct = 100 * np.sum(mismatch == 3) / excu_size
+
+        return (p_false_pos, p_false_neg, p_correct)
+
+    mismatches = []
+    # Compute the mismatch evolution.
+    for coverage in coverages:
+        mismatches.append(compute_mismatch(coverage))
+    mismatches = np.array(mismatches)
+
+    df = pd.DataFrame({'n_datapoints': n_datapoints, 'false positives': mismatches[:, 0],
+            'false negatives': mismatches[:, 1], 'correct': mismatches[:,2],
+            })
+    return df
+
+def compute_mismatches_quantile(ground_truth, quantile, coverages, n_datapoints, threshold_low, static_data_folder):
+    """ Given a list of coverages (at different sampling steps), compute the
+    mismatch between the estimated excursion set (using Vorob'ev expectation)
+    and the true excursion set.
+
+    Parameters
+    ----------
+    ground_truth: (n_cells) array-like
+        True value of the field at each cell.
+    coverages: List[(n_cells) array-like]
+        List of different estimations of the excursion probability at each cell.
+    n_datapoints: List[int]
+        List containing the number of datapoints that was used for each
+        estimation.
+    threshold_low: float
+        Threshold (lower) defining the excursion set.
+    static_data_folder: string
+        Path to folder containing static data for the volcano (discretization
+        grid, ...).
+
+    Returns
+    -------
+    pandas DataFrame
+        ['n_datapoints', 'false positives', 'false negatives','correct']
+        n_datapoints: List[int]: number of datapoints ingested at step n.
+        false_positives: number of false positives as percentage of true
+        excursion size.
+
+        Same for the others.
+
+    """
+    # Load static data.
+    grid = Grid.load(os.path.join(static_data_folder,
+                    "grid.pickle"))
+    volcano_coords = torch.from_numpy(grid.cells).float().detach()
+
+    true_excursion_inds = (ground_truth >= threshold_low).nonzero()[:, 0]
+
+    def compute_mismatch(coverage):
+        # Plot estimated excursion set using coverage function.
+        est_excursion_inds = vorobev_quantile_inds(coverage, quantile)
 
         # Compute mismatch.
         mismatch = np.zeros(volcano_coords.shape[0])
