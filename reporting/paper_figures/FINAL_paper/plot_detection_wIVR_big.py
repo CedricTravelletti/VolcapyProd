@@ -52,17 +52,15 @@ def process_sample(
     return df
 
 if __name__ == "__main__":
-    threshold_low = 1250.0
-    
     results_folder = os.path.join(base_results_folder,
-            "wIVR_final_small/")
+            "wIVR_final_big/")
 
     situations_folders = [results_folder]
-    strategies = ["wIVR, small set"]
+    strategies = ["wIVR, big set"]
 
-    thresholds = [1250.0
+    thresholds = [1000.0
             ]
-    n_datapoints_list = [list(range(0, 166))]
+    n_datapoints_list = [list(range(0, 185))]
     df = pd.DataFrame()
     for (situation, strategy, threshold, n_datapoints) in zip(
             situations_folders, strategies, thresholds, n_datapoints_list):
@@ -82,29 +80,9 @@ if __name__ == "__main__":
                 ground_truth_path, coverages_folder, sample_nr,
                 n_datapoints, strategy, threshold)])
 
-# ----------------
-# Add the big step.
-# ----------------
-sample_nr = 5
-ground_truth_path = os.path.join(
-                    os.path.join(base_results_folder,
-                    "final_samples_matern32/"),
-                    "prior_sample_{}.npy".format(sample_nr))
-coverages_folder = os.path.join(
-                    os.path.join(base_results_folder,
-                    "wIVR_final_small_bigstep/"),
-                    "sample_{}/".format(sample_nr))
-n_datapoints = list(range(0, 44))
-strategy = "wIVR small, bigstep"
-threshold = 1250.0
-df_tmp = process_sample(
-        ground_truth_path, coverages_folder, sample_nr,
-        n_datapoints, strategy, threshold)
-df = pd.concat([df, df_tmp])
-# ----------------------------------------------------------
-
 my_palette = sns.color_palette("RdBu", 8)
 my_palette = my_palette[:3] + my_palette[-2:]
+
 ax = sns.lineplot('n_datapoints', 'correct', ci=None, hue='sample_nr',
         style="strategy",
         data=df, palette=my_palette)
@@ -112,7 +90,7 @@ ax = sns.lineplot('n_datapoints', 'correct', ci=None, hue='sample_nr',
 ax.set_xlim([-1, 170])
 ax.set_xlabel("Number of observations")
 ax.set_ylabel("Detection percentage [% of true excursion volume]")
-plt.savefig("final_small_detection", bbox_inches="tight", pad_inches=0.1, dpi=400)
+plt.savefig("final_big_detection", bbox_inches="tight", pad_inches=0.1, dpi=400)
 plt.show()
 
 ax = sns.lineplot('n_datapoints', 'false positives', ci=None, hue='sample_nr',
@@ -122,5 +100,5 @@ ax = sns.lineplot('n_datapoints', 'false positives', ci=None, hue='sample_nr',
 ax.set_xlim([-1, 170])
 ax.set_xlabel("Number of observations")
 ax.set_ylabel("False positives  percentage [% of true excursion volume]")
-plt.savefig("final_small_falsepos", bbox_inches="tight", pad_inches=0.1, dpi=400)
+plt.savefig("final_big_falsepos", bbox_inches="tight", pad_inches=0.1, dpi=400)
 plt.show()
