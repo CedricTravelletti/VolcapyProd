@@ -754,7 +754,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         mu_prime, _ = self.condition_model(G, y_prime, data_std, hypothetical=True)
 
-        post_sample = post_mean + prior_sample - mu_prime
+        post_sample = post_mean.detach().cpu() + prior_sample - mu_prime.detach().cpu()
         return post_sample
 
     def coverage(self, lower=None, upper=None):
