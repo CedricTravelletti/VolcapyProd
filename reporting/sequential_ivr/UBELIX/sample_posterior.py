@@ -41,7 +41,7 @@ def sample_posterior(gp, n_samples, prior_sample_folder, G, data_values, data_st
         print("Sample updating run in {}s.".format(end - start))
 
         post_sample_path = os.path.join(
-                post_sample_folder, "post_sample_{}.npy")
+                post_sample_folder, "post_sample_{}.npy".format(i - 99))
         np.save(post_sample_path,
                 post_sample.detach().cpu().numpy())
 
@@ -85,7 +85,7 @@ def sample_posterior_strategy(
 
 
 if __name__ == "__main__":
-    sample_nr = 1
+    sample_nr = 5
 
 
     static_data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018"
