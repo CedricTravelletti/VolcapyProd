@@ -41,7 +41,7 @@ def main(sample_nr):
     # --------------------------------
     # DEFINITION OF THE EXCURSION SET.
     # --------------------------------
-    THRESHOLD_low = 1250.0
+    THRESHOLD_low = 2600.0
 
     # Choose a starting points on the coast.
     start_ind = 4478
@@ -50,9 +50,9 @@ def main(sample_nr):
     # Define GP model.
     # -------------------------------------
     data_std = 0.1
-    sigma0_matern32 = 527.84
-    m0_matern32 = 549.15
-    lambda0_matern32 = 891.66
+    sigma0_matern32 = 284.66
+    m0_matern32 = 2139.1
+    lambda0_matern32 = 651.58
 
     # Prepare data.
     data_values = F @ ground_truth
@@ -82,4 +82,4 @@ def main(sample_nr):
     print("Run in {} mins.".format((end - start)/60))
 
 if __name__ == "__main__":
-    main(1)
+    main(5)
