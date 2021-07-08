@@ -3,7 +3,7 @@
 import os
 import torch
 import numpy as np
-import volcapy.covariance.matern32 as kernel
+import volcapy.covariance.exponential as kernel
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
 
@@ -40,7 +40,7 @@ def main():
 
     # HYPERPARAMETERS to start search from.
     data_std = 0.1
-    sigma0 = 371.82
+    sigma0 = 200.65
     m0 = 561.0
     lambda0 = 50.0
 
@@ -48,8 +48,8 @@ def main():
             volcano_coords, kernel)
 
     # Train.
-    myGP.train(np.linspace(914.0, 1914.0, 20), F, data_values, data_std,
-            out_path="./train_res_matern32.pck",
+    myGP.train(np.linspace(966.0, 1966.0, 20), F, data_values, data_std,
+            out_path="./train_res_exponential.pck",
             n_epochs=2000, lr=0.5,
             n_chunks=80,
             n_flush=1)
