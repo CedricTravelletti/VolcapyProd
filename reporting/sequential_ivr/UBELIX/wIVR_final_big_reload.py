@@ -75,7 +75,8 @@ def main(sample_nr):
             start_ind, n_steps=4000, data_std=0.1,
             max_step=151.0,
             min_step=60.0,
-            output_folder=output_folder
+            output_folder=output_folder,
+            restart_from_save=output_folder
             )
 
     end = timer()

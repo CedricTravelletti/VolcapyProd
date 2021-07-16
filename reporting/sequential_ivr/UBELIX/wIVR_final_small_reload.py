@@ -20,7 +20,7 @@ base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
 def main(sample_nr):
     # Create output directory.
     output_folder = os.path.join(base_folder,
-            "wIVR_final_big/sample_{}".format(sample_nr))
+            "wIVR_final_small/sample_{}".format(sample_nr))
     os.makedirs(output_folder, exist_ok=True)
 
     # Load static data.
@@ -41,7 +41,7 @@ def main(sample_nr):
     # --------------------------------
     # DEFINITION OF THE EXCURSION SET.
     # --------------------------------
-    THRESHOLD_low = 2500.0
+    THRESHOLD_low = 2600.0
 
     # Choose a starting points on the coast.
     start_ind = 4478
@@ -75,7 +75,8 @@ def main(sample_nr):
             start_ind, n_steps=4000, data_std=0.1,
             max_step=151.0,
             min_step=60.0,
-            output_folder=output_folder
+            output_folder=output_folder,
+            restart_from_save=output_folder
             )
 
     end = timer()
