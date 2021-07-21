@@ -83,4 +83,4 @@ def main(sample_nr):
     print("Run in {} mins.".format((end - start)/60))
 
 if __name__ == "__main__":
-    main(5)
+    main(2)
