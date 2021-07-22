@@ -28,8 +28,8 @@ def sample_posterior(gp, n_samples, prior_sample_folder, G, data_values, data_st
         Where to save the computed posterior realization.
 
     """
-    for i in range(100, 100 + n_samples):
-        print("Generating sample nr. {}".format(i - 99))
+    for i in range(11, 11 + n_samples):
+        print("Generating sample nr. {}".format(i))
         # The samples for reskrig are the one with nr. 100 and up.
         prior_sample_path = os.path.join(prior_sample_folder,
                 "prior_sample_{}.npy".format(i))
@@ -41,7 +41,7 @@ def sample_posterior(gp, n_samples, prior_sample_folder, G, data_values, data_st
         print("Sample updating run in {}s.".format(end - start))
 
         post_sample_path = os.path.join(
-                post_sample_folder, "post_sample_{}.npy".format(i - 99))
+                post_sample_folder, "post_sample_{}.npy".format(i))
         np.save(post_sample_path,
                 post_sample.detach().cpu().numpy())
 
@@ -57,9 +57,9 @@ def sample_posterior_strategy(
 
     # Create GP (trained Matern 32).
     data_std = 0.1
-    sigma0_matern32 = 527.84
-    m0_matern32 = 549.15
-    lambda0_matern32 = 891.66
+    sigma0_matern32 = 284.66
+    m0_matern32 = 2139.1
+    lambda0_matern32 = 651.58
 
     myGP = InverseGaussianProcess(m0_matern32, sigma0_matern32,
             lambda0_matern32,
@@ -87,15 +87,14 @@ def sample_posterior_strategy(
 if __name__ == "__main__":
     sample_nr = 5
 
-
     static_data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018"
     # Samples for reskrig are in the same folder, but only use the samples from nr
     # 100 up.
     prior_sample_folder = "/storage/homefs/ct19x463/AISTATS_results/final_samples_matern32/"
     
     base_folder = "/storage/homefs/ct19x463/AISTATS_results/"
-    strategy_folder = os.path.join(base_folder, "wIVR_final_small/")
-    n_samples = 100
+    strategy_folder = os.path.join(base_folder, "wIVR_final_big/")
+    n_samples = 300
 
     sample_posterior_strategy(
             strategy_folder, sample_nr,
