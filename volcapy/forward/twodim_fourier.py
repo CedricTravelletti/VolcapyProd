@@ -3,7 +3,6 @@
 """
 import numpy as np
 from multiprocessing import Pool, RawArray
-from volcapy.niklas.banerjee2d import banerjee
 
 
 def compute_forward(coords, M, N, n_procs, forward_cutoff=None):
