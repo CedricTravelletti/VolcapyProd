@@ -47,12 +47,7 @@ import numpy as np
 import pickle
 from volcapy.utils import _make_column_vector
 from volcapy.gaussian_cdf import gaussian_cdf
-from rpy2.robjects import numpy2ri
-import rpy2.robjects as robjects
-from rpy2.robjects.packages import importr
 
-# Activate auto-wrapping of numpy arrays as rpy2 objects.
-numpy2ri.activate()
 
 # General torch settings and devices.
 torch.set_num_threads(8)
@@ -691,6 +686,13 @@ class UpdatableGP():
             Column vector of sampled values at each cells.
 
         """
+        from rpy2.robjects import numpy2ri
+        import rpy2.robjects as robjects
+        from rpy2.robjects.packages import importr
+        
+        # Activate auto-wrapping of numpy arrays as rpy2 objects.
+        numpy2ri.activate()
+
         # Import the R RandomFields library.
         rflib = importr("RandomFields")
 
