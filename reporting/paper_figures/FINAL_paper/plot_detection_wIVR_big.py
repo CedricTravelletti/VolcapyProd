@@ -12,12 +12,13 @@ from volcapy.plotting.plot_helper_paper import compute_mismatches
 
 sns.set()
 sns.set_style("white")
-plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.family"] = "serif"
 plot_params = {
-        'font.size': 16, 'font.style': 'oblique',
+        'font.size': 20, 'font.style': 'normal',
         'axes.labelsize': 'small',
         'axes.titlesize':'small',
-        'legend.fontsize': 'small'
+        'legend.fontsize': 'small',
+        'legend.title_fontsize': 'small'
         }
 plt.rcParams.update(plot_params)
 
@@ -54,13 +55,15 @@ def process_sample(
 if __name__ == "__main__":
     results_folder = os.path.join(base_results_folder,
             "wIVR_final_big/")
+    infill_folder = os.path.join(base_results_folder,
+            "INFILL_final_big/")
 
-    situations_folders = [results_folder]
-    strategies = ["wIVR, big set"]
+    situations_folders = [results_folder, infill_folder]
+    strategies = ["wIVR, big set", "limiting distribution"]
 
-    thresholds = [1000.0
+    thresholds = [2500.0, 2500.0
             ]
-    n_datapoints_list = [list(range(0, 185))]
+    n_datapoints_list = [list(range(0, 451)), list(range(0, 190, 10))]
     df = pd.DataFrame()
     for (situation, strategy, threshold, n_datapoints) in zip(
             situations_folders, strategies, thresholds, n_datapoints_list):
@@ -80,25 +83,40 @@ if __name__ == "__main__":
                 ground_truth_path, coverages_folder, sample_nr,
                 n_datapoints, strategy, threshold)])
 
+
+df['n_datapoints'] = df.index
+df['n_datapoints'][df['strategy'] == "limiting distribution"] = (5 * 
+        df['n_datapoints'][df['strategy'] == "limiting distribution"])
+
 my_palette = sns.color_palette("RdBu", 8)
 my_palette = my_palette[:3] + my_palette[-2:]
 
 ax = sns.lineplot('n_datapoints', 'correct', ci=None, hue='sample_nr',
         style="strategy",
         data=df, palette=my_palette)
+plt.setp(ax.lines[1], alpha=.4)
+plt.setp(ax.lines[3], alpha=.4)
+plt.setp(ax.lines[5], alpha=.4)
+plt.setp(ax.lines[7], alpha=.4)
+plt.setp(ax.lines[9], alpha=.4)
 
-ax.set_xlim([-1, 170])
+ax.set_xlim([-2, 455])
 ax.set_xlabel("Number of observations")
-ax.set_ylabel("Detection percentage [% of true excursion volume]")
+ax.set_ylabel("True positives [% of true excursion volume]")
 plt.savefig("final_big_detection", bbox_inches="tight", pad_inches=0.1, dpi=400)
 plt.show()
 
 ax = sns.lineplot('n_datapoints', 'false positives', ci=None, hue='sample_nr',
         style="strategy",
         data=df, palette=my_palette)
+plt.setp(ax.lines[1], alpha=.4)
+plt.setp(ax.lines[3], alpha=.4)
+plt.setp(ax.lines[5], alpha=.4)
+plt.setp(ax.lines[7], alpha=.4)
+plt.setp(ax.lines[9], alpha=.4)
 
-ax.set_xlim([-1, 170])
+ax.set_xlim([-2, 455])
 ax.set_xlabel("Number of observations")
-ax.set_ylabel("False positives  percentage [% of true excursion volume]")
+ax.set_ylabel("False positives [% of complementary of true excursion volume]")
 plt.savefig("final_big_falsepos", bbox_inches="tight", pad_inches=0.1, dpi=400)
 plt.show()

@@ -13,12 +13,13 @@ sns.set()
 sns.set_style("white")
 
 
-plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.family"] = "serif"
 plot_params = {
-        'font.size': 16, 'font.style': 'oblique',
+        'font.size': 20, 'font.style': 'normal',
         'axes.labelsize': 'small',
         'axes.titlesize':'small',
-        'legend.fontsize': 'small'
+        'legend.fontsize': 'small',
+        'legend.title_fontsize': 'small'
         }
 plt.rcParams.update(plot_params)
 
@@ -28,11 +29,11 @@ base_results_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/AISTATS_results_v2/
 
 
 def main():
-    thresholds = [500.0, 800.0, 1000, 1250]
+    thresholds = [2500.0, 2550.0, 2600.0, 2650.0]
     df = pd.DataFrame()
     for threshold in thresholds:
         excursion_sizes = []
-        for i in range(1, 400):
+        for i in range(1, 920):
             ground_truth_path = os.path.join(base_results_folder,
                     "final_samples_matern32/prior_sample_{}.npy".format(i))
             ground_truth = torch.from_numpy(np.load(ground_truth_path))
@@ -41,18 +42,32 @@ def main():
             excursion_size = 100 * (true_excursion_inds.shape[0] / ground_truth.shape[0])
             df = df.append({'Excursion size (percent of total volume)': excursion_size,
                     'threshold': threshold, 'sample_nr': i}, ignore_index=True)
-    # my_palette = sns.color_palette("rocket", 4)
-    my_palette = sns.color_palette("RdBu", 4)
 
+    my_palette = sns.color_palette("RdBu", 9)
+    my_palette = [my_palette[1]] + [my_palette[3]] + [my_palette[-4]] + [my_palette[-2]]
+
+    fig, ax1 = plt.subplots()
     sns.histplot(df, x='Excursion size (percent of total volume)',
-            kde=True, binwidth=2,
-            hue='threshold', palette=my_palette)
-    plt.savefig("histogram", bbox_inches="tight", pad_inches=0.1, dpi=600)
+            binwidth=1,
+            kde=True,
+            hue='threshold', palette=my_palette,
+            ax=ax1)
+    ax1.get_legend().set_title('threshold [$kg/m^3$]')
+    plt.savefig("histogram_prior_volume", bbox_inches="tight", pad_inches=0.01, dpi=600)
+    plt.show()
 
     # Now plot distribution of volume for small and big threshold.
-    threshold_small = 1250.0
-    threshold_big = 1000.0
+    threshold_small = 2600.0
+    threshold_big = 2500.0
 
+    """
+    # Find the quantiles.
+    sizes_big = df[df['threshold']==threshold_big]
+    sizes_big[
+            (sizes_big['Excursion size (percent of total volume)'] ==
+             sizes_big['Excursion size (percent of total volume)'].quantile(.95,
+                    interpolation='lower'))]
+    """
     # Palette defining the colors of the samples.
     samples_palette = sns.color_palette("RdBu", 8)
     samples_palette = samples_palette[:3] + samples_palette[-2:]
@@ -73,7 +88,8 @@ def main():
                 color = samples_palette[i-1]
                 ))
     plt.legend(handles=line_handles)
-    plt.savefig("histogram_with_small_volumes", bbox_inches="tight", pad_inches=0.1, dpi=600)
+    plt.savefig("histogram_with_small_volumes", bbox_inches="tight",
+            pad_inches=0.01, dpi=600)
     plt.show()
 
     # SAME FOR BIG
@@ -92,7 +108,8 @@ def main():
                 color = samples_palette[i-1]
                 ))
     plt.legend(handles=line_handles)
-    plt.savefig("histogram_with_big_volumes", bbox_inches="tight", pad_inches=0.1, dpi=600)
+    plt.savefig("histogram_with_big_volumes", bbox_inches="tight",
+            pad_inches=0.01, dpi=600)
     plt.show()
 
 

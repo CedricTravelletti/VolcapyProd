@@ -12,12 +12,13 @@ from volcapy.plotting.plot_helper_paper import compute_mismatches
 
 sns.set()
 sns.set_style("white")
-plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.family"] = "serif"
 plot_params = {
-        'font.size': 16, 'font.style': 'oblique',
+        'font.size': 20, 'font.style': 'normal',
         'axes.labelsize': 'small',
         'axes.titlesize':'small',
-        'legend.fontsize': 'small'
+        'legend.fontsize': 'x-small',
+        'legend.title_fontsize': 'x-small'
         }
 plt.rcParams.update(plot_params)
 
@@ -39,7 +40,7 @@ def process_sample(
             threshold, static_data_folder)
     # Add label.
     df = df.set_index('n_datapoints', drop=True)
-    df['sample_nr'] = sample_nr
+    df['sample'] = sample_nr
     df['threshold'] = threshold
     df['strategy'] = strategy
 
@@ -52,17 +53,18 @@ def process_sample(
     return df
 
 if __name__ == "__main__":
-    threshold_low = 1250.0
     
     results_folder = os.path.join(base_results_folder,
             "wIVR_final_small/")
+    infill_folder = os.path.join(base_results_folder,
+            "INFILL_final_small/")
 
-    situations_folders = [results_folder]
-    strategies = ["wIVR, small set"]
+    situations_folders = [results_folder, infill_folder]
+    strategies = ["wIVR, small set", "limiting distribution"]
 
-    thresholds = [1250.0
+    thresholds = [2600.0, 2600.0
             ]
-    n_datapoints_list = [list(range(0, 166))]
+    n_datapoints_list = [list(range(0, 451)), list(range(0, 190, 10))]
     df = pd.DataFrame()
     for (situation, strategy, threshold, n_datapoints) in zip(
             situations_folders, strategies, thresholds, n_datapoints_list):
@@ -82,45 +84,49 @@ if __name__ == "__main__":
                 ground_truth_path, coverages_folder, sample_nr,
                 n_datapoints, strategy, threshold)])
 
-# ----------------
-# Add the big step.
-# ----------------
-sample_nr = 5
-ground_truth_path = os.path.join(
-                    os.path.join(base_results_folder,
-                    "final_samples_matern32/"),
-                    "prior_sample_{}.npy".format(sample_nr))
-coverages_folder = os.path.join(
-                    os.path.join(base_results_folder,
-                    "wIVR_final_small_bigstep/"),
-                    "sample_{}/".format(sample_nr))
-n_datapoints = list(range(0, 44))
-strategy = "wIVR small, bigstep"
-threshold = 1250.0
-df_tmp = process_sample(
-        ground_truth_path, coverages_folder, sample_nr,
-        n_datapoints, strategy, threshold)
-df = pd.concat([df, df_tmp])
-# ----------------------------------------------------------
+
+df['n_datapoints'] = df.index
+df['n_datapoints'][df['strategy'] == "limiting distribution"] = (5 * 
+        df['n_datapoints'][df['strategy'] == "limiting distribution"])
+"""
+df_infill = df[df['strategy'] == "limiting distribution"]
+df = df[df['strategy'] == "wIVR, small set"]
+"""
 
 my_palette = sns.color_palette("RdBu", 8)
 my_palette = my_palette[:3] + my_palette[-2:]
-ax = sns.lineplot('n_datapoints', 'correct', ci=None, hue='sample_nr',
+
+ax = sns.lineplot('n_datapoints', 'correct', ci=None, hue='sample',
         style="strategy",
         data=df, palette=my_palette)
+plt.setp(ax.lines[1], alpha=.4)
+plt.setp(ax.lines[3], alpha=.4)
+plt.setp(ax.lines[5], alpha=.4)
+plt.setp(ax.lines[7], alpha=.4)
+plt.setp(ax.lines[9], alpha=.4)
+"""
+sns.lineplot('n_datapoints', 'correct', ci=None, hue='sample',
+        data=df_infill, legend=False,
+        alpha=0.2, palette=my_palette)
+"""
 
-ax.set_xlim([-1, 170])
+ax.set_xlim([-2, 455])
 ax.set_xlabel("Number of observations")
-ax.set_ylabel("Detection percentage [% of true excursion volume]")
+ax.set_ylabel("True positives [% of true excursion volume]")
 plt.savefig("final_small_detection", bbox_inches="tight", pad_inches=0.1, dpi=400)
 plt.show()
 
-ax = sns.lineplot('n_datapoints', 'false positives', ci=None, hue='sample_nr',
+ax = sns.lineplot('n_datapoints', 'false positives', ci=None, hue='sample',
         style="strategy",
         data=df, palette=my_palette)
+plt.setp(ax.lines[1], alpha=.4)
+plt.setp(ax.lines[3], alpha=.4)
+plt.setp(ax.lines[5], alpha=.4)
+plt.setp(ax.lines[7], alpha=.4)
+plt.setp(ax.lines[9], alpha=.4)
 
-ax.set_xlim([-1, 170])
+ax.set_xlim([-2, 455])
 ax.set_xlabel("Number of observations")
-ax.set_ylabel("False positives  percentage [% of true excursion volume]")
+ax.set_ylabel("False positives [% of complementary of true excursion volume]")
 plt.savefig("final_small_falsepos", bbox_inches="tight", pad_inches=0.1, dpi=400)
 plt.show()

@@ -22,7 +22,7 @@ def main():
 
     coast_coords = get_coast_coordinates(grid)
 
-    threshold = 1250.0
+    threshold = 2600.0
 
     def process_sample(sample_nr):
         ground_truth = torch.from_numpy(
@@ -36,12 +36,12 @@ def main():
                         "visited_inds.npy")
                 )
         visited_coords = surface_coords[visited_inds, :]
-        out_file_path = "excu_with_visited_inds_sample_{}".format(sample_nr)
+        out_file_path = "excu_small_with_visited_inds_sample_{}".format(sample_nr)
         plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
                 visited_coords, coast_coords,
                 ground_truth, threshold, out_file_path)
 
-    for sample_nr in range(1, 5):
+    for sample_nr in range(1, 6):
         process_sample(sample_nr)
 
 
