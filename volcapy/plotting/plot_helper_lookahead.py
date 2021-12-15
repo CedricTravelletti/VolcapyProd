@@ -96,6 +96,7 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
     f_ax2 = fig.add_subplot(gs[1:2, 1])
     f_ax3 = fig.add_subplot(gs[2:3, 1])
 
+    # Excursion set.
     f_ax1.scatter(volcano_X[true_excursion_inds],
             volcano_Y[true_excursion_inds], c=true_excu_densities,
             cmap=cmap,
@@ -112,6 +113,7 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
     f_ax1.scatter(X_coast_centred, Y_coast_centred, c="blue", linewidth=0.2, s=0.1,
             alpha=1.0)
 
+    # Visited locations.
     f_ax1.plot(X_visited_centred, Y_visited_centred,
             color='k',
             linewidth=0.1,
@@ -147,6 +149,7 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
     f_ax1.set_ylim([min_y, max_y])
 
 
+    # Excursion set.
     f_ax2.scatter(volcano_X[true_excursion_inds],
             volcano_Z[true_excursion_inds], c=true_excu_densities,
             cmap=cmap,
@@ -155,6 +158,7 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
             alpha=0.2, edgecolors='none')
     f_ax2.scatter(X_niklas_centred, Z_niklas, c="black", linewidth=0.2, s=0.05, alpha=1.0)
 
+    # Visited location.
     f_ax2.plot(X_visited_centred, Z_visited,
             color='k',
             linewidth=0.1,
@@ -168,12 +172,28 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
             s=2.5,
             alpha=1.0)
 
+    # Same for lookahead.
+    f_ax2.plot(X_visited_centred_lookahead, Z_visited_lookahead,
+            color='k',
+            linewidth=0.1,
+            zorder=-1,
+            alpha=1.0)
+    f_ax2.scatter(X_visited_centred_lookahead, Z_visited_lookahead,
+            c=visited_colors_lookahead,
+            cmap='Greys',
+            marker="8", edgecolor='k',
+            linewidth=0.1,
+            zorder=1,
+            s=2.5,
+            alpha=1.0)
+
     f_ax2.set_aspect(1.5)
     f_ax2.tick_params(axis='both', which='major', pad=0.1)
 
     f_ax2.set_xlim([min_x, max_x])
     f_ax2.set_ylim([min_z, max_z + 280.0])
 
+    # Excursion set.
     f_ax3.scatter(volcano_Y[true_excursion_inds],
             volcano_Z[true_excursion_inds], c=true_excu_densities,
             cmap=cmap,
@@ -182,6 +202,7 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
             alpha=0.2, edgecolors='none')
     f_ax3.scatter(Y_niklas_centred, Z_niklas, c="black", linewidth=0.2, s=0.05, alpha=1.0)
 
+    # Visited locations.
     f_ax3.plot(Y_visited_centred, Z_visited,
             color='k',
             linewidth=0.1,
@@ -189,6 +210,21 @@ def plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
             alpha=1.0)
     f_ax3.scatter(Y_visited_centred, Z_visited, c=visited_colors,
             cmap='YlOrRd',
+            marker="8", edgecolor='k',
+            linewidth=0.1,
+            s=2.5,
+            zorder=1,
+            alpha=1.0)
+
+    # Same for lookahead.
+    f_ax3.plot(Y_visited_centred_lookahead, Z_visited_lookahead,
+            color='k',
+            linewidth=0.1,
+            zorder=-1,
+            alpha=1.0)
+    f_ax3.scatter(Y_visited_centred_lookahead, Z_visited_lookahead,
+            c=visited_colors_lookahead,
+            cmap='Greys',
             marker="8", edgecolor='k',
             linewidth=0.1,
             s=2.5,
