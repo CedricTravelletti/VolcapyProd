@@ -48,7 +48,7 @@ def main():
 
         out_file_path = "excu_big_visited_lookahead_sample_{}".format(sample_nr)
         plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
-                visited_coords[:20], visited_coords_lookahead, coast_coords,
+                visited_coords[:50], visited_coords_lookahead, coast_coords,
                 ground_truth, threshold, out_file_path)
 
     """
