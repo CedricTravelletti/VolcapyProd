@@ -575,7 +575,7 @@ class UpdatableRealization(UpdatableMean):
         y_prime = G @ self.m + noise
 
         y = _make_column_vector(y)
-        y_prime = _make_column_vector(y_prime)
+        y_prime = _make_column_vector(y_prime).double()
 
         # Get the latest conditioning operators.
         K_dash = self.cov_module.pushforwards[-1]
