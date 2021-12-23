@@ -506,7 +506,7 @@ class UpdatableRealization(UpdatableMean):
         gp_module: UpdatableGP
 
         """
-        super().__init__(self, prior, gp_module.covariance)
+        super().__init__(prior, gp_module.covariance)
 
 
     @classmethod
