@@ -8,12 +8,13 @@ from scipy.spatial import KDTree
 import numpy as np
 import os
 import torch
-from volcapy.update.updatable_covariance import UpdatableGP
+from volcapy.update.updatable_covariance import UpdatableGP, UpdatableRealization
 
 
 class StrategyABC(ABC):
     def __init__(self, updatable_gp, candidates,
-            G, data_feed, lower=None, upper=None):
+            G, data_feed, lower=None, upper=None,
+            prior_realizations=[]):
         """ Abstract Base Class to run sequential design strategies. The only
         thing that changes among different types of strategies is how the next
         point to visit is chosen. Hence, this class only requires the end-user
@@ -37,6 +38,11 @@ class StrategyABC(ABC):
         upper: float or None
             Threshold defining the upper bound of the excursion set.
             If none, the defaults to +infinity.
+        prior_realizations: List[torch.tensor], optional
+            List of tensors corresponding to prior realizations. 
+            If provided, get updated to conditional realizations at 
+            each step of the strategy. Defaults to empty list so nothing 
+            gets updated.
 
         """
         self.gp = updatable_gp
@@ -48,6 +54,9 @@ class StrategyABC(ABC):
 
         self.lower = lower
         self.upper = upper
+
+        self.realizations = [UpdatableRealization(prior, self.gp) 
+                for prior in prior_realizations]
 
         # Defines the neighbor structure, i.e. how many neighbors a cell is
         # supposed to have.
@@ -208,6 +217,11 @@ class StrategyABC(ABC):
             G = self.G[self.current_ind,:].reshape(1, -1)
             self.gp.update(G, y, data_std)
 
+            # Update the conditional realizations.
+            for real in self.realizations:
+                print("Updating")
+                real.update(G, y, data_std)
+
             # Extract current coverage function (after observing at current
             # location).
             self.current_coverage = self.gp.coverage(self.lower, self.upper)
@@ -221,8 +235,8 @@ class StrategyABC(ABC):
             # Save coverage each iteration.
             self.save_state(output_folder, coverage_only=True)
 
-            # Save full state every 5 iterations.
-            if i % 5 == 0:
+            # Save full state every 3 iterations.
+            if i % 3 == 0:
                 self.save_state(output_folder)
 
         return visited_inds, observed_data

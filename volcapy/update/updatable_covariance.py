@@ -355,7 +355,7 @@ class UpdatableCovariance:
     def condition_fantasy_data(self, prior, stacked_G, fantasy_ys,
             splitted_inds):
         """ Compute the posterior mean that would result from observing other
-        data than the one which was assimilated.
+        data than the one which was assimilated (over the full history).
         
         The main use of this method is to compute conditional realizations
         using residual kriging.
@@ -472,13 +472,6 @@ class UpdatableMean:
                 + K_dash.double() @ R.double() @ (y - G @
                 self.m).double()).float()
 
-        # ----
-        # TEMP
-        # ----
-        torch.save(K_dash, "update_pushfwd.pt")
-        torch.save(R, "update_inversion_op.pt")
-        # ----
-
     def __dict__(self):
         state_dict = {
                 'prior': self.prior.cpu().numpy(),
@@ -488,7 +481,7 @@ class UpdatableMean:
 
 
 # TODO: Should it just inherit from UpdatableMean?
-class UpdatableRealization:
+class UpdatableRealization(UpdatableMean):
     """ Posterior conditional realization that can be sequentially updated.
 
     This class uses residual kriging to produce a sample from the posterior,
@@ -501,7 +494,7 @@ class UpdatableRealization:
     UpdatableGP and then *replay* the updates onto a sample from the prior.
 
     """
-    def __init__(self, prior_realization, gp_module):
+    def __init__(self, prior, gp_module):
         """ Build an updatable realization.
 
         Params
@@ -513,31 +506,7 @@ class UpdatableRealization:
         gp_module: UpdatableGP
 
         """
-        prior_realization = _make_column_vector(prior_realization)
-
-        self.prior_realization = prior_realization
-        self.conditional_mean = UpdatableMean(prior_realization,
-                gp_module.covariance)
-
-        self.n_cells = prior_realization.shape[0]
-        self.gp_module = gp_module
-        
-        if not (self.n_cells == self.gp_module.n_cells):
-            raise ValueError(
-                "Model size for mean: {} does not agree with "\
-                "model size for covariance {}.".format(
-                        self.n_cells, self.gp_module.n_cells))
-    @property
-    def _realization(self):
-        """" The actual conditional realization.
-
-        Returns
-        -------
-        conditional_realization: (n_cells, 1) Tensor
-
-        """
-        return (self.gp_module.mean.m
-                + (self.prior_realization - self.conditional_mean.m))
+        super().__init__(self, prior, gp_module.covariance)
 
 
     @classmethod
@@ -581,14 +550,11 @@ class UpdatableRealization:
                         splitted_inds))
         return updatable_realization
         
-    def set_conditional_mean(self, conditional_mean):
-        self.conditional_mean.m = conditional_mean
-
     # TODO: Find a better design patter. This subtlety of having to make sure
     # that the covariance_module has been updated first is dangerous. Maybe an
     # observer pattern or something like that.
     # WARNING: NOIT FINISHED.
-    def update(self, G, data_std):
+    def update(self, G, y, data_std):
         """ Updates the realization.
         WARNING: should only be used after the covariance module has been
         updated, since it depends on it having computed the latest quantities.
@@ -606,15 +572,16 @@ class UpdatableRealization:
         """
         # Compute simulated data.
         noise = torch.normal(mean=0.0, std=data_std, size=(G.shape[0], 1))
-        y = G @ self.prior_realization + noise
+        y_prime = G @ self.m + noise
 
-        # TODO: finish.
-        self.conditional_mean.update()
+        y = _make_column_vector(y)
+        y_prime = _make_column_vector(y_prime)
 
-    def __dict__(self):
-        state_dict = {
-                'realization': self.realization.cpu().numpy()
-                }
+        # Get the latest conditioning operators.
+        K_dash = self.cov_module.pushforwards[-1]
+        R = self.cov_module.inversion_ops[-1]
+        self.m = (self.m.double() 
+                + K_dash.double() @ R.double() @ (y - y_prime)).float()
         return state_dict
 
 
