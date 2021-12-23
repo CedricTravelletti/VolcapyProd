@@ -582,7 +582,6 @@ class UpdatableRealization(UpdatableMean):
         R = self.cov_module.inversion_ops[-1]
         self.m = (self.m.double() 
                 + K_dash.double() @ R.double() @ (y - y_prime)).float()
-        return state_dict
 
 
 class UpdatableGP():
