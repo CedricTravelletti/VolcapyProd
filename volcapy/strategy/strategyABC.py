@@ -221,8 +221,8 @@ class StrategyABC(ABC):
             # Save coverage each iteration.
             self.save_state(output_folder, coverage_only=True)
 
-            # Save full state every 3 iterations.
-            if i % 3 == 0:
+            # Save full state every 5 iterations.
+            if i % 5 == 0:
                 self.save_state(output_folder)
 
         return visited_inds, observed_data
@@ -293,3 +293,11 @@ class StrategyABC(ABC):
                         output_folder,
                         "plugin_est_inds_{}.npy".format(i)),
                 plugin_est_inds)
+
+    def get_cost(self, source_ind, target_ind):
+        """ Compute cost associated to going from where we are to 
+        candidate location.
+
+        """
+        dist = self.candidates[source_ind] - self.candidates[target_ind]
+        return dist[0]**2 + dist[1]**2 + 3 * dist[3]**2
