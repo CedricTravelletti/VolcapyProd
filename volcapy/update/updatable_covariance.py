@@ -315,6 +315,31 @@ class UpdatableCovariance:
                 IVR += torch.sum(V.diag() * weights[inds])
         return IVR.item()
 
+    def compute_fantasy_variance(self, G, data_std):
+        """ Compute the posterior variance that would
+        result from collecting the data described by the measurement operator
+        G.    
+
+        Parameters
+        ----------
+        G: (n_data, self.n_cells) Tensor
+            Measurement operator
+        data_std: float
+            Measurement noise standard deviation, assumed to be iid centered
+            gaussian.
+    
+        Returns
+        -------
+        variance: (self.n_cells) Tensor
+            Variance at each point resulting from the observation of G.    
+
+        """
+        # Compute variance reduction.
+        VR = self.compute_VR(G, data_std)
+        variance = self.extract_variance()
+
+        return (variance - VR)
+
     def compute_VR(self, G, data_std):
         """ Compute the variance reduction (VR) (no integral) that would
         result from collecting the data described by the measurement operator
