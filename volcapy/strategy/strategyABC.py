@@ -218,8 +218,9 @@ class StrategyABC(ABC):
             self.gp.update(G, y, data_std)
 
             # Update the conditional realizations.
+            # Since by default it is an empty list, everything works 
+            # as intended.
             for real in self.realizations:
-                print("Updating")
                 real.update(G, y, data_std)
 
             # Extract current coverage function (after observing at current
@@ -266,6 +267,12 @@ class StrategyABC(ABC):
                     'next_ind_to_visit': self.current_ind,
                     'data_std': self.data_std, 'i': i, 'remaining_steps': self.n_steps - i}
             np.save(os.path.join(output_folder, "metadata.npy"), metadata)
+
+        # Save conditional realizations. By default it is an empty list.
+        for i, real in self.realizations:
+            print("Saving {}.".format(i))
+            np.save(os.path.join(output_folder, "conditional_real_{}.npy".format(i)), 
+                    real.numpy())
 
         """
             # Save current mean if needed.
