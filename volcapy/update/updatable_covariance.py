@@ -332,13 +332,15 @@ class UpdatableCovariance:
         -------
         variance: (self.n_cells) Tensor
             Variance at each point resulting from the observation of G.    
+        G_dash: (self.n_cells, G.shape[0]) Tensor
+            Covariance pushforward for the considered potential observation.
 
         """
         # Compute variance reduction.
-        VR = self.compute_VR(G, data_std)
+        VR, G_dash = self.compute_VR(G, data_std)
         variance = self.extract_variance()
 
-        return (variance - VR)
+        return (variance - VR, G_dash)
 
     def compute_VR(self, G, data_std):
         """ Compute the variance reduction (VR) (no integral) that would
@@ -357,6 +359,8 @@ class UpdatableCovariance:
         -------
         VR: (self.n_cells) Tensor
             Variance reduction, at each point resulting from the observation of G.    
+        G_dash: (self.n_cells, G.shape[0]) Tensor
+            Covariance pushforward for the considered potential observation.
 
         """
         # First subdivide the model cells in subgroups.
@@ -367,15 +371,15 @@ class UpdatableCovariance:
         G_dash = self.mul_right(G.t())
 
         # Get inversion op.
-        R = G @ G_dash
+        R = G.double() @ G_dash.double()
         inversion_op, _ = self._inversion_helper(R, data_std)
 
         VR = torch.zeros(self.n_cells)
         for inds in chunked_indices:
             G_part = G_dash[inds,:]
-            V = G_part @ inversion_op.float() @ G_part.t()
+            V = G_part.float() @ inversion_op.float() @ G_part.t().float()
             VR[inds] = V.diag()
-        return VR
+        return (VR, G_dash)
 
     def condition_fantasy_data(self, prior, stacked_G, fantasy_ys,
             splitted_inds):
@@ -640,6 +644,13 @@ class UpdatableGP():
 
     @property
     def mean_vec(self):
+        """ Returns the current mean vector.
+
+        Returns
+        -------
+        mean_vec: Tensor (self.n_cell, 1)
+
+        """
         return self.mean.m
 
     @property
