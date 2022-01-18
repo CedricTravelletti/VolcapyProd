@@ -268,11 +268,11 @@ class StrategyABC(ABC):
                     'data_std': self.data_std, 'i': i, 'remaining_steps': self.n_steps - i}
             np.save(os.path.join(output_folder, "metadata.npy"), metadata)
 
-        # Save conditional realizations. By default it is an empty list.
-        for i, real in self.realizations:
-            print("Saving {}.".format(i))
-            np.save(os.path.join(output_folder, "conditional_real_{}.npy".format(i)), 
-                    real.numpy())
+            # Save conditional realizations. By default it is an empty list.
+            for i, real in enumerate(self.realizations):
+                print("Saving {}.".format(i))
+                np.save(os.path.join(output_folder, "conditional_real_{}.npy".format(i)), 
+                        real.numpy())
 
         """
             # Save current mean if needed.
