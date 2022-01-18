@@ -272,7 +272,7 @@ class StrategyABC(ABC):
             for i, real in enumerate(self.realizations):
                 print("Saving {}.".format(i))
                 np.save(os.path.join(output_folder, "conditional_real_{}.npy".format(i)), 
-                        real.numpy())
+                        real.m.detach().float().numpy())
 
         """
             # Save current mean if needed.
