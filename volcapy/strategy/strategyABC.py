@@ -271,7 +271,6 @@ class StrategyABC(ABC):
 
             # Save conditional realizations. By default it is an empty list.
             for i, real in enumerate(self.realizations):
-                print("Saving {}.".format(i))
                 np.save(os.path.join(output_folder, "conditional_real_{}.npy".format(i)), 
                         real.m.detach().float().numpy())
 
@@ -347,7 +346,7 @@ class StrategyABC(ABC):
         for real in self.realizations:
             # Compute excursion realization.
             true_excursion_inds = (
-                    real.detach().numpy() >= self.lower).nonzero()[:, 0]
+                    real.m.detach().numpy().reshape(-1) >= self.lower)
 
             # Compute mismatch.
             mismatch = np.zeros(self.gp.cells_coords.shape[0])

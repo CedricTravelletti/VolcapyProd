@@ -12,6 +12,16 @@ from volcapy.uq.set_estimation import vorobev_quantile_inds
 
 
 class ConservativeStrategy(StrategyABC):
+    def __init__(self, updatable_gp, candidates,
+            G, data_feed, lower=None, upper=None,
+            prior_realizations=[]):
+
+            super().__init__(updatable_gp, candidates,
+                G, data_feed, lower, upper,
+                prior_realizations)
+            self.vorobev_quantile_sizes = []
+            self.inclusion_probas = []
+
     def compute_helper_quantities(self, G, data_std):
         """ Compute helper quantities a_n, b_n defined 
         in eq. 5.9.
@@ -74,10 +84,17 @@ class ConservativeStrategy(StrategyABC):
     def get_next_ind(self):
         # TODO: temporary.
         # Compute inclusion proba for vorobev quantile at level rho.
-        rho = 0.95
+        rho = 0.7
         vorb_quantile_inds = vorobev_quantile_inds(self.current_coverage, rho)
         inclusion_proba = self.compute_inclusion_probability(vorb_quantile_inds)
+        print(
+                "Vorobev quantile size at level {}: {} cells.".format(
+                    rho, vorb_quantile_inds.sum()))
         print("Inclusion proba: {}".format(inclusion_proba))
+        self.vorobev_quantile_sizes.append(vorb_quantile_inds.sum())
+        self.inclusion_probas.append(inclusion_proba)
+        np.save("vorobev_quantile_sizes.npy", self.vorobev_quantile_sizes)
+        np.save("inclusion_probas.npy", self.inclusion_probas)
 
         # Evaluate criterion on neighbors.
         neighbors_inds = self.get_neighbors(self.current_ind)
