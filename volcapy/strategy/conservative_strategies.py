@@ -75,8 +75,8 @@ class ConservativeStrategy(StrategyABC):
         # TODO: temporary.
         # Compute inclusion proba for vorobev quantile at level rho.
         rho = 0.95
-        vorobev_quantile_inds = vorobev_quantile_inds(self.current_coverage, rho)
-        inclusion_proba = self.compute_inclusion_probability(vorobev_quantile_inds)
+        vorb_quantile_inds = vorobev_quantile_inds(self.current_coverage, rho)
+        inclusion_proba = self.compute_inclusion_probability(vorb_quantile_inds)
         print("Inclusion proba: {}".format(inclusion_proba))
 
         # Evaluate criterion on neighbors.
