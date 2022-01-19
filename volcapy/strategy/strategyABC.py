@@ -322,4 +322,40 @@ class StrategyABC(ABC):
 
         """
         dist = self.candidates[source_ind] - self.candidates[target_ind]
-        return dist[0]**2 + dist[1]**2 + 3 * dist[3]**2
+
+    def compute_inclusion_probability(self, candidate_set_inds):
+        """ Compute the probability the a given candidate set 
+        is entirely included in the excursion set.
+
+        WARNING: should have defined some realizations.
+
+        Parameters
+        ----------
+        candidate_set_inds: array_like
+            List of indices of the cells that belong to the set.
+
+        Returns
+        -------
+        inclusion_probability: float
+
+        """
+        # Check if we are carrying conditional realizations.
+        if len(self.realizations) <= 0:
+            raise ValueError("There are no conditional realizations available.")
+
+        count_inclusion = 0
+        for real in self.realizations:
+            # Compute excursion realization.
+            true_excursion_inds = (
+                    real.detach().numpy() >= self.lower).nonzero()[:, 0]
+
+            # Compute mismatch.
+            mismatch = np.zeros(self.gp.cells_coords.shape[0])
+            mismatch[candidate_set_inds] = 1
+            tmp = np.zeros(self.gp.cells_coords.shape[0])
+            tmp[true_excursion_inds] = 2
+            mismatch = mismatch + tmp
+
+            # Find if there are any false negatives.
+            count_inclusion += int(not np.any(mismatch == 2))
+        return (count_inclusion / len(self.realizations))
