@@ -17,9 +17,12 @@ def vorobev_expectation_inds(coverage):
 
     Returns
     -------
-    excursion_inds: array
+    excursion_inds: boolean array (n_cells)
         Array of indices (in the cells list) that correspond to cells belonging
         to the Vorob'ev expectation.
+        This array has the same shape as coverage 
+        and contains true where cells belong to the set. 
+        One can then use it for logical indexing.
 
     """
     # Find the Vorob'ev threshold.
@@ -48,9 +51,11 @@ def vorobev_quantile_inds(coverage, quantile):
 
     Returns
     -------
-    excursion_inds: array
+    excursion_inds: boolean array (n_cells)
         Array of indices (in the cells list) that correspond to cells belonging
-        to the Vorob'ev expectation.
+        to the Vorob'ev expectation. This array has the same shape as coverage 
+        and contains true where cells belong to the set. 
+        One can then use it for logical indexing.
 
     """
     # Find the Vorob'ev threshold.
