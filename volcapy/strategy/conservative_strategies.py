@@ -5,6 +5,8 @@ thesis, chapter 5.2.
 """
 import torch
 import numpy as np
+from scipy.stats import norm
+from torch.distributions import Normal
 from volcapy.strategy.strategyABC import StrategyABC
 
 
@@ -24,7 +26,8 @@ class ConservativeStrategy(StrategyABC):
         Returns
         -------
         a: Tensor (n_cells)
-        b: Tensor (n_cells, n_obs)
+        b: Tensor (n_obs, n_cells)
+        gamma: Tensor (n_cells)
 
         """
         mean = self.gp.mean_vec
@@ -37,8 +40,35 @@ class ConservativeStrategy(StrategyABC):
                 fantasy_std)
         K_q = G.double() @ G_dash.double()
         b = torch.div(G_dash.double() @ torch.inverse(K_q),
-                fantasy_std.repeat(1, K_q.shape[0]).double()).float()
-        return (a, b)
+                fantasy_std.repeat(1, K_q.shape[0]).double()).t().float()
+
+        gamma = torch.sqrt(b.t().double() @ K_q.double() @ b.double())
+        return (a, b, gamma.float())
+
+    def compute_J_meas(self, G, data_std, rho):
+        """ Compute the J^{MEAS} criterions (Eq.5.13) for a given candidate 
+        location.
+
+        Parameters
+        ----------
+        G: Tensor (n_obs, n_cells)
+            Observation operator.
+        data_std: float
+            Observational noise standard deviation.
+        rho: float
+            Conservative level for the criterion.
+
+        Returns
+        -------
+        criterion: float
+
+        """
+        a, b, gamma = compute_helper_quantities(self, G, data_std)
+        J_meas = Normal(loc=0, std=1).cdf(
+                torch.div(
+                    a - norm.ppf(rho) * torch.ones(a.shape),
+                    gamma)).sum()
+        return J_meas
 
     def get_next_ind(self):
         # Evaluate criterion on neighbors.
