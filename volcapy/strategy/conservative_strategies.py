@@ -8,6 +8,7 @@ import numpy as np
 from scipy.stats import norm
 from torch.distributions import Normal
 from volcapy.strategy.strategyABC import StrategyABC
+from volcapy.uq.set_estimation import vorobev_quantile_inds
 
 
 class ConservativeStrategy(StrategyABC):
@@ -71,6 +72,13 @@ class ConservativeStrategy(StrategyABC):
         return J_meas
 
     def get_next_ind(self):
+        # TODO: temporary.
+        # Compute inclusion proba for vorobev quantile at level rho.
+        rho = 0.95
+        vorobev_quantile_inds = vorobev_quantile_inds(self.current_coverage, rho)
+        inclusion_proba = self.compute_inclusion_probability(vorobev_quantile_inds)
+        print("Inclusion proba: {}".format(inclusion_proba))
+
         # Evaluate criterion on neighbors.
         neighbors_inds = self.get_neighbors(self.current_ind)
         neighbors_ivrs = []
