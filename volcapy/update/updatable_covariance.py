@@ -536,7 +536,7 @@ class UpdatableRealization(UpdatableMean):
 
         """
         super().__init__(prior, gp_module.covariance)
-
+        self.gp = gp_module
 
     @classmethod
     def bootstrap(cls, prior_realization, stacked_G, data_std, gp_module,
