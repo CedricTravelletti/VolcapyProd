@@ -3,6 +3,7 @@ problem where coefficients of the 2d DFT are observed.
 
 """
 import numpy as np
+import torch
 from volcapy.grid.square_grid import Grid
 from volcapy.forward.twodim_fourier import compute_forward
 
@@ -20,11 +21,15 @@ class ToyFourier2d():
     G_re: array
 
     """
-    def __init__(self, grid, G_re, G_im, n_cells_1d):
+    def __init__(self, grid, G_re, G_im, fourier_inds, n_cells_1d):
         self.grid = grid
-        self.G_re = G_re
-        self.G_im = G_im
+        self.G_re = torch.from_numpy(G_re)
+        self.G_im = torch.from_numpy(G_im)
         self.n_cells_1d = n_cells_1d
+        self.fourier_inds = fourier_inds
+
+        # Concatenate to make compatible with code for single observations.
+        self.G = np.stack([G_re, G_im], axis=1)
 
     @classmethod
     def build_problem(cls, n_cells_1d, forward_cutoff=None):
@@ -49,10 +54,10 @@ class ToyFourier2d():
         # Compute the forward.
         M = n_cells_1d
         N = n_cells_1d
-        G_re, G_im = compute_forward(grid.cells, M, N, n_procs=4,
+        G_re, G_im, fourier_inds = compute_forward(grid.cells, M, N, n_procs=4,
                 forward_cutoff=forward_cutoff)
         
-        return cls(grid, G_re, G_im, n_cells_1d)
+        return cls(grid, G_re, G_im, fourier_inds, n_cells_1d)
 
     def index_to_1d(self, m, n):
         """ Converts a 2D index (in Fourier space) to a 1D index, which allows

@@ -53,16 +53,21 @@ def compute_forward(coords, M, N, n_procs, forward_cutoff=None):
         for k in range(i-1):
             fourier_inds.append([i-1, k])
 
-
-    print(forward_cutoff)
+    inds = []
     for l in range(forward_cutoff):
-        print(l)
         i, j = fourier_inds[l][0], fourier_inds[l][1]
         # ind = np.ravel_multi_index((i, j), (M, M))
         ind = l
+
+        inds.append([i, j])
         for k, cell in enumerate(coords):
             G_re[ind, k] = np.cos((2*np.pi / scale_factor) * (i * cell[0] +
                     j * cell[1]))
             G_im[ind, k] = np.sin((2*np.pi / scale_factor) * (i * cell[0] +
                     j * cell[1]))
-    return G_re, G_im
+    # Remove the first measurement since it is singular (vanishing imaginary component).
+    G_re = G_re[1:, :]
+    G_im = G_im[1:, :]
+    inds = inds[1:]
+
+    return G_re, G_im, inds
