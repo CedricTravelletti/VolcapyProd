@@ -17,7 +17,10 @@ class MyopicWIVRStrategy(StrategyABC):
         # Compute criterion for each candidate.
         for ind in neighbors_inds:
             # Observation operator for candidate location.
-            candidate_G = self.G[ind,:].reshape(1, -1)
+            # Make sure that the observation operator has 
+            # at least two dimensions.
+            candidate_G = self.G[ind,:]
+            if len(candidate_G.shape) <= 1: candidate_G = candidate_G.reshape(1, -1)
             ivr = self.gp.IVR(candidate_G, self.data_std, 
                                 weights=self.current_coverage)
             neighbors_ivrs.append(ivr)

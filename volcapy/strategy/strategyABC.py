@@ -212,10 +212,14 @@ class StrategyABC(ABC):
 
         for i in range(n_steps):
             # Observe at currennt location and update model.
-            self.visited_inds.append(self.current_ind)
+            self.visited_inds.append(self.current_ind.item())
             y = self.data_feed(self.current_ind).detach().float()
             self.observed_data.append(y.detach().float().numpy())
-            G = self.G[self.current_ind,:].reshape(1, -1)
+
+            # Make sure that the observation operator has 
+            # at least two dimensions.
+            G = self.G[self.current_ind,:]
+            if len(G.shape) <= 1: G = G.reshape(1, -1)
             self.gp.update(G, y, data_std)
 
             # Update the conditional realizations.
@@ -241,7 +245,7 @@ class StrategyABC(ABC):
             if i % 3 == 0:
                 self.save_state(output_folder)
 
-        return visited_inds, observed_data
+        return self.visited_inds, self.observed_data
 
     def save_state(self, output_folder, coverage_only=False):
         """ Save the current state of the run, so can be re-launched in case of
@@ -297,7 +301,11 @@ class StrategyABC(ABC):
             current_ind = int(current_ind)
 
             y = self.data_feed(current_ind)
-            G = self.G[current_ind,:].reshape(1, -1)
+
+            # Make sure that the observation operator has 
+            # at least two dimensions.
+            G = self.G[current_ind,:]
+            if len(G.shape) <= 1: G = G.reshape(1, -1)
             self.gp.update(G, y, data_std)
 
             post_mean = self.gp.mean_vec.detach().numpy()
