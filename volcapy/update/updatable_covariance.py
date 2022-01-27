@@ -45,6 +45,7 @@ themselves to the cov module.
 import torch
 import numpy as np
 import pickle
+import warnings
 from volcapy.utils import _make_column_vector
 from volcapy.gaussian_cdf import gaussian_cdf
 
@@ -679,6 +680,7 @@ class UpdatableGP():
         self.covariance.update(G, data_std)
         self.mean.update(y, G)
 
+    # TODO: Warning: only samples from Matern 5/2.
     def sample_prior(self):
         """ Sample from prior model.
 
@@ -688,6 +690,8 @@ class UpdatableGP():
             Column vector of sampled values at each cells.
 
         """
+        warnings.warn("PRIOR SAMPLING ONLY IMPLEMENTED FOR MATERN 5/2.")
+
         from rpy2.robjects import numpy2ri
         import rpy2.robjects as robjects
         from rpy2.robjects.packages import importr
@@ -718,6 +722,8 @@ class UpdatableGP():
         i.e. there are no update involved.
 
         """
+        raise NotImplementedError
+
         prior_sample = self.sample_prior
 
         # Update model.
