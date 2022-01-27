@@ -212,7 +212,7 @@ class StrategyABC(ABC):
 
         for i in range(n_steps):
             # Observe at currennt location and update model.
-            self.visited_inds.append(self.current_ind.item())
+            self.visited_inds.append(self.current_ind)
             y = self.data_feed(self.current_ind).detach().float()
             self.observed_data.append(y.detach().float().numpy())
 
