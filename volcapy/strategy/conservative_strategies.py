@@ -53,7 +53,8 @@ class ConservativeStrategy(StrategyABC):
         b = torch.div(G_dash.double() @ torch.inverse(K_q),
                 fantasy_std.repeat(1, K_q.shape[0]).double()).t().float()
 
-        gamma = torch.sqrt(b.t().double() @ K_q.double() @ b.double())
+        # We want to process cell by cell. This is the correct way to do it.
+        gamma = torch.sqrt(b.t().double() @ K_q.double() @ b.double()).diag()
         return (a, b, gamma.float())
 
     def compute_J_meas(self, G, data_std, rho):
@@ -74,8 +75,8 @@ class ConservativeStrategy(StrategyABC):
         criterion: float
 
         """
-        a, b, gamma = compute_helper_quantities(self, G, data_std)
-        J_meas = Normal(loc=0, std=1).cdf(
+        a, b, gamma = self.compute_helper_quantities(G, data_std)
+        J_meas = Normal(loc=0, scale=1).cdf(
                 torch.div(
                     a - norm.ppf(rho) * torch.ones(a.shape),
                     gamma)).sum()
@@ -84,7 +85,7 @@ class ConservativeStrategy(StrategyABC):
     def get_next_ind(self):
         # TODO: temporary.
         # Compute inclusion proba for vorobev quantile at level rho.
-        rho = 0.7
+        rho = 0.95
         vorb_quantile_inds = vorobev_quantile_inds(self.current_coverage, rho)
         inclusion_proba = self.compute_inclusion_probability(vorb_quantile_inds)
         print(
@@ -98,19 +99,22 @@ class ConservativeStrategy(StrategyABC):
 
         # Evaluate criterion on neighbors.
         neighbors_inds = self.get_neighbors(self.current_ind)
-        neighbors_ivrs = []
+        neighbors_crit = []
 
         print("Evaluating criterion among {} candidates.".format(neighbors_inds.shape[0]))
 
         # Compute criterion for each candidate.
         for ind in neighbors_inds:
             # Observation operator for candidate location.
-            candidate_G = self.G[ind,:].reshape(1, -1)
-            ivr = self.gp.IVR(candidate_G, self.data_std, 
-                                weights=self.current_coverage)
-            neighbors_ivrs.append(ivr)
+            # Make sure that the observation operator has 
+            # at least two dimensions.
+            candidate_G = self.G[ind,:]
+            if len(candidate_G.shape) <= 1: candidate_G = candidate_G.reshape(1, -1)
+
+            crit = self.compute_J_meas(candidate_G, self.data_std, rho)
+            neighbors_crit.append(crit)
 
         # Find best candidate.
-        tmp_ind = np.argmax(neighbors_ivrs)
+        tmp_ind = np.argmax(neighbors_crit)
         best_ind = neighbors_inds[tmp_ind]
         return best_ind
