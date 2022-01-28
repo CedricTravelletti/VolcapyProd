@@ -31,6 +31,9 @@ class ToyFourier2d():
         # Concatenate to make compatible with code for single observations.
         self.G = np.stack([G_re, G_im], axis=1)
 
+        # Add point observations.
+        self.G_pt = np.eye(self.G_re.shape[1])
+
     @classmethod
     def build_problem(cls, n_cells_1d, forward_cutoff=None):
         """ Prepare data for a square geometry [-1,1] x [-1, 1] with
