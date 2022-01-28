@@ -147,7 +147,7 @@ class StrategyABC(ABC):
         pass
 
     def run(self, start_ind, n_steps, data_std,
-            output_folder, max_step=None, min_step=None, restart_from_save=None):
+            output_folder=None, max_step=None, min_step=None, restart_from_save=None):
         """ Run the startegy. Note that this works with any criterion to choose
         the next point, the only requirement is that selt.get_next_ind is
         defined before running the strategy.
@@ -239,10 +239,10 @@ class StrategyABC(ABC):
                     len(self.visited_inds)))
 
             # Save coverage each iteration.
-            self.save_state(output_folder, coverage_only=True)
+            if output_folder is not None: self.save_state(output_folder, coverage_only=True)
 
             # Save full state every 3 iterations.
-            if i % 3 == 0:
+            if i % 3 == 0 and output_folder is not None:
                 self.save_state(output_folder)
 
         return self.visited_inds, self.observed_data
