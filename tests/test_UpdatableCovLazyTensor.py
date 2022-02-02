@@ -15,6 +15,7 @@ from volcapy.update.updatable_covariance import UpdatableGP
 from volcapy.update.lazy_updatable_covariance import UpdatableCovLazyTensor
 import volcapy.covariance.matern52 as kernel
 from volcapy.inverse.toy_fourier_2d import ToyFourier2d
+from gpytorch.lazy import MatmulLazyTensor
 from gpytorch.utils import linear_cg
 
 
@@ -49,4 +50,9 @@ lazy_cov[0:10, 0:10].evaluate()
 # Test pivoted Cholesky decomposition.
 from gpytorch.utils.pivoted_cholesky import pivoted_cholesky
 
-res = pivoted_cholesky(lazy_cov, max_iter=100, error_tol=0.01)
+res = pivoted_cholesky(lazy_cov, max_iter=300, error_tol=0.01)
+preconditioner = MatmulLazyTensor(res, res.t())
+
+# Now test conjugate gradient inversion.
+rhs = torch.rand((lazy_cov.n, 1))
+ans = linear_cg(lazy_cov.matmul, rhs, tolerance=0.1, max_iter=400, preconditioner=preconditioner.matmul)

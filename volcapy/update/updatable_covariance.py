@@ -245,7 +245,8 @@ class UpdatableCovariance:
         return self.sigma0**2 * pushfwd
 
     def extract_variance(self):
-        """ Extracts the pointwise variance from an UpdatableCovariane module.
+        """ Extracts the pointwise variance from an UpdatableCovariance module. 
+        I.e. extracts the diagonal.
     
         Returns
         -------
