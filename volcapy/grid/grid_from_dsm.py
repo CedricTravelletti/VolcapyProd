@@ -8,13 +8,18 @@ import pickle
 
 
 class Grid():
-    def __init__(self, cells, cells_roof, surface_inds, res_x, res_y, res_z):
+    def __init__(self, cells, cells_roof, surface_inds):
         self.cells = cells
         self.cells_roof = cells_roof
         self.surface_inds = surface_inds
-        self.res_x = res_x
-        self.res_y = res_y
-        self.res_z = res_z
+
+        # Deduce resolutions.
+        sorted_unique_x = np.sort(list(set(cells[:, 0])))
+        sorted_unique_y = np.sort(list(set(cells[:, 1])))
+        sorted_unique_z = np.sort(list(set(cells[:, 2])))
+        self.res_x = sorted_unique_x[1] - sorted_unique_x[0]
+        self.res_y = sorted_unique_y[1] - sorted_unique_y[0]
+        self.res_z = sorted_unique_z[1] - sorted_unique_z[0]
 
     @classmethod
     def build_grid(cls, dsm_x, dsm_y, dsm_z, z_low, z_step):
@@ -27,21 +32,19 @@ class Grid():
 
         cells, cells_roof, surface_inds = build_grid_below_dsm(
                 dsm_x, dsm_y, dsm_z, z_low, z_step)
-        return cls(cells, cells_roof, surface_inds, res_x, res_y, res_z)
+        return cls(cells, cells_roof, surface_inds)
 
     @classmethod
     def load(cls, path):
         with open(path, 'rb') as f:
                 t = pickle.load(f)
                 return cls(
-                        t['cells'], t['cells_roof'], t['surface_inds'],
-                        t['res_x'], t['res_y'], t['res_z'])
+                        t['cells'], t['cells_roof'], t['surface_inds'])
 
     def save(self, path):
         pickled_grid = {
                 'cells': self.cells, 'cells_roof': self.cells_roof,
-                'surface_inds': self.surface_inds,
-                'res_x': self.res_x, 'res_y': self.res_y, 'res_z': self.res_z}
+                'surface_inds': self.surface_inds}
 
         with open(path, 'wb') as f:
                 pickle.dump(pickled_grid, f)
