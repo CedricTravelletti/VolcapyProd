@@ -8,7 +8,7 @@ import pickle
 
 
 class Grid():
-    def __init__(self, cells, cells_roof, surface_inds):
+    def __init__(self, cells, cells_roof, surface_inds, mesh_index_table=None):
         self.cells = cells
         self.cells_roof = cells_roof
         self.surface_inds = surface_inds
@@ -20,6 +20,9 @@ class Grid():
         self.res_x = sorted_unique_x[1] - sorted_unique_x[0]
         self.res_y = sorted_unique_y[1] - sorted_unique_y[0]
         self.res_z = sorted_unique_z[1] - sorted_unique_z[0]
+
+        if mesh_index_table is None: mesh_index_table = self.gen_mesh_index_table()
+        self.mesh_index_table = mesh_index_table
 
     @classmethod
     def build_grid(cls, dsm_x, dsm_y, dsm_z, z_low, z_step):
@@ -39,12 +42,15 @@ class Grid():
         with open(path, 'rb') as f:
                 t = pickle.load(f)
                 return cls(
-                        t['cells'], t['cells_roof'], t['surface_inds'])
+                        t['cells'], t['cells_roof'], t['surface_inds'],
+                        mesh_index_table=t['mesh_index_table'])
 
     def save(self, path):
         pickled_grid = {
                 'cells': self.cells, 'cells_roof': self.cells_roof,
-                'surface_inds': self.surface_inds}
+                'surface_inds': self.surface_inds,
+                'mesh_index_table': self.mesh_index_table
+                }
 
         with open(path, 'wb') as f:
                 pickle.dump(pickled_grid, f)
@@ -59,6 +65,90 @@ class Grid():
     @property
     def surface(self):
         return self.cells[self.surface_inds]
+
+    def build_mesh(self):
+        """ Buils a regular mesh containing the grid points. 
+        This is useful for plotting and interpolation.
+
+        The grids we are working with are irregular due to the shape of the domain, 
+        i.e. compared to a full parallelepipedic mesh, some cells are missing. 
+        The goal of this function is to build a parallelepipedic mesh that encloses 
+        the grid. 
+
+        Returns
+        -------
+        X_mesh, Y_,mesh, Z_mesh: array [n_x, n_y, n_z]
+            Mesh arrays. The number of points along each dimensions corresponds 
+            to the number of unique values along that dimension in the original grid array.
+
+        """
+        x_s = np.sort(list(set(self.cells[:, 0])))
+        y_s = np.sort(list(set(self.cells[:, 1])))
+        z_s = np.sort(list(set(self.cells[:, 2])))
+
+        # 3D mesh grid for interpolation
+        X_mesh, Y_mesh, Z_mesh = np.meshgrid(x_s, y_s, z_s, indexing='ij')
+        return X_mesh, Y_mesh, Z_mesh
+
+    def gen_mesh_index_table(self):
+        """ Generates a table that gives the corresponding indices in the regular 
+        mesh for each cell in the grid. The regular mesh is the one build by 
+        self.build_mesh.
+
+        Returns
+        -------
+        mesh_index_table: array (n_cells, n_dims)
+
+        """
+        X_mesh, Y_mesh, Z_mesh = self.build_mesh()
+
+        # Idea of the algo: the cells array is a bit like the mesh 
+        # array, but with cells removed. Hence we can start by iterating the two 
+        # synchronously and increment the mesh index faster.
+        mesh_size = X_mesh.shape[0]*X_mesh.shape[1]*X_mesh.shape[2]
+        start_ind_mesh = 0
+        regular_index_table = []
+        for ind_1d, cell in enumerate(self.cells):
+            print(ind_1d)
+            if start_ind_mesh >= mesh_size:
+                return
+            for ind_mesh in range(start_ind_mesh, mesh_size):
+                # Indices in meshed array.
+                i, j, k = np.unravel_index(ind_mesh, X_mesh.shape)
+                pt_mesh = np.array([X_mesh[i, j, k], Y_mesh[i, j, k], Z_mesh[i, j, k]])
+                print(ind_mesh)
+                print(cell)
+                print(pt_mesh)
+
+                # If close enough break the search.
+                start_ind_mesh += 1
+                dist = np.linalg.norm(pt_mesh - cell)
+                print(dist)
+                if (dist < np.min([self.res_x, self.res_y, self.res_z]) / 3):
+                    regular_index_table.append((i, j, k))
+                    break
+
+        return np.array(regular_index_table)
+
+    def mesh_values(self, values):
+        """ Given a list of values at grid points, returns them in a regular mesh, 
+        as built by self.build_mesh.
+
+        Returns
+        -------
+        X_mesh: array [n_x, n_y, n_z]
+        Y_mesh: array [n_x, n_y, n_z]
+        Z_mesh: array [n_x, n_y, n_z]
+        vals_mesh: array [n_x, n_y, n_z]
+
+        """
+        X_mesh, Y_mesh, Z_mesh = self.build_mesh()
+        vals_mesh = np.full(X_mesh.shape, np.nan)
+        vals_mesh[
+                self.mesh_index_table[:, 0],
+                self.mesh_index_table[:, 1],
+                self.mesh_index_table[:, 2]] = values.reshape(-1)
+        return vals_mesh
 
     # TODO: Unused. Check and remove.
     def generate_mesh_data(self, cell_data=None):
