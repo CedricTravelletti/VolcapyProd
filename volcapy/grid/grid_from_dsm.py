@@ -24,6 +24,8 @@ class Grid():
         if mesh_index_table is None: mesh_index_table = self.gen_mesh_index_table()
         self.mesh_index_table = mesh_index_table
 
+        self.X_mesh, self.Y_mesh, self.Z_mesh = self.build_mesh()
+
     @classmethod
     def build_grid(cls, dsm_x, dsm_y, dsm_z, z_low, z_step):
 
@@ -41,9 +43,14 @@ class Grid():
     def load(cls, path):
         with open(path, 'rb') as f:
                 t = pickle.load(f)
-                return cls(
+                if 'mesh_index_table' in t:
+                    return cls(
                         t['cells'], t['cells_roof'], t['surface_inds'],
                         mesh_index_table=t['mesh_index_table'])
+                else:
+                    return cls(
+                        t['cells'], t['cells_roof'], t['surface_inds'],
+                        mesh_index_table=None)
 
     def save(self, path):
         pickled_grid = {
@@ -100,30 +107,23 @@ class Grid():
         mesh_index_table: array (n_cells, n_dims)
 
         """
-        X_mesh, Y_mesh, Z_mesh = self.build_mesh()
-
         # Idea of the algo: the cells array is a bit like the mesh 
         # array, but with cells removed. Hence we can start by iterating the two 
         # synchronously and increment the mesh index faster.
-        mesh_size = X_mesh.shape[0]*X_mesh.shape[1]*X_mesh.shape[2]
+        mesh_size = self.X_mesh.shape[0]*self.X_mesh.shape[1]*self.X_mesh.shape[2]
         start_ind_mesh = 0
         regular_index_table = []
         for ind_1d, cell in enumerate(self.cells):
-            print(ind_1d)
             if start_ind_mesh >= mesh_size:
                 return
             for ind_mesh in range(start_ind_mesh, mesh_size):
                 # Indices in meshed array.
                 i, j, k = np.unravel_index(ind_mesh, X_mesh.shape)
-                pt_mesh = np.array([X_mesh[i, j, k], Y_mesh[i, j, k], Z_mesh[i, j, k]])
-                print(ind_mesh)
-                print(cell)
-                print(pt_mesh)
+                pt_mesh = np.array([self.X_mesh[i, j, k], self.Y_mesh[i, j, k], self.Z_mesh[i, j, k]])
 
                 # If close enough break the search.
                 start_ind_mesh += 1
                 dist = np.linalg.norm(pt_mesh - cell)
-                print(dist)
                 if (dist < np.min([self.res_x, self.res_y, self.res_z]) / 3):
                     regular_index_table.append((i, j, k))
                     break
@@ -136,14 +136,11 @@ class Grid():
 
         Returns
         -------
-        X_mesh: array [n_x, n_y, n_z]
-        Y_mesh: array [n_x, n_y, n_z]
-        Z_mesh: array [n_x, n_y, n_z]
         vals_mesh: array [n_x, n_y, n_z]
+            Values projected on self.X_mesh, self.Y_mesh, self.Z_mesh.
 
         """
-        X_mesh, Y_mesh, Z_mesh = self.build_mesh()
-        vals_mesh = np.full(X_mesh.shape, np.nan)
+        vals_mesh = np.full(self.X_mesh.shape, np.nan)
         vals_mesh[
                 self.mesh_index_table[:, 0],
                 self.mesh_index_table[:, 1],
