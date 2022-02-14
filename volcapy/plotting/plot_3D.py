@@ -245,3 +245,21 @@ def plot_surfaces(slices, title="", cmap='jet'):
                        colorbar_len=0.75,
                        cmin=vmin, cmax=vmax))
     return fig1
+
+def mesh_to_vtkStructuredGrid(X_mesh, Y_mesh, Z_mesh, vals_mesh):
+    # Points in the format required by VTK.
+    pts = np.empty(Z_mesh.shape + (3,), dtype=float)
+    pts[..., 0] = X_mesh
+    pts[..., 1] = Y_mesh
+    pts[..., 2] = Z_mesh
+    
+    # We reorder the points, scalars and vectors so this is as per VTK's
+    # requirement of x first, y next and z last.
+    pts = pts.transpose(2, 1, 0, 3).copy()
+    pts = pts.reshape(int(pts.size / 3), 3)
+    scalars = vals_mesh.transpose(2, 0, 1).copy()
+    
+    sg = tvtk.StructuredGrid(dimensions=X_mesh.shape, points=pts)
+    sg.point_data.scalars = scalars.ravel()
+    sg.point_data.scalars.name = 'values'
+    return sg
