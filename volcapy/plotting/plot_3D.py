@@ -214,7 +214,7 @@ def get_plotly_surface(x_mesh, y_mesh,z_mesh, vals_mesh):
                       surfacecolor=vals_mesh,
                       coloraxis='coloraxis')
 
-def plot_surfaces(slices, title="", cmap='jet'):
+def plot_surfaces(slices, title="", cmap='jet', vmin=None, vmax=None):
     """ Plots the surfaces obtained from get_plotly_surface.
 
     """
@@ -228,8 +228,10 @@ def plot_surfaces(slices, title="", cmap='jet'):
     max_z = max([np.max(slice['z']) for slice in slices])
     
     # Find color boundaries.
-    vmin = np.nanmin([np.nanmin(slice['surfacecolor']) for slice in slices])
-    vmax = np.nanmax([np.nanmax(slice['surfacecolor']) for slice in slices])
+    if vmin is None:
+        vmin = np.nanmin([np.nanmin(slice['surfacecolor']) for slice in slices])
+    if vmax is None:
+        vmax = np.nanmax([np.nanmax(slice['surfacecolor']) for slice in slices])
 
     fig1 = go.Figure(data=slices)
     fig1.update_layout(
