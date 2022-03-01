@@ -33,7 +33,7 @@ vhaar = np.vectorize(_haar)
 def haar(x, n, k):
     return 2.0**(n/2.0) * vhaar(2.0**n * x - k)
 
-def build_tensor_haar_basis(nmin=-2, nmax=1, kmin=-2, kmax=2):
+def build_tensor_haar_basis(coords, nmin=-2, nmax=1, kmin=-2, kmax=2):
     """ Build the design matrix for Haar wavelet basis in 3D 
     via tensor products.
 
