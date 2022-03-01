@@ -641,10 +641,11 @@ class InverseGaussianProcess(torch.nn.Module):
         """
         import volcapy.covariance.sample as Rinterface
         m0 = self.m0.detach().cpu().item()
+        prior = m0 * torch.ones(self.cells_coords.shape[0])
         sigma0 = self.sigma0.detach().cpu().item()
         lambda0 = self.lambda0
 
-        sample = Rinterface.sample(self.kernel, sigma0, lambda0, m0, self.cells_coords)
+        sample = Rinterface.sample(self.kernel, sigma0, lambda0, prior, self.cells_coords)
         return sample
 
     def posterior_variance(self):

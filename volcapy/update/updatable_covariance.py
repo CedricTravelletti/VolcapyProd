@@ -37,7 +37,7 @@ TODO
 Implement some shape getter.
 Implement computation of the diagonal.
 
-REFACTOR USING OBSERVER PATTERN: UpdatableMean, Realizations and so on register
+REFACTOn USING OBSERVER PATTERN: UpdatableMean, Realizations and so on register
 themselves to the cov module.
 
 
@@ -681,7 +681,6 @@ class UpdatableGP():
         self.covariance.update(G, data_std)
         self.mean.update(y, G)
 
-    # TODO: Warning: only samples from Matern 5/2.
     def sample_prior(self):
         """ Sample from prior model.
 
@@ -691,30 +690,13 @@ class UpdatableGP():
             Column vector of sampled values at each cells.
 
         """
-        warnings.warn("PRIOR SAMPLING ONLY IMPLEMENTED FOR MATERN 5/2.")
+        import volcapy.covariance.sample as Rinterface
+        sigma0 = self.covariance.sigma0.detach().cpu().item()
+        lambda0 = self.covariance.lambda0
 
-        from rpy2.robjects import numpy2ri
-        import rpy2.robjects as robjects
-        from rpy2.robjects.packages import importr
-        
-        # Activate auto-wrapping of numpy arrays as rpy2 objects.
-        numpy2ri.activate()
-
-        # Import the R RandomFields library.
-        rflib = importr("RandomFields")
-
-        # Create the model and sample.
-        # TODO: Autodetect covariance model.
-        model = rflib.RMmatern(nu=2.5, var=self.covariance.sigma0**2,
-                scale=self.covariance.lambda0)
-        simu = rflib.RFsimulate(model,
-                self.covariance.cells_coords.detach().cpu().numpy())
-
-        # Back to numpy, make column vector also.
-        sample = torch.from_numpy(
-                np.asarray(simu.slots['data']).astype(np.float32)[:, None])
-
-        return sample + self.mean.prior
+        centred_sample = Rinterface.sample(self.covariance.cov_module, sigma0, lambda0,
+                0.0, self.cells_coords)
+        return centred_sample + self.prior_mean_vec
 
     # TODO: Finish implementation.
     def sample_conditional(self, G, y, data_std):
