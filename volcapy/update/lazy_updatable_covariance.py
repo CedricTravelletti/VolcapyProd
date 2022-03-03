@@ -8,6 +8,9 @@ import gpytorch.settings as settings
 
 
 class UpdatableCovLazyTensor(LazyTensor):
+    """ Wrapper to make our updatable covariances into gpytorch Lazy Tensors.
+
+    """
     def __init__(self, updatable_cov):
         super(UpdatableCovLazyTensor, self).__init__(updatable_cov.cells_coords)
         self.updatable_cov = updatable_cov
