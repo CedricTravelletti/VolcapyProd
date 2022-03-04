@@ -5,6 +5,7 @@ import volcapy.covariance.matern52 as kernel
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.update.lazy_updatable_covariance import UpdatableCovLazyTensor
 
+import gpytorch
 from ax import optimize
 
 
@@ -28,7 +29,7 @@ updatable_gp = UpdatableGP(kernel, lambda0, torch.tensor([sigma0]), m0,
 
 lazy_cov = UpdatableCovLazyTensor(updatable_gp.covariance)
 
-logdet = gpytorch.logdet(UpdatableCovLazyTensor)
+logdet = gpytorch.logdet(lazy_cov)
 
 """
 inv_quad, logdet = gpytorch.inv_quad_logdet(cov_mat, inv_quad_rhs, logdet=True)
