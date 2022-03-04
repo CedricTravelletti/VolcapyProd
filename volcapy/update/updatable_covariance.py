@@ -152,6 +152,7 @@ class UpdatableCovariance:
 
         end = time.time()
         print((end - start) / 60.0)
+        torch.cuda.empty_cache()
         # Note the first term (the one with C_0 alone) only has one sigma0**2
         # factor associated with it, whereas all other terms in the updating
         # have two one.
