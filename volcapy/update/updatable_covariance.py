@@ -93,12 +93,12 @@ class UpdatableCovariance:
 
         """
         self.cov_module = cov_module
-        self.lambda0 = lambda0
-        self.sigma0 = sigma0
+        self.lambda0 = lambda0.to(DEVICE)
+        self.sigma0 = sigma0.to(DEVICE)
         
         if not torch.is_tensor(cells_coords):
             cells_coords = torch.from_numpy(cells_coords)
-        self.cells_coords = cells_coords
+        self.cells_coords = cells_coords.to(DEVICE)
         self.n_cells = cells_coords.shape[0]
 
         self.n_chunks = n_chunks
@@ -130,6 +130,9 @@ class UpdatableCovariance:
             K * A
 
         """
+        # If both devices not equal, fallback to standard device.
+        if not A.device == DEVICE: A = A.to(DEVICE)
+
         # First compute the level 0 pushforward.
         # Warning: the original covariance pushforward method was used to
         # comput K G^T, taking G as an argument, i.e. it does transposing in
@@ -238,6 +241,9 @@ class UpdatableCovariance:
         pushfwd: (self.n_cells, n_data) Tensor
 
         """
+        # If both devices not equal, fallback to standard device.
+        if not G.device == DEVICE: G = G.to(DEVICE)
+
         pushfwd = self.cov_module.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
