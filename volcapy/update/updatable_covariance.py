@@ -46,6 +46,7 @@ import torch
 import numpy as np
 import pickle
 import warnings
+import time
 from volcapy.utils import _make_column_vector
 from volcapy.gaussian_cdf import gaussian_cdf
 
@@ -93,7 +94,11 @@ class UpdatableCovariance:
 
         """
         self.cov_module = cov_module
+        if not torch.is_tensor(lambda0):
+            lambda0 = torch.tensor([lambda0])
         self.lambda0 = lambda0.to(DEVICE)
+        if not torch.is_tensor(sigma0):
+                sigma0 = torch.tensor([sigma0])
         self.sigma0 = sigma0.to(DEVICE)
         
         if not torch.is_tensor(cells_coords):
@@ -130,6 +135,7 @@ class UpdatableCovariance:
             K * A
 
         """
+        start = time.time()
         # If both devices not equal, fallback to standard device.
         if not A.device == DEVICE: A = A.to(DEVICE)
 
@@ -144,13 +150,15 @@ class UpdatableCovariance:
         for p, r in zip(self.pushforwards, self.inversion_ops):
             temp -= p.double() @ (r @ (p.double().t() @ A.double()))
 
+        end = time.time()
+        print((end - start) / 60.0)
         # Note the first term (the one with C_0 alone) only has one sigma0**2
         # factor associated with it, whereas all other terms in the updating
         # have two one.
         if strip:
-            return cov_pushfwd_0 + temp
+            return cov_pushfwd_0 + temp.to(DEVICE)
         else:
-            return cov_pushfwd_0 + temp
+            return cov_pushfwd_0 + temp.to(DEVICE)
 
     # TODO: DEPRECATED. Not adapted to new stripped pushforwards.
     # TODO: Is this ever used?
@@ -247,7 +255,7 @@ class UpdatableCovariance:
         pushfwd = self.cov_module.compute_cov_pushforward(
                 self.lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
-                n_flush=self.n_flush).cpu()
+                n_flush=self.n_flush)
         return self.sigma0**2 * pushfwd
 
     def extract_variance(self):
