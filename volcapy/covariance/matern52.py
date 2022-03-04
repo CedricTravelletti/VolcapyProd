@@ -146,7 +146,7 @@ def compute_diagonal(lambda0, cells_coords, device=None, n_chunks=200,
         Diagonal of the covariance matrix.
     """
     # We have a stationary covariance, so the diagonal is trivial.
-    return torch.ones(cells_coords.shape[0])
+    return torch.ones(cells_coords.shape[0], device=device)
 
 def compute_cov(lambda0, cells_coords, i, j):
     """ Compute the covariance between two points.
