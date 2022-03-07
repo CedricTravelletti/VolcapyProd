@@ -852,9 +852,9 @@ class UpdatableGP():
 
         """
         y = y.reshape(-1, 1)
-        prior_mean = m0 @ torch.ones(G.shape[1], 1)
+        prior_mean = m0 * torch.ones(G.shape[1], 1)
 
-        pushfwd = self.covariance.compute_prior_pushforward(G, lambda0)
+        pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0).cpu()
         data_cov = G @ pushfwd
         nll = (torch.logdet(data_cov)
                 + (y - G @ prior_mean).t() 
