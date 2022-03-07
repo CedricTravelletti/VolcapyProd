@@ -237,7 +237,7 @@ class UpdatableCovariance:
             "Impossible to invert matrix, even at noise std {}".format(self.data_std))
         return -1, data_std
 
-    def compute_prior_pushfwd(self, G, lambda0=None):
+    def compute_prior_pushfwd(self, G, lambda0=None, sigma0=None):
         """ Given an operator G, compute the covariance pushforward K_0 G^T,
         i.e. the pushforward with respect to the prior.
 
@@ -256,12 +256,13 @@ class UpdatableCovariance:
         if not G.device == DEVICE: G = G.to(DEVICE)
 
         if lambda0 is None: lambda0 = self.lambda0
+        if sigma0 is None: lambda0 = self.sigma0
 
         pushfwd = self.cov_module.compute_cov_pushforward(
                 lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
                 n_flush=self.n_flush)
-        return self.sigma0**2 * pushfwd
+        return sigma0**2 * pushfwd
 
     def extract_variance(self):
         """ Extracts the pointwise variance from an UpdatableCovariance module. 
@@ -830,7 +831,7 @@ class UpdatableGP():
                 lower=lower, upper=upper)
         return coverage
 
-    def neg_log_likelihood(self, lambda0, sigma0, m0, G, y):
+    def neg_log_likelihood(self, lambda0, sigma0, m0, G, y, data_std=0.0):
         """ Compute the negative log-likelihood (up to a constant and a factor 1/2).
 
         Parameters
@@ -854,8 +855,9 @@ class UpdatableGP():
         y = y.reshape(-1, 1)
         prior_mean = m0 * torch.ones(G.shape[1], 1)
 
-        pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0).cpu()
-        data_cov = G @ pushfwd
+        pushfwd = self.covariance.compute_prior_pushforward(G, lambda0, sigma0).cpu()
+        data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
+
         nll = (torch.logdet(data_cov)
                 + (y - G @ prior_mean).t() 
                 @ torch.inverse(data_cov) 
