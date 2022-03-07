@@ -830,7 +830,7 @@ class UpdatableGP():
                 lower=lower, upper=upper)
         return coverage
 
-    def neg_log_likelihood(self, lambda0, sigma0, m0, y):
+    def neg_log_likelihood(self, lambda0, sigma0, m0, G, y):
         """ Compute the negative log-likelihood (up to a constant and a factor 1/2).
 
         Parameters
