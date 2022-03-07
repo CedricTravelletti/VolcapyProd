@@ -173,6 +173,37 @@ class UniversalUpdatableGP(UpdatableGP):
 
         return (centred_sample.reshape(-1) + self.coeff_F @ trend_sample.reshape(-1), trend_sample)
 
+    def neg_log_likelihood(self, lambda0, sigma0, coeff_cov, coeff_mean, y):
+        """ Compute the negative log-likelihood (up to a constant and a factor 1/2).
+
+        Parameters
+        ----------
+        lambda0: Tensor
+            Lengthscale parameter.
+        sigma0: Tensor
+            Prior standard deviation.
+        coeff_cov: Tensor (n_cells, n_cells)
+            Prior covariance matrix of the trend coefficients.
+        coeff_mean: Tensor (n_cells, 1)
+            Prior mean of the trend coefficients
+        G: Tensor (n_data, n_model)
+            Observation operator.
+        y: Tensor (n_data)
+            The data vector.
+
+        Returns
+        -------
+        neg_log_likelihood: Tensor
+
+        """
+        y = y.reshape(-1, 1)
+        data_cov = G @ cov @ G.t() + G @ self.coeff_F @ coeff_cov @ self.coeff_F.t() @ G.t()
+        nll = (torch.logdet(data_cov)
+                + (y - G @ self.coeff_F @ coeff_mean).t() 
+                @ torch.inverse(data_cov) 
+                @ (y - G @ self.coeff_F @ coeff_mean))
+        return nll
+
 
 class UniversalUpdatableMean(UpdatableMean):
     """ Universal kriging version of the UpdatableMean.
