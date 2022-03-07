@@ -237,13 +237,15 @@ class UpdatableCovariance:
             "Impossible to invert matrix, even at noise std {}".format(self.data_std))
         return -1, data_std
 
-    def compute_prior_pushfwd(self, G):
+    def compute_prior_pushfwd(self, G, lambda0=None):
         """ Given an operator G, compute the covariance pushforward K_0 G^T,
         i.e. the pushforward with respect to the prior.
 
         Parameters
         ----------
         G: (n_data, self.n_cells) Tensor
+        lambda0: Tensor, defaults to None
+            If not provided, use self.lambda0 as lengthscale.
 
         Returns
         -------
@@ -253,8 +255,10 @@ class UpdatableCovariance:
         # If both devices not equal, fallback to standard device.
         if not G.device == DEVICE: G = G.to(DEVICE)
 
+        if lambda0 is None: lambda0 = self.lambda0
+
         pushfwd = self.cov_module.compute_cov_pushforward(
-                self.lambda0, G, self.cells_coords, DEVICE,
+                lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
                 n_flush=self.n_flush)
         return self.sigma0**2 * pushfwd
@@ -825,6 +829,38 @@ class UpdatableGP():
         coverage = gaussian_cdf(mean, variance.reshape(-1, 1),
                 lower=lower, upper=upper)
         return coverage
+
+    def neg_log_likelihood(self, lambda0, sigma0, m0, y):
+        """ Compute the negative log-likelihood (up to a constant and a factor 1/2).
+
+        Parameters
+        ----------
+        lambda0: Tensor
+            Lengthscale parameter.
+        sigma0: Tensor
+            Prior standard deviation.
+        m0: Tensor
+            Prior mean.
+        G: Tensor (n_data, n_model)
+            Observation operator.
+        y: Tensor (n_data)
+            The data vector.
+
+        Returns
+        -------
+        neg_log_likelihood: Tensor
+
+        """
+        y = y.reshape(-1, 1)
+        prior_mean = m0 @ torch.ones(G.shape[1], 1)
+
+        pushfwd = self.covariance.compute_prior_pushforward(G, lambda0)
+        data_cov = G @ pushfwd
+        nll = (torch.logdet(data_cov)
+                + (y - G @ prior_mean).t() 
+                @ torch.inverse(data_cov) 
+                @ (y - G @ prior_mean))
+        return nll
 
     def __dict__(self):
         return {'mean': self.mean.__dict__(),
