@@ -257,6 +257,7 @@ class UpdatableCovariance:
 
         if lambda0 is None: lambda0 = self.lambda0
         if sigma0 is None: lambda0 = self.sigma0
+        sigma0 = sigma0.to(DEVICE)
 
         pushfwd = self.cov_module.compute_cov_pushforward(
                 lambda0, G, self.cells_coords, DEVICE,
@@ -855,7 +856,7 @@ class UpdatableGP():
         y = y.reshape(-1, 1)
         prior_mean = m0 * torch.ones(G.shape[1], 1)
 
-        pushfwd = self.covariance.compute_prior_pushforward(G, lambda0, sigma0).cpu()
+        pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0, sigma0).cpu()
         data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
 
         nll = (torch.logdet(data_cov)
