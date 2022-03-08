@@ -855,11 +855,15 @@ class UpdatableGP():
         y = y.reshape(-1, 1)
         prior_mean = m0 @ torch.ones(G.shape[1], 1)
 
-        pushfwd = self.covariance.compute_prior_pushforward(G, lambda0, sigma0)
-        data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
-        nll = (torch.logdet(data_cov)
-                + (y - G @ prior_mean).t() 
-                @ torch.inverse(data_cov) 
+        # Compute a stripped version, i.e. without the sigma0^2.
+        pushfwd_strip = self.covariance.compute_prior_pushforward(G, lambda0, sigma0=1.0)
+        data_cov_strip = G @ pushfwd + (data_std / sigma0)**2 * torch.eye(G.shape[0])
+        n = data_cov_strip.shape[0]
+        nll = (
+                sigma0**(2*n) * torch.logdet(data_cov_strip)
+                + 
+                sigma0**(-2) * (y - G @ prior_mean).t() 
+                @ torch.inverse(data_cov_strip) 
                 @ (y - G @ prior_mean))
         return nll
 
