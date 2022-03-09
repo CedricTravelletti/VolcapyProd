@@ -37,26 +37,36 @@ def sample(kernel, sigma0, lambda0, m0, cells):
     """
     if torch.is_tensor(cells):
         cells = cells.detach().cpu().numpy()
+    if torch.is_tensor(sigma0):
+        sigma0 = sigma0.detach().cpu().item()
+    if torch.is_tensor(lambda0):
+        lambda0 = lambda0.detach().cpu().item()
 
     scale = lambda0
 
     # Create the model.
     if kernel.KERNEL_FAMILY == "exponential":
+        print("Sampling from exponential model")
         model = rflib.RMexp(var=sigma0**2,
                 scale=lambda0)
     elif kernel.KERNEL_FAMILY == "squared_exponential":
+        print("Sampling from squared exponential model")
         model = rflib.RMgauss(var=sigma0**2,
                 scale=lambda0)
     elif kernel.KERNEL_FAMILY == "matern32":
+        print("Sampling from Matern 3/2 model")
         model = rflib.RMmatern(nu=1.5, var=sigma0**2,
                 scale=scale)
     elif kernel.KERNEL_FAMILY == "matern52":
+        print("Sampling from Matern 5/2 model")
         model = rflib.RMmatern(nu=2.5, var=sigma0**2,
                 scale=scale)
     else: raise ValueError("Kernel type not recognized.")
 
-        # Sample.
-    simu = rflib.RFsimulate(model, cells)
+    # Sample.
+    # Warning: the implementation seems to have changed. We have to make 
+    # the model circulant now.
+    simu = rflib.RFsimulate(rflib.RPtbm(model, linesimustep=10.0), cells)
 
     # Back to numpy, make column vector also.
     sample = torch.from_numpy(
