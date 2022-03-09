@@ -74,9 +74,9 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
                 self.lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
                 n_flush=self.n_flush).cpu()
-        # Trend part.
-        trend_pushfwd = self.coeff_F @ (self.sigma_Ft @ G.t())
-        return self.sigma0**2 * pushfwd + trend_pushfwd
+        # Trend part, perform on CPU.
+        trend_pushfwd = self.coeff_F.cpu() @ (self.sigma_Ft.cpu() @ G.cpu().t())
+        return self.sigma0.cpu()**2 * pushfwd + trend_pushfwd
 
     def extract_variance(self):
         """ Extracts the pointwise variance from an UpdatableCovariane module.
