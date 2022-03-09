@@ -832,7 +832,22 @@ class UpdatableGP():
                 lower=lower, upper=upper)
         return coverage
 
-    def neg_log_likelihood(self, lambda0, sigma0, m0, G, y, data_std=0.0):
+    def concentrate_mean(self, lambda0, sigma0, G, y, m0=None, data_std=0.0):
+        y = y.reshape(-1, 1)
+        pushfwd = self.covariance.compute_prior_pushfwd(
+                G, lambda0, sigma0).cpu()
+        data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
+        inv = torch.inverse(data_cov)
+
+        id = torch.ones(G.shape[1], 1)
+        m0 = (
+                torch.inverse(id.t() @ G.t() @ inv @ G @ id)
+                @
+                y.t() @ inv @ G @ id)
+
+        return m0
+
+    def neg_log_likelihood(self, lambda0, sigma0, G, y, m0=None, data_std=0.0):
         """ Compute the negative log-likelihood (up to a constant and a factor 1/2).
 
         Parameters
@@ -841,12 +856,14 @@ class UpdatableGP():
             Lengthscale parameter.
         sigma0: Tensor
             Prior standard deviation.
-        m0: Tensor
-            Prior mean.
         G: Tensor (n_data, n_model)
             Observation operator.
         y: Tensor (n_data)
             The data vector.
+        m0: Tensor
+            Prior mean. If not provided, then use concentration identity.
+        data_std: float
+            Noise variance, if not provided, then defaults to 0.
 
         Returns
         -------
@@ -854,17 +871,26 @@ class UpdatableGP():
 
         """
         y = y.reshape(-1, 1)
-        prior_mean = m0 * torch.ones(G.shape[1], 1)
 
-        # Compute a stripped version, i.e. without the sigma0^2.
-        pushfwd_strip = self.covariance.compute_prior_pushforward(G, lambda0, sigma0=1.0).cpu()
-        data_cov_strip = G @ pushfwd + (data_std / sigma0)**2 * torch.eye(G.shape[0])
-        n = data_cov_strip.shape[0]
+        pushfwd = self.covariance.compute_prior_pushfwd(
+                G, lambda0, sigma0).cpu()
+        data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
+        inv = torch.inverse(data_cov)
+
+        # If not provided, use concentration identity.
+        if m0 is None:
+            id = torch.ones(G.shape[1], 1)
+            m0 = (
+                    torch.inverse(id.t() @ G.t() @ inv @ G @ id)
+                    @
+                    y.t() @ inv @ G @ id)
+
+        prior_mean = m0 * torch.ones(G.shape[1], 1)
         nll = (
-                sigma0**(2*n) * torch.logdet(data_cov_strip)
+                torch.logdet(data_cov)
                 + 
-                sigma0**(-2) * (y - G @ prior_mean).t() 
-                @ torch.inverse(data_cov_strip) 
+                (y - G @ prior_mean).t() 
+                @ inv 
                 @ (y - G @ prior_mean))
         return nll
 
