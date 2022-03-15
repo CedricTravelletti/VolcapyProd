@@ -265,3 +265,42 @@ def mesh_to_vtkStructuredGrid(X_mesh, Y_mesh, Z_mesh, vals_mesh):
     sg.point_data.scalars = scalars.ravel()
     sg.point_data.scalars.name = 'values'
     return sg
+
+def get_standard_slices(grid, values, std_z=15, std_y=50, std_x=50):
+    """ Helper function to plot the x-y-z slices of the volcano at standard depth.
+
+    Parameters
+    ----------
+    grid
+    values
+    std_z: int, Defaults to 15.
+        Altitude (given by index in the mesh) at which to plot the z-slice.
+    std_y: int, Defaults to 15.
+        Altitude (given by index in the mesh) at which to plot the y-slice.
+    std_x: int, Defaults to 15.
+        Altitude (given by index in the mesh) at which to plot the x-slice.
+
+    Returns
+    -------
+    slice_z, slice_y, slice_x
+        Slices that can then by plotted using plotly.graph_objects add_trace.
+
+    """
+    values_mesh = grid.mesh_values(values)
+    
+    # z slice.
+    X_mesh_slice, Y_mesh_slice, Z_mesh_slice = grid.X_mesh[:, :, std_z], grid.Y_mesh[:, :, std_z], grid.Z_mesh[:, :, std_z]
+    values_slice = values_mesh[:, :, std_z]
+    slice_z = get_plotly_surface(X_mesh_slice, Y_mesh_slice, Z_mesh_slice, values_slice)
+
+    # y slice.
+    X_mesh_slice, Y_mesh_slice, Z_mesh_slice = grid.X_mesh[:, std_y, :], grid.Y_mesh[:, std_y, :], grid.Z_mesh[:, std_y, :]
+    values_slice = values_mesh[:, std_y, :]
+    slice_y = get_plotly_surface(X_mesh_slice, Y_mesh_slice, Z_mesh_slice, values_slice)
+
+    # x slice.
+    X_mesh_slice, Y_mesh_slice, Z_mesh_slice = grid.X_mesh[std_x, :, :], grid.Y_mesh[std_x, :, :], grid.Z_mesh[std_x, :, :]
+    values_slice = values_mesh[std_x, :, :]
+    slice_x = get_plotly_surface(X_mesh_slice, Y_mesh_slice, Z_mesh_slice, values_slice)
+    
+    return slice_z, slice_y, slice_x
