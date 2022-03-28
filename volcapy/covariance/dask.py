@@ -5,7 +5,7 @@ import dask.array as da
 import dask_distance
 
 
-def matern32(self, coords, lambda0):
+def matern32(coords, lambda0):
     """ Matern 3/2 covariance kernel.
 
     Parameters
