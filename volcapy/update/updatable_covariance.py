@@ -144,12 +144,16 @@ class UpdatableCovariance:
         # Warning: the original covariance pushforward method was used to
         # comput K G^T, taking G as an argument, i.e. it does transposing in
         # the background. We hence have to feed it A.t.
+
+        # Note this is on GPU.
         cov_pushfwd_0 = self.compute_prior_pushfwd(A.t()).double()
 
-        temp = torch.zeros(cov_pushfwd_0.shape, dtype=torch.float64)
+        temp = torch.zeros(cov_pushfwd_0.shape, dtype=torch.float64, device=DEVICE)
 
+        # Do the big computation on GPU.
         for p, r in zip(self.pushforwards, self.inversion_ops):
-            temp -= p.double() @ (r @ (p.double().t() @ A.double()))
+            p = p.to(DEVICE).double()
+            temp -= p @ (r.to(DEVICE) @ (p.t() @ A.double()))
 
         end = time.time()
         print((end - start) / 60.0)
@@ -251,6 +255,8 @@ class UpdatableCovariance:
         Returns
         -------
         pushfwd: (self.n_cells, n_data) Tensor
+            Note that the returned tensor sits on the default device 
+            (GPU if available).
 
         """
         # If both devices not equal, fallback to standard device.
