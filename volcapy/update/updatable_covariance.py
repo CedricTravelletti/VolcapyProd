@@ -917,7 +917,6 @@ class UpdatableGP():
 
         """
         y = y.reshape(-1, 1).double()
-        G = G.double()
 
         pushfwd = self.covariance.mul_right(G.t()).cpu()
         R = G.double() @ pushfwd.double() + data_std**2 * torch.eye(G.shape[0]).double()
@@ -928,11 +927,11 @@ class UpdatableGP():
         neg_predictive_log_density = (
                 torch.logdet(R) 
                 +
-                (y - G @ current_mean).t() 
+                (y - G.double() @ current_mean).t() 
                 @ inv 
-                @ (y - G @ current_mean)
+                @ (y - G.double() @ current_mean)
                 + 
-                G.shape[0] * torch.log(torch.tensor([np.pi]))
+                G.shape[0] * torch.log(torch.tensor([np.pi]).double())
                 )
         return neg_predictive_log_density.float()
 
