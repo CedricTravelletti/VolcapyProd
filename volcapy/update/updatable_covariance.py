@@ -256,7 +256,7 @@ class UpdatableCovariance:
         if not G.device == DEVICE: G = G.to(DEVICE)
 
         if lambda0 is None: lambda0 = self.lambda0
-        if sigma0 is None: lambda0 = self.sigma0
+        if sigma0 is None: sigma0 = self.sigma0
         sigma0 = sigma0.to(DEVICE)
 
         pushfwd = self.cov_module.compute_cov_pushforward(
