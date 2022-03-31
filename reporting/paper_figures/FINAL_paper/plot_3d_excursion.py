@@ -3,8 +3,7 @@ import torch
 import numpy as np
 import pandas as pd
 from volcapy.grid.grid_from_dsm import Grid
-from volcapy.plotting.plot_helper_paper import plot_excu_profile_with_data
-from volcapy.plotting.plot_helper_paper import get_coast_coordinates
+from volcapy.plotting.plot_helper_paper import plot_excu_profile_with_data_revised
 
 
 data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_173018"
@@ -20,8 +19,6 @@ def main():
     data_coords_niklas = np.load(os.path.join(data_folder,"niklas_data_coords.npy"))
 
 
-    coast_coords = get_coast_coordinates(grid)
-
     threshold_small = 2600.0
     threshold_big = 2500.0
 
@@ -31,14 +28,13 @@ def main():
                     "prior_sample_{}.npy".format(i))))
 
         out_file_path = "excu_profile_small_{}".format(i)
-        plot_excu_profile_with_data(volcano_coords, data_coords_niklas,
-            coast_coords,
+        plot_excu_profile_with_data_revised(volcano_coords, data_coords_niklas,
             ground_truth, threshold_small, out_file_path)
 
         out_file_path = "excu_profile_big_{}".format(i)
-        plot_excu_profile_with_data(volcano_coords, data_coords_niklas,
-            coast_coords,
+        plot_excu_profile_with_data_revised(volcano_coords, data_coords_niklas,
             ground_truth, threshold_big, out_file_path)
+
 
 
 if __name__ == "__main__":
