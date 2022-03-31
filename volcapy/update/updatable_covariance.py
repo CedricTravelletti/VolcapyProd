@@ -894,6 +894,40 @@ class UpdatableGP():
                 @ (y - G @ prior_mean))
         return nll
 
+    def neg_predictive_log_density(self, y, G, data_std=0):
+        """ Compute the likelihood of a given data batch under the current model.
+
+        y: Tensor (n_data)
+            The data vector.
+        G: Tensor (n_data, n_model)
+            Observation operator.
+        data_std: float
+            Noise variance, if not provided, then defaults to 0.
+
+        Returns
+        -------
+        neg_predictive_log_density: Tensor
+
+        """
+        y = y.reshape(-1, 1)
+
+        pushfwd = self.covariance.mul_right(G.t())
+        R = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
+        inv = torch.inverse(R)
+
+        current_mean = self.mean_vec
+
+        neg_predictive_log_density = (
+                torch.logdet(R) 
+                +
+                (y - G @ current_mean).t() 
+                @ inv 
+                @ (y - G @ current_mean)
+                + 
+                G.shape[0] * torch.log(torch.tensor([np.pi]))
+                )
+        return neg_predictive_log_density
+
     def __dict__(self):
         return {'mean': self.mean.__dict__(),
                 'covariance': self.covariance.__dict__()}

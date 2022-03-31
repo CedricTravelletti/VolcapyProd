@@ -91,10 +91,16 @@ def main():
                 test_rmse = torch.sqrt(
                         torch.mean((data_values_test - data_values_pred)**2))
 
+                # Compute negative log predictive density.
+                neg_predictive_log_density = gp.neg_predictive_log_density(
+                        data_values_test, F_test, data_std)
+
                 df = df.append({'kernel': gp.kernel.KERNEL_FAMILY,
                         'Test set size': F.shape[0] - n_train,
                         'repetition': repetition,
-                        'Test RMSE': test_rmse.detach().item()}, ignore_index=True)
+                        'Test RMSE': test_rmse.detach().item(),
+                        'Test neg_predictive_log_density': neg_predictive_log_density.detach().item()
+                        }, ignore_index=True)
         # Save after each train set size.
         df.to_pickle("test_set_results.pkl")
 
