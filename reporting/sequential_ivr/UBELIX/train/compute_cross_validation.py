@@ -83,7 +83,7 @@ def main():
                 torch.cuda.empty_cache()
                 # Condition on training data.
                 gp.update(F_train, data_values_train, data_std)
-                m_post_m = gp.mean_vec()
+                m_post_m = gp.mean_vec
                 # Predict test data.
                 data_values_pred = (F_test @ m_post_m.cpu()).reshape(-1)
                 test_rmse = torch.sqrt(
