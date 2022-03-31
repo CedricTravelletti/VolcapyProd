@@ -919,7 +919,7 @@ class UpdatableGP():
         y = y.reshape(-1, 1)
 
         pushfwd = self.covariance.mul_right(G.t()).cpu()
-        R = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
+        R = G.double() @ pushfwd.double() + data_std**2 * torch.eye(G.shape[0]).double()
         inv = torch.inverse(R)
 
         current_mean = self.mean_vec
