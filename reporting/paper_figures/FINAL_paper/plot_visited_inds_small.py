@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import pandas as pd
 from volcapy.grid.grid_from_dsm import Grid
-from volcapy.plotting.plot_helper_paper import plot_excu_profile_with_visited_inds
+from volcapy.plotting.plot_helper_paper import plot_excu_profile_with_visited_inds_revised
 from volcapy.plotting.plot_helper_paper import get_coast_coordinates
 
 
@@ -37,7 +37,7 @@ def main():
                 )
         visited_coords = surface_coords[visited_inds, :]
         out_file_path = "excu_small_with_visited_inds_sample_{}".format(sample_nr)
-        plot_excu_profile_with_visited_inds(volcano_coords, data_coords_niklas,
+        plot_excu_profile_with_visited_inds_revised(volcano_coords, data_coords_niklas,
                 visited_coords, coast_coords,
                 ground_truth, threshold, out_file_path)
 
