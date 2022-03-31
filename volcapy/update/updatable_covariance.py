@@ -132,7 +132,8 @@ class UpdatableCovariance:
         Returns
         -------
         Tensor
-            K * A
+            K * A. Note that this tensor will be left on the default device 
+            (GPU if available).
 
         """
         start = time.time()
@@ -206,7 +207,7 @@ class UpdatableCovariance:
         """
         # Pushforwards are big, so store in single precision.
         # But keep in double for the inversion operator.
-        current_pushfwd = self.mul_right(G.t(), strip=True)
+        current_pushfwd = self.mul_right(G.t(), strip=True).cpu()
         self.pushforwards.append(current_pushfwd.float())
 
         # Get inversion op.
@@ -318,7 +319,7 @@ class UpdatableCovariance:
                 self.n_chunks)
 
         # Compute the current pushforward.
-        G_dash = self.mul_right(G.t())
+        G_dash = self.mul_right(G.t()).cpu()
 
 
         # Get inversion op.
@@ -391,7 +392,7 @@ class UpdatableCovariance:
                 self.n_chunks)
 
         # Compute the current pushforward.
-        G_dash = self.mul_right(G.t())
+        G_dash = self.mul_right(G.t()).cpu()
 
         # Get inversion op.
         R = G.double() @ G_dash.double()
@@ -911,7 +912,7 @@ class UpdatableGP():
         """
         y = y.reshape(-1, 1)
 
-        pushfwd = self.covariance.mul_right(G.t())
+        pushfwd = self.covariance.mul_right(G.t()).cpu()
         R = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
         inv = torch.inverse(R)
 
