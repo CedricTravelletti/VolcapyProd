@@ -10,7 +10,7 @@ import volcapy.covariance.matern32 as matern32_kernel
 import volcapy.covariance.matern52 as matern52_kernel
 
 from volcapy.grid.grid_from_dsm import Grid
-from volcapy.inverse.inverse_gaussian_process import InverseGaussianProcess
+from volcapy.update.updatable_covariance import UpdatableGP
 
 
 data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018"
@@ -45,17 +45,14 @@ def main():
     m0_matern52 = 582.43
     lambda0_matern52 = 436.206
 
-    gp_exp = InverseGaussianProcess(m0_exp, sigma0_exp, lambda0_exp,
-            volcano_coords, exponential_kernel,
-            n_chunks=500,
-            )
-    gp_matern32 = InverseGaussianProcess(m0_matern32, sigma0_matern32,
-            lambda0_matern32,
-            volcano_coords, matern32_kernel,
+    gp_exp = UpdatableGP(
+            exponential_kernel, lambda0_exp, sigma0_exp, m0_exp, volcano_coords,
             n_chunks=500)
-    gp_matern52 = InverseGaussianProcess(m0_matern52, sigma0_matern52,
-            lambda0_matern52,
-            volcano_coords, matern52_kernel,
+    gp_matern32 = UpdatableGP(
+            matern32_kernel, lambda0_matern32, sigma0_matern32, m0_matern32, volcano_coords,
+            n_chunks=500)
+    gp_matern52 = UpdatableGP(
+            matern52_kernel, lambda0_matern52, sigma0_matern52, m0_matern52, volcano_coords,
             n_chunks=500)
 
     df = pd.DataFrame(columns=['kernel', 'Test set size', 'repetition',
