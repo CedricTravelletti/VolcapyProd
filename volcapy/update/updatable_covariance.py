@@ -933,7 +933,13 @@ class UpdatableGP():
                 + 
                 G.shape[0] * torch.log(torch.tensor([np.pi]).double())
                 )
-        return neg_predictive_log_density.float()
+        # If get nan, then re-run with increased noise.
+        if torch.any(torch.isnan(neg_predictive_log_density)):
+            # Increase noise by 50%.
+            data_std = 1.5 * data_std
+            print("WARNING: singular covariance. Increasing noise to: {}.".format(data_std))
+            return neg_predictive_log_density(y, G, data_std)
+        else: return neg_predictive_log_density.float()
 
     def __dict__(self):
         return {'mean': self.mean.__dict__(),
