@@ -938,7 +938,7 @@ class UpdatableGP():
             # Increase noise by 50%.
             data_std = 1.5 * data_std
             print("WARNING: singular covariance. Increasing noise to: {}.".format(data_std))
-            return neg_predictive_log_density(y, G, data_std)
+            return self.neg_predictive_log_density(y, G, data_std)
         else: return neg_predictive_log_density.float()
 
     def __dict__(self):
