@@ -901,7 +901,7 @@ class UpdatableGP():
                 @ (y - G @ prior_mean))
         return nll
 
-    def neg_predictive_log_density(self, y, G, data_std=0):
+    def neg_predictive_log_density(self, y, G, data_std=0, svd=False):
         """ Compute the likelihood of a given data batch under the current model.
 
         y: Tensor (n_data)
@@ -910,6 +910,9 @@ class UpdatableGP():
             Observation operator.
         data_std: float
             Noise variance, if not provided, then defaults to 0.
+        svd: bool, defaults to False
+            If True, then compute using the SVD, which is more stable 
+            for close to singular matrices.
 
         Returns
         -------
@@ -918,14 +921,24 @@ class UpdatableGP():
         """
         y = y.reshape(-1, 1).double()
 
+        current_mean = self.mean_vec.double()
         pushfwd = self.covariance.mul_right(G.t()).cpu()
         R = G.double() @ pushfwd.double() + data_std**2 * torch.eye(G.shape[0]).double()
-        inv = torch.inverse(R)
 
-        current_mean = self.mean_vec.double()
+        # Compute using SVD instead of standard Cholesky.
+        if svd is True:
+            u, s, v = torch.svd(R)
+            inv = torch.mm(
+                    torch.mm(v, torch.div(torch.ones(s.shape).double(), s)),
+                    u.t())
+            logdet = torch.log(torch.prod(s))
+        # Else use standard Cholesky.
+        else:
+            inv = torch.inverse(R)
+            logdet = torch.logdet(R)
 
         neg_predictive_log_density = (
-                torch.logdet(R) 
+                logdet 
                 +
                 (y - G.double() @ current_mean).t() 
                 @ inv 
