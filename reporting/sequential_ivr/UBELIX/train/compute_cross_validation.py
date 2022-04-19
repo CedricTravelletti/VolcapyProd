@@ -73,9 +73,9 @@ def main():
 
     # Loop over hold-out length:
     gps = [gp_exp, gp_matern32, gp_matern52]
-    # n_trains = [150, 200, 250, 300, 350, 400, 450, 500, 510, 520, 530]
-    n_trains = [300, 350, 400, 450, 500, 510, 520]
-    n_repetitions = 15
+    n_trains = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
+    n_trains = [250, 300, 350, 400, 450, 500]
+    n_repetitions = 30
 
     print("Go")
     for n_train in n_trains:
