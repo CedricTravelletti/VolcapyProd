@@ -140,8 +140,8 @@ def plot_ground_truth(grid, ground_truth, cmap, vmin, vmax, outfile):
     plt.imshow(gridded_data.T, extent=(min_x,max_x,min_y,max_y),
             origin='lower', cmap=cmap, vmin=vmin, vmax=vmax)
     cbar = plt.colorbar()
-    cbar.set_ticks([-5, -2.5, 0, 2.5, 5])
-    cbar.set_ticklabels([-5, -2.5, 0, 2.5, 5])
+    cbar.set_ticks([-5.0, -2.5, 0.0, 2.5, 5.0])
+    cbar.set_ticklabels([-5.0, -2.5, 0.0, 2.5, 5.0])
 
     plt.xlim([min_x, max_x])
     plt.ylim([min_y, max_y])
