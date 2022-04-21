@@ -929,9 +929,10 @@ class UpdatableGP():
         if svd is True:
             u, s, v = torch.svd(R)
             inv = torch.mm(
-                    torch.mm(v, torch.div(torch.ones(s.shape).double(), s)),
+                    torch.mm(v, torch.diag(torch.div(torch.ones(s.shape).double(), s))),
                     u.t())
-            logdet = torch.log(torch.prod(s))
+            # logdet = torch.log(torch.prod(s))
+            logdet = torch.sum(torch.log(s))
         # Else use standard Cholesky.
         else:
             inv = torch.inverse(R)
