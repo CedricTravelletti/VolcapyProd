@@ -58,23 +58,13 @@ def main():
     m0_matern52 = 582.43
     lambda0_matern52 = 436.206
 
-    gp_exp = UpdatableGP(
-            exponential_kernel, lambda0_exp, sigma0_exp, m0_exp, volcano_coords,
-            n_chunks=400)
-    gp_matern32 = UpdatableGP(
-            matern32_kernel, lambda0_matern32, sigma0_matern32, m0_matern32, volcano_coords,
-            n_chunks=400)
-    gp_matern52 = UpdatableGP(
-            matern52_kernel, lambda0_matern52, sigma0_matern52, m0_matern52, volcano_coords,
-            n_chunks=400)
-
     df = pd.DataFrame(columns=['kernel', 'Test set size', 'repetition',
             'Test RMSE'])
 
     # Loop over hold-out length:
-    gps = [gp_exp, gp_matern32, gp_matern52]
     n_trains = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
     n_trains = [250, 300, 350, 400, 450, 500]
+    n_trains = [400, 450, 500]
     n_repetitions = 30
 
     print("Go")
@@ -93,6 +83,19 @@ def main():
             data_values_train = data_values_shuffled[:n_train]
             F_test = F_shuffled[n_train:, :]
             data_values_test = data_values_shuffled[n_train:]
+
+            # Re-create the GPs at every loop.
+            gp_exp = UpdatableGP(
+                    exponential_kernel, lambda0_exp, sigma0_exp, m0_exp, volcano_coords,
+                    n_chunks=400)
+            gp_matern32 = UpdatableGP(
+                    matern32_kernel, lambda0_matern32, sigma0_matern32, m0_matern32, volcano_coords,
+                    n_chunks=400)
+            gp_matern52 = UpdatableGP(
+                    matern52_kernel, lambda0_matern52, sigma0_matern52, m0_matern52, volcano_coords,
+                    n_chunks=400)
+            gps = [gp_exp, gp_matern32, gp_matern52]
+
             for gp in gps:
                 print(gp.covariance.cov_module.KERNEL_FAMILY)
                 torch.cuda.empty_cache()
@@ -106,7 +109,7 @@ def main():
 
                 # Compute negative log predictive density.
                 neg_predictive_log_density = gp.neg_predictive_log_density(
-                        data_values_test, F_test, data_std)
+                        data_values_test, F_test, data_std, svd=True)
 
                 df = df.append({'kernel': gp.covariance.cov_module.KERNEL_FAMILY,
                         'Test set size': F.shape[0] - n_train,
