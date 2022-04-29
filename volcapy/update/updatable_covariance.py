@@ -938,14 +938,14 @@ class UpdatableGP():
             inv = torch.inverse(R)
             logdet = torch.logdet(R)
 
-        neg_predictive_log_density = (
+        neg_predictive_log_density = (1/2) * (
                 logdet 
                 +
                 (y - G.double() @ current_mean).t() 
                 @ inv 
                 @ (y - G.double() @ current_mean)
                 + 
-                G.shape[0] * torch.log(torch.tensor([np.pi]).double())
+                G.shape[0] * torch.log(2 * torch.tensor([np.pi]).double())
                 )
         # If get nan, then re-run with increased noise.
         if torch.any(torch.isnan(neg_predictive_log_density)):
