@@ -11,15 +11,14 @@ import seaborn as sns
 
 sns.set()
 sns.set_style("white")
-
-
 plt.rcParams["font.family"] = "serif"
 plot_params = {
-        'font.size': 20, 'font.style': 'normal',
-        'axes.labelsize': 'small',
-        'axes.titlesize':'small',
-        'legend.fontsize': 'small',
-        'legend.title_fontsize': 'small'
+        'font.size': 18, 'font.style': 'oblique',
+        'axes.labelsize': 'x-small',
+        'axes.titlesize':'x-small',
+        'legend.fontsize': 'x-small',
+        'xtick.labelsize': 'x-small',
+        'ytick.labelsize': 'x-small'
         }
 plt.rcParams.update(plot_params)
 
@@ -46,14 +45,15 @@ def main():
     my_palette = sns.color_palette("RdBu", 9)
     my_palette = [my_palette[1]] + [my_palette[3]] + [my_palette[-4]] + [my_palette[-2]]
 
-    fig, ax1 = plt.subplots()
+    fig = plt.figure(figsize=(5, 6), dpi=400)
+    ax1 = fig.gca()
     sns.histplot(df, x='Excursion size (percent of total volume)',
             binwidth=1,
             kde=True,
             hue='threshold', palette=my_palette,
             ax=ax1)
     ax1.get_legend().set_title('threshold [$kg/m^3$]')
-    plt.savefig("histogram_prior_volume", bbox_inches="tight", pad_inches=0.01, dpi=600)
+    plt.savefig("histogram_prior_volume", bbox_inches="tight", pad_inches=0.01, dpi=400)
     plt.show()
 
     # Now plot distribution of volume for small and big threshold.
@@ -73,6 +73,7 @@ def main():
     samples_palette = samples_palette[:3] + samples_palette[-2:]
 
     # Replot the histogram, but only for the big and small thresholds.
+    fig = plt.figure(figsize=(4, 4), dpi=400)
     sns.histplot(
         df[(df["threshold"] == threshold_small)], x='Excursion size (percent of total volume)',
             kde=True, binwidth=2,
@@ -89,10 +90,11 @@ def main():
                 ))
     plt.legend(handles=line_handles)
     plt.savefig("histogram_with_small_volumes", bbox_inches="tight",
-            pad_inches=0.01, dpi=600)
+            pad_inches=0.01, dpi=400)
     plt.show()
 
     # SAME FOR BIG
+    fig = plt.figure(figsize=(4, 4), dpi=400)
     sns.histplot(
         df[(df["threshold"] == threshold_big)], x='Excursion size (percent of total volume)',
             kde=True, binwidth=2,
@@ -109,7 +111,7 @@ def main():
                 ))
     plt.legend(handles=line_handles)
     plt.savefig("histogram_with_big_volumes", bbox_inches="tight",
-            pad_inches=0.01, dpi=600)
+            pad_inches=0.01, dpi=400)
     plt.show()
 
 
