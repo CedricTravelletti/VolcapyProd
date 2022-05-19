@@ -95,16 +95,19 @@ def main():
 
     # Add noise and generate data.
     """
-    noise = MultivariateNormal(loc=torch.zeros(n_data), covariance_matrix=data_std**2 * torch.eye(n_data)).rsample()
+    noise = MultivariateNormal(loc=torch.zeros(n_data), covariance_matrix=data_std**2 * torch.eye(n_data)).rsample().reshape(-1, 1)
     synth_data = G @ ground_truth + noise
     np.save(os.path.join(results_folder, "synth_data.npy"), synth_data.cpu().numpy())
     """
-    synth_data = np.load(os.path.join(results_folder, "synth_data.npy"))
+    synth_data = torch.from_numpy(
+            np.load(os.path.join(results_folder, "synth_data.npy")))
 
     # Now train GP model on it.
-    constant_updatable_gp = UpdatableGP(kernel, lambda0, torch.tensor([sigma0]), m0_true,
+    constant_updatable_gp = UpdatableGP(kernel, lambda0, torch.tensor([sigma0]), m0,
             volcano_coords, n_chunks=200)
 
+    # Compute log-likelihood.
+    updatable_gp.concentrated_NLL(10.0, G, synth_data, kappa_2=0.01)
 
     """
     updatable_gp.update(G, synth_data, data_std)
