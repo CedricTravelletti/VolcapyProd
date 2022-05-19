@@ -63,9 +63,9 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
         # Transfer everything to device.
-        lambda0 = torch.tensor(lambda0, requires_grad=False).to(device)
-        F = F.to(device)
-        cells_coords = cells_coords.to(device)
+        lambda0 = torch.tensor(lambda0, requires_grad=False).to(device).float()
+        F = F.to(device).float()
+        cells_coords = cells_coords.to(device).float()
 
         # Flush to make sure everything clean.
         if torch.cuda.is_available():
