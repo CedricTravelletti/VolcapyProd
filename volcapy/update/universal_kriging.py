@@ -2,8 +2,10 @@
 
 """
 import numpy as np
+import pandas as pd
 import torch
 import warnings
+from timeit import default_timer as timer
 from torch.distributions.multivariate_normal import MultivariateNormal
 from volcapy.utils import _make_column_vector
 from volcapy.update.updatable_covariance import UpdatableCovariance, UpdatableMean, UpdatableGP
@@ -51,9 +53,9 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
 
         """
         super().__init__(cov_module, lambda0, sigma0, cells_coords, n_chunks, n_flush)
-        self.coeff_F = coeff_F.to(DEVICE)
-        self.coeff_cov = coeff_cov.to(DEVICE)
-        self.coeff_mean = coeff_mean.to(DEVICE)
+        self.coeff_F = coeff_F
+        self.coeff_cov = coeff_cov
+        self.coeff_mean = coeff_mean
 
         # Pre compute some stuff.
         self.sigma_Ft = coeff_cov @ coeff_F.t()
@@ -148,10 +150,13 @@ class UniversalUpdatableGP(UpdatableGP):
         if not torch.is_tensor(coeff_F): coeff_F = torch.from_numpy(coeff_F)
         if not torch.is_tensor(coeff_cov): coeff_F = torch.from_numpy(coeff_cov)
         if not torch.is_tensor(coeff_mean): coeff_F = torch.from_numpy(coeff_mean)
+
+        # We work in single precision to allow more to fit on GPU.
         coeff_F, coeff_cov, coeff_mean = coeff_F.float(), coeff_cov.float(), coeff_mean.float()
-        self.coeff_F = coeff_F
-        self.coeff_cov = coeff_cov
-        self.coeff_mean = coeff_mean
+
+        self.coeff_F = coeff_F.to(DEVICE)
+        self.coeff_cov = coeff_cov.to(DEVICE)
+        self.coeff_mean = coeff_mean.to(DEVICE)
 
         self.covariance = UniversalUpdatableCovariance(cov_module, lambda0,
                 sigma0, cells_coords,
@@ -214,13 +219,16 @@ class UniversalUpdatableGP(UpdatableGP):
         neg_log_likelihood: Tensor
 
         """
+        if not G.device == DEVICE: G = G.to(DEVICE)
+        if not y.device == DEVICE: y = y.to(DEVICE)
+
         y = y.reshape(-1, 1)
 
         pushfwd = self.covariance.compute_prior_pushfwd(
                 G, lambda0, sigma0).cpu()
         data_cov = (
                 G @ pushfwd
-                + data_std**2 * torch.eye(G.shape[0])
+                + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
                 + G @ self.coeff_F @ coeff_cov @ self.coeff_F.t() @ G.t())
         inv = torch.inverse(data_cov)
 
@@ -234,6 +242,9 @@ class UniversalUpdatableGP(UpdatableGP):
         return nll
 
     def concentrated_NLL(self, lambda0, G, y, kappa_2):
+        if not G.device == DEVICE: G = G.to(DEVICE)
+        if not y.device == DEVICE: y = y.to(DEVICE)
+
         y = y.reshape(-1, 1)
         n = y.shape[0]
 
@@ -241,10 +252,10 @@ class UniversalUpdatableGP(UpdatableGP):
         pushfwd = self.covariance.compute_prior_pushfwd(
                 G, lambda0,
                 sigma0=1.0, ignore_trend=True)
-        R = G @ pushfwd + kappa_2 * torch.eye(G.shape[0])
+        R = G @ pushfwd + kappa_2 * torch.eye(G.shape[0], device=DEVICE)
         R_inv = torch.inverse(R)
         beta_hat = (
-                torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F.t())
+                torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
                 @
                 self.coeff_F.t() @ G.t() @ R_inv @ y
                 )
@@ -258,10 +269,7 @@ class UniversalUpdatableGP(UpdatableGP):
         NLL = n * torch.log(sigma_hat_2) + torch.logdet(R) + n
         return (NLL, torch.sqrt(sigma_hat_2), beta_hat)
 
-    def train(self, lambda0s, G, y, data_std,
-            out_path, device=None,
-            n_epochs=5000, lr=0.1,
-            n_chunks=200, n_flush=50):
+    def train(self, lambda0s, kappa_s, G, y, out_path):
         """ Given lambda0, optimize the two remaining hyperparams via MLE.
         Here, instead of giving lambda0, we give a (stripped) covariance
         matrix. Stripped means without sigma0.
@@ -276,18 +284,8 @@ class UniversalUpdatableGP(UpdatableGP):
             Measurement matrix
         y: (n_data, 1) Tensor
             Observed data. Has to be column vector.
-        data_std: flot
-            Data noise standard deviation.
         out_path: string
             Path for training results.
-        device: torch.device
-            Device on which to perform the training. Should be the same as the
-            one the inputs are located on.
-            If None, defaults to gpu0.
-        n_epochs: int
-            Number of training epochs.
-        lr: float
-            Learning rate.
 
         Returns
         -------
@@ -295,19 +293,18 @@ class UniversalUpdatableGP(UpdatableGP):
 
         """
         start = timer()
-        y = _make_column_vector(y)
-
         # Store results in Pandas DataFrame.
-        df = pd.DataFrame(columns=['lambda0', 'sigma0', 'beta0', 'nll'])
+        df = pd.DataFrame(columns=['lambda0', 'kappa', 'sigma0', 'beta0', 'nll'])
 
         for lambda0 in lambda0s:
-            (NLL, sigma0, beta0) = concentrated_NLL(self, lambda0, G, y, kappa_2)
-            df = df.append({'lambda0': lambda0, 'sigma0': sigma0,
-                    'beta0': beta0,
-                    'nll': NLL, ignore_index=True)
+            for kappa in kappa_s:
+                kappa_2 = kappa**2
+                (NLL, sigma0, beta0) = self.concentrated_NLL(lambda0, G, y, kappa_2)
+                df = df.append({'lambda0': lambda0, 'kappa': kappa, 
+                    'sigma0': sigma0.cpu(), 'beta0': beta0.cpu(),
+                    'nll': NLL.cpu()}, ignore_index=True)
             # Save after each lambda0.
             df.to_pickle(out_path)
-
         end = timer()
         print("Training done in {} minutes.".format((end-start)/60))
 
