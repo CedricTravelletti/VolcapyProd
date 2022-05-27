@@ -54,8 +54,8 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
         """
         super().__init__(cov_module, lambda0, sigma0, cells_coords, n_chunks, n_flush)
         self.coeff_F = coeff_F
-        self.coeff_cov = coeff_cov
-        self.coeff_mean = coeff_mean
+        self.coeff_prior_cov = coeff_cov
+        self.coeff_prior_mean = coeff_mean
 
         # Pre compute some stuff.
         self.sigma_Ft = coeff_cov @ coeff_F.t()
@@ -138,25 +138,34 @@ class UniversalUpdatableGP(UpdatableGP):
             Coordinates of the model points.
         coeff_F: Tensor (n_cells, n_coeffs)
             Design matrix of the trend.
-        coeff_cov: Tensor (n_cells, n_cells)
-            Prior covariance matrix of the trend coefficients.
         coeff_mean: Tensor (n_cells, 1)
             Prior mean of the trend coefficients
+        coeff_cov: Tensor (n_cells, n_cells)
+            Prior covariance matrix of the trend coefficients.
         n_chunks: int
             Number of chunks to break the covariane matrix in.
             Increase if computations do not fit in memory.
     
         """
         if not torch.is_tensor(coeff_F): coeff_F = torch.from_numpy(coeff_F)
-        if not torch.is_tensor(coeff_cov): coeff_F = torch.from_numpy(coeff_cov)
-        if not torch.is_tensor(coeff_mean): coeff_F = torch.from_numpy(coeff_mean)
-
         # We work in single precision to allow more to fit on GPU.
-        coeff_F, coeff_cov, coeff_mean = coeff_F.float(), coeff_cov.float(), coeff_mean.float()
-
+        coeff_F = coeff_F.float()
         self.coeff_F = coeff_F.to(DEVICE)
-        self.coeff_cov = coeff_cov.to(DEVICE)
-        self.coeff_mean = coeff_mean.to(DEVICE)
+
+        # Improper uniform prior and true Bayesian prior are handled differently.
+        # Not that after having seen the first batch of data, the uniform case 
+        # reduces to the Bayesian one.
+        if coeff_cov == 'uniform' and coeff_mean == 'uniform':
+            self.state = 'uniform'
+        else:
+            self.state = 'bayesian'
+            # Pre-process the mean and covariance parameters.
+            if not torch.is_tensor(coeff_cov): coeff_F = torch.from_numpy(coeff_cov)
+            if not torch.is_tensor(coeff_mean): coeff_F = torch.from_numpy(coeff_mean)
+            # We work in single precision to allow more to fit on GPU.
+            coeff_cov, coeff_mean = coeff_cov.float(), coeff_mean.float()
+            self.coeff_prior_cov = coeff_cov.to(DEVICE)
+            self.coeff_prior_mean = coeff_mean.to(DEVICE)
 
         self.covariance = UniversalUpdatableCovariance(cov_module, lambda0,
                 sigma0, cells_coords,
@@ -166,6 +175,41 @@ class UniversalUpdatableGP(UpdatableGP):
             self.covariance)
 
         self.n_cells = cells_coords.shape[0]
+
+    # TODO: Finish implementing in update form.
+    def update_uniform(self, G, y, data_std):
+        """ Compute posterior in the case where the trend prior 
+        is an improper uniform one.
+
+        """
+        if not G.device == DEVICE: G = G.to(DEVICE)
+        if not y.device == DEVICE: y = y.to(DEVICE)
+
+        y = y.reshape(-1, 1)
+        n = y.shape[0]
+
+        # Compute with correlation matrix by setting sigma to 1.
+        pushfwd = self.covariance.compute_prior_pushfwd(
+                G, lambda0,
+                sigma0=1.0, ignore_trend=True)
+        R = self.sigma0**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+        R_inv = torch.inverse(R)
+        beta_hat = (
+                torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
+                @
+                self.coeff_F.t() @ G.t() @ R_inv @ y
+                )
+        cov_beta_hat = R_inv
+
+        # After first conditioning, the posterior on the trend parameters is Gaussian, 
+        # and we are in the Bayesian kriging case.
+        self.state = 'bayesian' 
+        self.coeff_post_mean = beta_hat
+        self.coeff_post_cov = cov_beta_hat
+
+        self.post_mean = (
+                self.coeff_F @ beta_hat
+                + self.sigma0**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F @ beta_hat))
 
     # TODO: Warning: only samples from Matern 5/2.
     def sample_prior(self):
@@ -189,7 +233,7 @@ class UniversalUpdatableGP(UpdatableGP):
         # Sample from the tend model.
         # We need to reshape to a row vector because of the implementation of MultivariateNormal.
         distrib = MultivariateNormal(
-                loc=self.coeff_mean.reshape(-1), covariance_matrix=self.coeff_cov)
+                loc=self.coeff_prior_mean.reshape(-1), covariance_matrix=self.coeff_prior_cov)
         trend_sample = distrib.rsample().float()
 
         return (centred_sample.reshape(-1) + self.coeff_F @ trend_sample.reshape(-1), trend_sample)
@@ -242,6 +286,24 @@ class UniversalUpdatableGP(UpdatableGP):
         return nll
 
     def concentrated_NLL(self, lambda0, G, y, kappa_2):
+        " Concentrated negative log-likelihood for the universal kriging 
+        (improper uniform prior) model.
+
+        Parameters
+        ----------
+        lambda0
+        G
+        y
+        kappa_2: float
+            (squared) noise to variance ratio.
+
+        Returns
+        -------
+        NLL: Tensor
+        sigma_hat: Tensor
+        beta_hat: Tensor
+
+        """
         if not G.device == DEVICE: G = G.to(DEVICE)
         if not y.device == DEVICE: y = y.to(DEVICE)
 
@@ -273,6 +335,8 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Given lambda0, optimize the two remaining hyperparams via MLE.
         Here, instead of giving lambda0, we give a (stripped) covariance
         matrix. Stripped means without sigma0.
+
+        This method is only valid for uniform trend priors.
 
         The user can choose between CPU and GPU.
 
