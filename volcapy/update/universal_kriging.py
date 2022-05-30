@@ -221,12 +221,12 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         if not G.device == DEVICE: G = G.to(DEVICE)
         pushfwd = self.covariance.compute_prior_pushfwd(
-                G, sigma0=1.0, ignore_trend=True)
-        R = self.covariance.sigma0**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+                G, sigma0=1.0, ignore_trend=True).double()
+        R = self.covariance.sigma0**2 * G.double() @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE).double()
         K_tilde = torch.vstack([
-            torch.hstack([R, G @ self.coeff_F]),
-            torch.hstack([self.coeff_F.t() @ G.t(),
-                torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]), device=DEVICE)])])
+            torch.hstack([R, G.double() @ self.coeff_F.double()]),
+            torch.hstack([self.coeff_F.t().double() @ G.t().double(),
+                torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]), device=DEVICE).double()])])
         return K_tilde
 
     def compute_cv_residual(self, G, y, data_std, out_inds):
