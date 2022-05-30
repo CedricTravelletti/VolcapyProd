@@ -73,6 +73,9 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
         pushfwd: (self.n_cells, n_data) Tensor
 
         """
+        if lambda0 is None: lambda0 = self.lambda0
+        if sigma0 is None: sigma0 = self.sigma0
+
         if not torch.is_tensor(lambda0):
             lambda0 = torch.tensor([lambda0])
         if not torch.is_tensor(sigma0):
@@ -157,6 +160,8 @@ class UniversalUpdatableGP(UpdatableGP):
         # reduces to the Bayesian one.
         if coeff_cov == 'uniform' and coeff_mean == 'uniform':
             self.state = 'uniform'
+            coeff_mean = torch.zeros(coeff_F.shape[1]).float()
+            coeff_cov = torch.zeros((coeff_F.shape[1], coeff_F.shape[1])).float()
         else:
             self.state = 'bayesian'
             # Pre-process the mean and covariance parameters.
@@ -190,9 +195,8 @@ class UniversalUpdatableGP(UpdatableGP):
 
         # Compute with correlation matrix by setting sigma to 1.
         pushfwd = self.covariance.compute_prior_pushfwd(
-                G, lambda0,
-                sigma0=1.0, ignore_trend=True)
-        R = self.sigma0**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+                G, sigma0=1.0, ignore_trend=True)
+        R = self.covariance.sigma0**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
         R_inv = torch.inverse(R)
         beta_hat = (
                 torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
@@ -209,7 +213,7 @@ class UniversalUpdatableGP(UpdatableGP):
 
         self.post_mean = (
                 self.coeff_F @ beta_hat
-                + self.sigma0**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F @ beta_hat))
+                + self.covariance.sigma0**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F @ beta_hat))
 
     # TODO: Warning: only samples from Matern 5/2.
     def sample_prior(self):
@@ -269,7 +273,7 @@ class UniversalUpdatableGP(UpdatableGP):
         y = y.reshape(-1, 1)
 
         pushfwd = self.covariance.compute_prior_pushfwd(
-                G, lambda0, sigma0).cpu()
+                G, lambda0, sigma0, ignore_trend=True).cpu()
         data_cov = (
                 G @ pushfwd
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
@@ -286,7 +290,7 @@ class UniversalUpdatableGP(UpdatableGP):
         return nll
 
     def concentrated_NLL(self, lambda0, G, y, kappa_2):
-        " Concentrated negative log-likelihood for the universal kriging 
+        """ Concentrated negative log-likelihood for the universal kriging 
         (improper uniform prior) model.
 
         Parameters

@@ -1,8 +1,9 @@
 """ Study the posterior for the universal GP (in the log-gaussian comparison).
 """
-from volcapy.update.updatable_covariance import UpdatableGP
+from volcapy.update.universal_kriging import UniversalUpdatableGP
 import volcapy.covariance.matern52 as kernel
 from volcapy.grid.grid_from_dsm import Grid
+from volcapy.universal_kriging.basis_functions import *
 
 import numpy as np
 import os
@@ -40,13 +41,18 @@ def main():
     synth_data = torch.from_numpy(
             np.load(os.path.join(results_folder, "synth_data.npy")))
 
-    # Now fit GP model
+    # Build trends: constant cylindrical.
+    x0 = volcano_coords[:, 0].mean() # Volcano center.
+    y0 = volcano_coords[:, 1].mean()
+    z0 = volcano_coords[:, 2].mean()
     coeff_F = torch.hstack([
         torch.ones(volcano_coords.shape[0], 1),
         cylindrical(
             volcano_coords,
             x0, y0).reshape(-1, 1)
         ]).float()
+
+    # Now fit GP model
     updatable_gp = UniversalUpdatableGP(kernel, lambda0, torch.tensor([sigma0]),
             volcano_coords,
             coeff_F, coeff_cov="uniform", coeff_mean="uniform",
@@ -55,8 +61,12 @@ def main():
     # Compute posterior mean.
     updatable_gp.update_uniform(G, synth_data, data_std)
     np.save(os.path.join(results_folder, "post_mean_universal.npy"),
-            constant_updatable_gp.mean_vec.cpu().numpy())
-    variance = constant_updatable_gp.covariance.extract_variance()
+            updatable_gp.post_mean.cpu().numpy())
+
+    np.save(os.path.join(results_folder, "coeff_post_mean.npy"),
+            updatable_gp.coeff_post_mean.cpu().numpy())
+
+    variance = updatable_gp.covariance.extract_variance()
     np.save(os.path.join(results_folder, "variance_universal.npy"),
             variance.cpu().numpy())
 
