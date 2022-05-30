@@ -248,10 +248,10 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Helper function for cv residuals computation.
 
         """
-        block_1 = K_tilde_inv[out_inds, :][:, out_inds]
+        block_1 = torch.inverse(K_tilde_inv[out_inds, :][:, out_inds])
         block_2 = (K_tilde_inv[:, :y.shape[0]] @ y)[out_inds, :]
         residual = block_1 @ block_2
-        residual_cov = torch.inverse(block_1)
+        residual_cov = block_1
         return residual, residual_cov
 
     # TODO: Warning: only samples from Matern 5/2.
