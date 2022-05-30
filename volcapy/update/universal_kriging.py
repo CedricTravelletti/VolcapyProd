@@ -215,6 +215,39 @@ class UniversalUpdatableGP(UpdatableGP):
                 self.coeff_F @ beta_hat
                 + self.covariance.sigma0**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F @ beta_hat))
 
+    def compute_cv_matrix(self, G, y, data_std):
+        """ Compute the inverse cross-validation matrix K_tilde_inv.
+
+        """
+        pushfwd = self.covariance.compute_prior_pushfwd(
+                G, sigma0=1.0, ignore_trend=True)
+        R = self.covariance.sigma0**2 * G @ pushfwd
+        K_tilde = torch.vstack([
+            torch.hstack([R, G @ self.coeff_F]),
+            torch.hstack([self.coeff_F.t() @ G.t(),
+                torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]))])])
+        K_tilde_inv = torch.inverse(K_tilde)
+        return K_tilde_inv
+
+    def compute_cv_residual(self, G, y, data_std, out_inds):
+        """ Compute cross-validation residual at left out indices out_inds.
+
+        Returns
+        -------
+        residual: Tensor (out_inds.shape[0], 1)
+            Cross-validation residual when prediciting at the left out indices.
+        residual_cov: Tensor (out_inds.shape[0], out_inds.shape[0])
+            Cross-validation predictor covariance.
+
+        """
+        K_tilde_inv = self.compute_cv_matrix(G, y, data_std)
+
+        block_1 = K_tilde_inv[out_inds, :][:, out_inds]
+        block_2 = (K_tilde_inv[:, :n] @ y)[out_inds, :]
+        residual = block_1 @ block_2
+        residual_cov = torch.inverse(block_1)
+        return residual, residual_cov
+
     # TODO: Warning: only samples from Matern 5/2.
     def sample_prior(self):
         """ Sample from prior model.
