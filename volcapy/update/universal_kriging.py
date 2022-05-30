@@ -216,7 +216,7 @@ class UniversalUpdatableGP(UpdatableGP):
                 + self.covariance.sigma0**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F @ beta_hat))
 
     def compute_cv_matrix(self, G, y, data_std):
-        """ Compute the inverse cross-validation matrix K_tilde_inv.
+        """ Compute the cross-validation matrix K_tilde.
 
         """
         if not G.device == DEVICE: G = G.to(DEVICE)
@@ -227,8 +227,7 @@ class UniversalUpdatableGP(UpdatableGP):
             torch.hstack([R, G @ self.coeff_F]),
             torch.hstack([self.coeff_F.t() @ G.t(),
                 torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]), device=DEVICE)])])
-        K_tilde_inv = torch.inverse(K_tilde)
-        return K_tilde_inv
+        return K_tilde
 
     def compute_cv_residual(self, G, y, data_std, out_inds):
         """ Compute cross-validation residual at left out indices out_inds.
@@ -241,7 +240,8 @@ class UniversalUpdatableGP(UpdatableGP):
             Cross-validation predictor covariance.
 
         """
-        K_tilde_inv = self.compute_cv_matrix(G, y, data_std)
+        K_tilde = self.compute_cv_matrix(G, y, data_std)
+        K_tilde_inv = torch.inverse(K_tilde)
         return _compute_cv_residual(K_tilde_inv, y, out_inds)
 
     def _compute_cv_residual(self, K_tilde_inv, y ,out_inds):
