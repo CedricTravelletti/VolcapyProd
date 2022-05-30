@@ -219,13 +219,14 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Compute the inverse cross-validation matrix K_tilde_inv.
 
         """
+        if not G.device == DEVICE: G = G.to(DEVICE)
         pushfwd = self.covariance.compute_prior_pushfwd(
                 G, sigma0=1.0, ignore_trend=True)
         R = self.covariance.sigma0**2 * G @ pushfwd
         K_tilde = torch.vstack([
             torch.hstack([R, G @ self.coeff_F]),
             torch.hstack([self.coeff_F.t() @ G.t(),
-                torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]))])])
+                torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]), device=DEVICE)])])
         K_tilde_inv = torch.inverse(K_tilde)
         return K_tilde_inv
 
