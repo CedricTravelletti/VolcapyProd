@@ -1,6 +1,7 @@
 """ Module implementing universal kriging for inversion.
 
 """
+import itertools
 import numpy as np
 import pandas as pd
 import torch
