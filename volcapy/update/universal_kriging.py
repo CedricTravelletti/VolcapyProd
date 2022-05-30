@@ -254,6 +254,19 @@ class UniversalUpdatableGP(UpdatableGP):
         residual_cov = block_1
         return residual, residual_cov
 
+    def leave_k_out_criterion(self, k, G, y, data_std):
+        """ Compute the leave k out cross validation criterion (squared errors).
+
+        """
+        K_tilde = self.compute_cv_matrix(G, y, data_std)
+        K_tilde_inv = torch.inverse(K_tilde)
+
+        criterion = 0
+        # Generate all subsets with k elements.
+        for out_inds in itertools.combinations(list(range(y.shape[0])), k):
+            criterion += _compute_cv_residual(K_tilde_inv, y, np.array(out_inds))**2
+        return criterion
+
     # TODO: Warning: only samples from Matern 5/2.
     def sample_prior(self):
         """ Sample from prior model.
