@@ -222,7 +222,7 @@ class UniversalUpdatableGP(UpdatableGP):
         if not G.device == DEVICE: G = G.to(DEVICE)
         pushfwd = self.covariance.compute_prior_pushfwd(
                 G, sigma0=1.0, ignore_trend=True)
-        R = self.covariance.sigma0**2 * G @ pushfwd
+        R = self.covariance.sigma0**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
         K_tilde = torch.vstack([
             torch.hstack([R, G @ self.coeff_F]),
             torch.hstack([self.coeff_F.t() @ G.t(),
@@ -242,9 +242,14 @@ class UniversalUpdatableGP(UpdatableGP):
 
         """
         K_tilde_inv = self.compute_cv_matrix(G, y, data_std)
+        return _compute_cv_residual(K_tilde_inv, y, out_inds)
 
+    def _compute_cv_residual(self, K_tilde_inv, y ,out_inds):
+        """ Helper function for cv residuals computation.
+
+        """
         block_1 = K_tilde_inv[out_inds, :][:, out_inds]
-        block_2 = (K_tilde_inv[:, :n] @ y)[out_inds, :]
+        block_2 = (K_tilde_inv[:, :y.shape[0]] @ y)[out_inds, :]
         residual = block_1 @ block_2
         residual_cov = torch.inverse(block_1)
         return residual, residual_cov
