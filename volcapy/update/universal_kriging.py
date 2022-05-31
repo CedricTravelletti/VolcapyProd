@@ -94,10 +94,14 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
                 n_chunks=self.n_chunks,
                 n_flush=self.n_flush)
         if ignore_trend is True:
+            # Caching.
+            self._pushfwd_cache = sigma0**2 * pushfwd
             return sigma0**2 * pushfwd
         else:
             # Trend part.
             trend_pushfwd = self.coeff_F @ (self.sigma_Ft @ G.t())
+            # Caching.
+            self._pushfwd_cache = sigma0**2 * pushfwd + trend_pushfwd
             return sigma0**2 * pushfwd + trend_pushfwd
 
     def extract_variance(self):
@@ -216,14 +220,28 @@ class UniversalUpdatableGP(UpdatableGP):
                 self.coeff_F @ beta_hat
                 + self.covariance.sigma0**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F @ beta_hat))
 
-    def compute_cv_matrix(self, G, y, data_std):
+    def compute_cv_matrix(self, G, y, data_std, use_cached_pushfwd=False):
         """ Compute the cross-validation matrix K_tilde.
+
+        Parameters
+        ----------
+        use_cached_pushfwd: bool, defaults to False
+            If true, then use the pushforward from last computations. 
+            This is to be used if lambda0 hasn't changed, so we can 
+            speed up drastically.
 
         """
         if not G.device == DEVICE: G = G.to(DEVICE)
-        pushfwd = self.covariance.compute_prior_pushfwd(
+
+        # If only sigma0 has changed, then can used cached pushforward.
+        if use_cached_pushfwd is True:
+            pushfwd = self.covariance._pushfwd_cache.double()
+        else:
+            pushfwd = self.covariance.compute_prior_pushfwd(
                 G, sigma0=1.0, ignore_trend=True).double()
-        R = self.covariance.sigma0**2 * G.double() @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE).double()
+        R = (
+                self.covariance.sigma0**2 * G.double() @ pushfwd
+                + data_std**2 * torch.eye(G.shape[0], device=DEVICE).double())
         K_tilde = torch.vstack([
             torch.hstack([R, G.double() @ self.coeff_F.double()]),
             torch.hstack([self.coeff_F.t().double() @ G.t().double(),
@@ -249,24 +267,60 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Helper function for cv residuals computation.
 
         """
+        if not y.device == DEVICE: y = y.to(DEVICE)
+
         block_1 = torch.inverse(K_tilde_inv[out_inds, :][:, out_inds])
-        block_2 = (K_tilde_inv[:, :y.shape[0]] @ y)[out_inds, :]
+        block_2 = (K_tilde_inv[:, :y.shape[0]] @ y.double())[out_inds, :]
         residual = block_1 @ block_2
         residual_cov = block_1
         return residual, residual_cov
 
-    def leave_k_out_criterion(self, k, G, y, data_std):
+    def leave_k_out_criterion(self, k, G, y, data_std, use_cached_pushfwd=False):
         """ Compute the leave k out cross validation criterion (squared errors).
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std)
+        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd)
         K_tilde_inv = torch.inverse(K_tilde)
 
         criterion = 0
         # Generate all subsets with k elements.
-        for out_inds in itertools.combinations(list(range(y.shape[0])), k):
-            criterion += _compute_cv_residual(K_tilde_inv, y, np.array(out_inds))**2
+        for i, out_inds in enumerate(itertools.combinations(list(range(y.shape[0])), k)):
+            print(i)
+            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, np.array(out_inds))
+            criterion += (residual**2).sum().item()
         return criterion
+
+    def train_leave_k_out(self, k, lambda0s, sigma0s, G, y, data_std, out_path):
+        """ Compute the leave-k-out criterion on a grid of covariance 
+        hyperparameters.
+
+        """
+        start = timer()
+        # Store results in Pandas DataFrame.
+        df = pd.DataFrame(columns=['lambda0', 'sigma0', 'sum squared residuals'])
+
+        for lambda0 in lambda0s:
+            # Compute the pushforward once lambda0 has changed, 
+            # so that then we can use the cached version.
+            pushfwd = self.covariance.compute_prior_pushfwd(
+                G, sigma0=1.0, ignore_trend=True).double()
+
+            for sigma0 in sigma0s:
+                print(sigma0)
+                # Set the new parameters.
+                self.lambda0 = lambda0
+                self.sigma0 = sigma0
+
+                sum_squared_residual = self.leave_k_out_criterion(k, G, y, data_std,
+                        use_cached_pushfwd=True)
+
+                df = df.append({'lambda0': lambda0, 'sigma0': sigma0,
+                    'sum squared residuals': sum_squared_residual},
+                    ignore_index=True)
+            # Save after each lambda0.
+            df.to_pickle(out_path)
+        end = timer()
+        print("Training done in {} minutes.".format((end-start)/60))
 
     # TODO: Warning: only samples from Matern 5/2.
     def sample_prior(self):

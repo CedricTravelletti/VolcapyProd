@@ -94,12 +94,8 @@ class UpdatableCovariance:
 
         """
         self.cov_module = cov_module
-        if not torch.is_tensor(lambda0):
-            lambda0 = torch.tensor([lambda0])
-        self.lambda0 = lambda0.to(DEVICE)
-        if not torch.is_tensor(sigma0):
-                sigma0 = torch.tensor([sigma0])
-        self.sigma0 = sigma0.to(DEVICE)
+        self.sigma0 = sigma0
+        self.lambda0 = lambda0
         
         if not torch.is_tensor(cells_coords):
             cells_coords = torch.from_numpy(cells_coords)
@@ -111,6 +107,28 @@ class UpdatableCovariance:
 
         self.pushforwards = []
         self.inversion_ops = []
+
+    @property
+    def lambda0(self):
+        return self._lambda0
+
+    @property
+    def sigma0(self):
+        return self._sigma0
+
+    @lambda0.setter
+    def lambda0(self, val):
+        if not torch.is_tensor(val):
+            val = torch.tensor([val])
+        val = val.to(DEVICE)
+        self._lambda0 = val
+
+    @sigma0.setter
+    def sigma0(self, val):
+        if not torch.is_tensor(val):
+            val = torch.tensor([val])
+        val = val.to(DEVICE)
+        self._sigma0 = val
 
     def mul_right(self, A, strip=False):
         """ Multiply covariance matrix from the right.
@@ -691,6 +709,22 @@ class UpdatableGP():
     @property
     def cells_coords(self):
         return self.covariance.cells_coords
+
+    @property
+    def lambda0(self):
+        return self.covariance.lambda0
+
+    @property
+    def sigma0(self):
+        return self.covariance.sigma0
+
+    @lambda0.setter
+    def lambda0(self, val):
+        self.covariance.lambda0 = val
+
+    @sigma0.setter
+    def sigma0(self, val):
+        self.covariance.sigma0 = val
 
     def update(self, G, y, data_std):
         """ Given some data, update the model.
