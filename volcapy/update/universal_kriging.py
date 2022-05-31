@@ -191,18 +191,23 @@ class UniversalUpdatableGP(UpdatableGP):
         if not G.device == DEVICE: G = G.to(DEVICE)
         if not y.device == DEVICE: y = y.to(DEVICE)
 
+        G = G.float()
+        y = y.float()
+
         y = y.reshape(-1, 1)
         n = y.shape[0]
 
         # Compute with correlation matrix by setting sigma to 1.
         pushfwd = self.covariance.compute_prior_pushfwd(
-                G, sigma0=1.0, ignore_trend=True)
-        R = self.covariance.sigma0**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+                G, sigma0=1.0, ignore_trend=True).float()
+
+        # Do everything in floats.
+        R = self.covariance.sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
         R_inv = torch.inverse(R)
         beta_hat = (
-                torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
+                torch.inverse(self.coeff_F.float().t() @ G.t() @ R_inv @ G @ self.coeff_F.float())
                 @
-                self.coeff_F.t() @ G.t() @ R_inv @ y
+                self.coeff_F.float().t() @ G.t() @ R_inv @ y
                 )
         cov_beta_hat = R_inv
 
