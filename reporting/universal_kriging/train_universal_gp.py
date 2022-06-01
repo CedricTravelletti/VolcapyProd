@@ -67,8 +67,8 @@ def main():
     ground_truth = torch.from_numpy(np.load(os.path.join(results_folder, "ground_truth.npy")))
     synth_data = torch.from_numpy(
             np.load(os.path.join(results_folder, "synth_data.npy")))
-    lambda0s = np.linspace(1.0, 2000, 30)
-    kappa_s = np.linspace(1.0, 2000, 30)
+    lambda0s = np.linspace(1.0, 3000, 30)
+    kappa_s = np.linspace(1e-5, 1, 30)
 
     updatable_gp.train(lambda0s, kappa_s, G, synth_data,
             out_path=os.path.join(results_folder, "./train_res_universal.pck"))
