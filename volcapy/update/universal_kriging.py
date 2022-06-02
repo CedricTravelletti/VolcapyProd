@@ -310,8 +310,8 @@ class UniversalUpdatableGP(UpdatableGP):
             criterion += (residual**2).sum().item()
         return criterion
 
-    def train_cv_criterion(self, lambda0s, sigma0s, G, y, data_std, out_path, criterion,
-            k=None, folds=None):
+    def train_cv_criterion(self, lambda0s, sigma0s, G, y, data_std,
+            criterion, k=None, folds=None, out_path=None):
         """ Compute the specified cross-validation criterion on a grid of covariance 
         hyperparameters.
 
@@ -345,7 +345,7 @@ class UniversalUpdatableGP(UpdatableGP):
 
         # Pick the corresponding criterion function.
         if criterion == "leave k out":
-            criterion_fn = lambda self.leave_k_out_criterion(k, G, y, data_std,
+            criterion_fn = lambda: self.leave_k_out_criterion(k, G, y, data_std,
                         use_cached_pushfwd=True)
         elif criterion == "k fold":
             criterion_fn = lambda: self.k_fold_criterion(folds, G, y, data_std,

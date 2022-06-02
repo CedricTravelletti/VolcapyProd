@@ -1,9 +1,10 @@
-""" Study the posterior for the universal GP (in the log-gaussian comparison).
+""" Train GP with cross-validation with k means folds.
 """
 from volcapy.update.universal_kriging import UniversalUpdatableGP
 import volcapy.covariance.matern52 as kernel
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.universal_kriging.basis_functions import *
+from volcapy.utils import kMeans_folds
 
 import numpy as np
 import os
@@ -31,6 +32,8 @@ def main():
                     "grid.pickle"))
     volcano_coords = torch.from_numpy(
             grid.cells).float().detach()
+    data_coords = np.load(os.path.join(data_folder,
+                    "niklas_data_coords.npy"))
 
     data_std = 0.1
     ground_truth = torch.from_numpy(np.load(os.path.join(results_folder, "ground_truth.npy")))
@@ -50,19 +53,21 @@ def main():
 
     # Define GP model with arbitrary parameters (we will train them anyway).
     lambda0, sigma0 = 10, 2
-    updatable_gp = UniversalUpdatableGP(kernel, lambda0, torch.tensor([sigma0]),
+    updatable_gp = UniversalUpdatableGP(kernel, lambda0, sigma0,
             volcano_coords,
             coeff_F, coeff_cov="uniform", coeff_mean="uniform",
             n_chunks=200)
 
     # Train cross-validation.
-    lambda0s = np.linspace(1.0, 1000, 30)
-    sigma0s = np.linspace(0.1, 100, 30)
+    lambda0s = np.linspace(0.2, 1000, 50)
+    sigma0s = np.linspace(0.1, 100, 50)
 
-    k = 2
+    # Compute folds via kMeans.
+    k = 10 # number of clusters.
+    folds = kMeans_folds(k, data_coords)
     updatable_gp.train_cv_criterion(lambda0s, sigma0s, G, synth_data, data_std,
-            criterion="leave k out", k=k,
-            out_path=os.path.join(results_folder, "./leave_{}_out_residuals.pck".format(k)))
+            criterion="k fold", folds=folds,
+            out_path=os.path.join(results_folder, "./{}_fold_kMeans_residuals.pck".format(k)))
 
 
 if __name__ == "__main__":

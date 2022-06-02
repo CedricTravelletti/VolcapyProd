@@ -56,13 +56,15 @@ def main():
             n_chunks=200)
 
     # Train cross-validation.
-    lambda0s = np.linspace(1.0, 1000, 30)
-    sigma0s = np.linspace(0.1, 100, 30)
+    lambda0s = np.linspace(1000, 2000, 60)
+    sigma0s = np.linspace(0.05, 10, 30)
 
-    k = 2
+    k = 1
     updatable_gp.train_cv_criterion(lambda0s, sigma0s, G, synth_data, data_std,
             criterion="leave k out", k=k,
-            out_path=os.path.join(results_folder, "./leave_{}_out_residuals.pck".format(k)))
+            out_path=os.path.join(
+                results_folder, 
+                "./leave_{}_out_residuals_smallsigma_biglambda.pck".format(k)))
 
 
 if __name__ == "__main__":
