@@ -223,7 +223,7 @@ class UniversalUpdatableGP(UpdatableGP):
 
         self.post_mean = (
                 self.coeff_F @ beta_hat
-                + self.covariance.sigma0**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F @ beta_hat))
+                + self.covariance.sigma0.float()**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F.float() @ beta_hat))
 
     def compute_cv_matrix(self, G, y, data_std, use_cached_pushfwd=False):
         """ Compute the cross-validation matrix K_tilde.
