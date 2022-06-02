@@ -32,11 +32,7 @@ def main():
     volcano_coords = torch.from_numpy(
             grid.cells).float().detach()
 
-    # Optimal hyperparameters.
     data_std = 0.1
-    sigma0 = 2.968352
-    lambda0 = 207.8275
-
     ground_truth = torch.from_numpy(np.load(os.path.join(results_folder, "ground_truth.npy")))
     synth_data = torch.from_numpy(
             np.load(os.path.join(results_folder, "synth_data.npy")))
@@ -52,7 +48,8 @@ def main():
             x0, y0).reshape(-1, 1)
         ]).float()
 
-    # Now fit GP model
+    # Define GP model with arbitrary parameters (we will train them anyway).
+    lambda0, sigma0 = 10, 2
     updatable_gp = UniversalUpdatableGP(kernel, lambda0, torch.tensor([sigma0]),
             volcano_coords,
             coeff_F, coeff_cov="uniform", coeff_mean="uniform",
@@ -63,7 +60,8 @@ def main():
     sigma0s = np.linspace(0.1, 100, 30)
 
     k = 2
-    updatable_gp.train_leave_k_out(k, lambda0s, sigma0s, G, synth_data, data_std,
+    updatable_gp.train_cv_criterion(lambda0s, sigma0s, G, synth_data, data_std,
+            criterion="leave k out", k=k,
             out_path=os.path.join(results_folder, "./leave_{}_out_residuals.pck".format(k)))
 
 

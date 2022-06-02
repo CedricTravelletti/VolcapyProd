@@ -58,6 +58,11 @@ def main():
             coeff_F, coeff_cov="uniform", coeff_mean="uniform",
             n_chunks=200)
 
+    # Compute cross-validation matrix.
+    K_tilde = updatable_gp.compute_cv_matrix(G, synth_data, data_std=0.2)
+    np.save(os.path.join(results_folder, "K_tilde.npy"),
+            K_tilde.cpu().numpy())
+
     # Compute posterior mean.
     updatable_gp.update_uniform(G, synth_data, data_std)
     np.save(os.path.join(results_folder, "post_mean_universal.npy"),
