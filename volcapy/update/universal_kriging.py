@@ -295,14 +295,61 @@ class UniversalUpdatableGP(UpdatableGP):
             criterion += (residual**2).sum().item()
         return criterion
 
-    def train_leave_k_out(self, k, lambda0s, sigma0s, G, y, data_std, out_path):
-        """ Compute the leave-k-out criterion on a grid of covariance 
+    def k_fold_criterion(self, folds, G, y, data_std, use_cached_pushfwd=False):
+        """ Compute the k fold cross validation criterion (squared errors).
+
+        """
+        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd)
+        K_tilde_inv = torch.inverse(K_tilde)
+
+        criterion = 0
+        # Loop over folds.
+        for i, fold_inds in enumerate(folds):
+            print(i)
+            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, fold_inds)
+            criterion += (residual**2).sum().item()
+        return criterion
+
+    def train_cv_criterion(self, lambda0s, sigma0s, G, y, data_std, out_path, criterion,
+            k=None, folds=None):
+        """ Compute the specified cross-validation criterion on a grid of covariance 
         hyperparameters.
+
+        Parameters
+        ----------
+        lambda0s: array
+            List of lambda0 values.
+        sigma0s: array 
+            List of simga0 values.
+        G: Tensor (n_data, n_cells)
+            Forward operator.
+        y: Tensor (n_data, 1)
+            Data vector.
+        data_std: float
+            Observation noise standard deviation.
+        out_path: string
+            Where to save the pandas dataframe containing the training results.
+        criterion: string
+            "leave k out" or "k fold"
+        k: int, defaults to None.
+            If criterion is "leave k out", then specifies the number of left-out points.
+        folds: List[array]
+            If criterion is "k fold", then specifies the folds.
+            List of integer arrays, each describing the indices 
+            belonging to a given fold.
 
         """
         start = timer()
         # Store results in Pandas DataFrame.
         df = pd.DataFrame(columns=['lambda0', 'sigma0', 'sum squared residuals'])
+
+        # Pick the corresponding criterion function.
+        if criterion == "leave k out":
+            criterion_fn = lambda self.leave_k_out_criterion(k, G, y, data_std,
+                        use_cached_pushfwd=True)
+        elif criterion == "k fold":
+            criterion_fn = lambda: self.k_fold_criterion(folds, G, y, data_std,
+                    use_cached_pushfwd=True)
 
         for lambda0 in lambda0s:
             # Compute the pushforward once lambda0 has changed, 
@@ -316,8 +363,7 @@ class UniversalUpdatableGP(UpdatableGP):
                 self.lambda0 = lambda0
                 self.sigma0 = sigma0
 
-                sum_squared_residual = self.leave_k_out_criterion(k, G, y, data_std,
-                        use_cached_pushfwd=True)
+                sum_squared_residual = criterion_fn()
 
                 df = df.append({'lambda0': lambda0, 'sigma0': sigma0,
                     'sum squared residuals': sum_squared_residual},
