@@ -175,7 +175,7 @@ def compute_cov(lambda0, cells_coords, i, j):
 
     return (1 - inv_lambda2 * d) * torch.exp(inv_lambda2 * d)
 
-def compute_full_cov(lambda0, cells_coords, device, n_chunks=200,
+def compute_full_cov(lambda0, cells_coords, device=None, n_chunks=200,
         n_flush=50):
     """ Compute the full covariance matrix.
 
@@ -204,6 +204,9 @@ def compute_full_cov(lambda0, cells_coords, device, n_chunks=200,
     Tensor
         n_cells * n_cells covariance matrix.
     """
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     # Transfer everything to device.
     lambda0 = torch.tensor(lambda0, requires_grad=False).to(device)
     cells_coords = cells_coords.to(device)

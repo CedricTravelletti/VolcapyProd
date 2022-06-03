@@ -216,6 +216,9 @@ def compute_full_cov(lambda0, cells_coords, device=None, n_chunks=200,
     Tensor
         n_model * n_data covariance pushforward K F^t.
     """
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     start = timer()
 
     if device is None:

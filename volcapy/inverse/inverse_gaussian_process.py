@@ -502,6 +502,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         end = timer()
         print("Training done in {} minutes.".format((end-start)/60))
+        return df
 
     def get_inversion_op(self, K_d, data_std):
         """ Compute the Cholesky decomposition of the inverse of the inversion operator.
