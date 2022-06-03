@@ -79,7 +79,7 @@ def direct_sample(kernel, sigma0, lambda0, m0, cells):
 
     """
     n = cells.shape[0]
-    cov_mat = sigma0**2 * kernel.compute_covariance(lambda0, cells)
+    cov_mat = sigma0**2 * kernel.compute_full_cov(lambda0, cells)
     L = torch.cholesky(cov_mat).double()
     Z = torch.normal(mean=0, std=1.0, size=(n, 1)).double()
     return (m0 + L @ Z).float()

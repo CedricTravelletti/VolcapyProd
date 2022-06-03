@@ -181,7 +181,7 @@ def compute_cov(lambda0, cells_coords, i, j):
 
     return (1 - inv_lambda2 * d + (1/3) * inv_lambda2**2 * d**2) * torch.exp(inv_lambda2 * d)
 
-def compute_covariance(lambda0, cells_coords, device=None, n_chunks=200,
+def compute_full_cov(lambda0, cells_coords, device=None, n_chunks=200,
         n_flush=50):
     """ Compute the covariance pushforward.
 
