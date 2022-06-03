@@ -225,7 +225,7 @@ class UniversalUpdatableGP(UpdatableGP):
                 self.coeff_F @ beta_hat
                 + self.covariance.sigma0.float()**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F.float() @ beta_hat))
 
-    def compute_cv_matrix(self, G, y, data_std, use_cached_pushfwd=False):
+    def compute_cv_matrix(self, G, y, data_std, sigma0=None, use_cached_pushfwd=False):
         """ Compute the cross-validation matrix K_tilde.
 
         Parameters
@@ -238,6 +238,10 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         if not G.device == DEVICE: G = G.to(DEVICE)
 
+        # If sigma0 not specified, then use the one from the GP. 
+        # Otherwise, we can use gradients for optimization.
+        if sigma0 is None: sigma0 = self.sigma0
+
         # If only sigma0 has changed, then can used cached pushforward.
         if use_cached_pushfwd is True:
             pushfwd = self.covariance._pushfwd_cache.double()
@@ -245,7 +249,7 @@ class UniversalUpdatableGP(UpdatableGP):
             pushfwd = self.covariance.compute_prior_pushfwd(
                 G, sigma0=1.0, ignore_trend=True).double()
         R = (
-                self.covariance.sigma0**2 * G.double() @ pushfwd
+                sigma0**2 * G.double() @ pushfwd
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE).double())
         K_tilde = torch.vstack([
             torch.hstack([R, G.double() @ self.coeff_F.double()]),
@@ -253,7 +257,7 @@ class UniversalUpdatableGP(UpdatableGP):
                 torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]), device=DEVICE).double()])])
         return K_tilde
 
-    def compute_cv_residual(self, G, y, data_std, out_inds):
+    def compute_cv_residual(self, G, y, data_std, out_inds, sigma0=None):
         """ Compute cross-validation residual at left out indices out_inds.
 
         Returns
@@ -264,7 +268,7 @@ class UniversalUpdatableGP(UpdatableGP):
             Cross-validation predictor covariance.
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std)
+        K_tilde = self.compute_cv_matrix(G, y, data_std, sigma0)
         K_tilde_inv = torch.inverse(K_tilde)
         return _compute_cv_residual(K_tilde_inv, y, out_inds)
 
@@ -280,11 +284,26 @@ class UniversalUpdatableGP(UpdatableGP):
         residual_cov = block_1
         return residual, residual_cov
 
-    def leave_k_out_criterion(self, k, G, y, data_std, use_cached_pushfwd=False):
+    def leave_1_out_residuals((self, G, y, data_std, sigma0=None, use_cached_pushfwd=False):
+            """ Return the vector of leave-one-out cross-validation erros.
+
+            """
+        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd, sigma0)
+        K_tilde_inv = torch.inverse(K_tilde)
+
+        residuals = torch.zeros(y.shape)
+        # Loop over data points.
+        for i in range(y.shape[0]):
+            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, np.array(out_inds))
+            residuals[i] = residual.item()
+
+        return residuals
+
+    def leave_k_out_criterion(self, k, G, y, data_std, sigma0=None, use_cached_pushfwd=False):
         """ Compute the leave k out cross validation criterion (squared errors).
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd)
+        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd, sigma0)
         K_tilde_inv = torch.inverse(K_tilde)
 
         criterion = 0
