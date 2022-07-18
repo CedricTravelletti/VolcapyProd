@@ -102,6 +102,52 @@ def plot_stds(grid, ground_truth, means, sigmas,
         plt.close()
     else: plt.show()
 
+##################################################
+def plot_excu_ground_truth(grid, ground_truth, means, sigmas,
+        pts_x, pts_y, ymin, ymax, excu_inds_plugin):
+    # Generate regular gridding over which to plot.
+    min_x = np.min(grid.cells[:])
+    max_x = np.max(grid.cells[:])
+
+    fig, ax = plt.subplots(1)
+    ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis
+
+    # Plot true excursion.
+    excu_inds_true = np.argwhere(ground_truth >= THRESHOLD)[:, 0]
+    ax.scatter(grid.cells.reshape(-1)[excu_inds_true],
+            ground_truth[excu_inds_true], label='true',
+            s=20,
+            color='black', alpha=0.05)
+    ax.plot(grid.cells.reshape(-1), ground_truth, lw=1.8, label='true',
+            color='black', linestyle="dashed")
+
+    # Annotate Excursion set.
+    ax.text(-0.25, 1.5, r'$\Gamma^*$', fontsize=18)
+
+    # Horizontal line at excursion level.
+    ax.plot(grid.cells.reshape(-1),
+            np.repeat(THRESHOLD, grid.cells.shape[0]), lw=1.0, label='true',
+            color='red', linestyle="dashed")
+
+    # Remove the axis text, since we don't care in presentations.
+    ax.xaxis.set_ticklabels([])
+    ax.yaxis.set_ticklabels([])
+
+
+    ymin = np.min([-4, ymin])
+    ymax = np.max([4, ymax])
+    ax.set_ylim(ymin - 0.1, ymax + 0.1)
+
+    plt.xlim([min_x, max_x])
+
+    ax2.set_ylabel('A', color='white', alpha=0.0)  # we already handled the x-label with
+    ax2.set_yticks([0.0, 0.2])
+    ax2.tick_params(axis='y', labelcolor='white', color='white')
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+
+    plt.savefig("./excu_ground_truth.png", bbox_inches='tight', pad_inches=0, dpi=400)
+    plt.close()
+
 def plot_excu_plugin(grid, ground_truth, means, sigmas,
         pts_x, pts_y, ymin, ymax, excu_inds_plugin):
     """ Plot a dataset over the grid. The values should be an array
@@ -126,6 +172,10 @@ def plot_excu_plugin(grid, ground_truth, means, sigmas,
             s=20,
             color='black', alpha=0.05)
 
+    # Annotate Excursion set.
+    ax.text(-0.25, 1.5, r'$\Gamma^*$', fontsize=18)
+    ax.text(-0.85, 2.5, r'$\Gamma_{plugin}$', fontsize=18, color="steelblue")
+
     # Plot where mean is in excursion.
     ax.scatter(grid.cells.reshape(-1)[excu_inds_plugin],
             means[excu_inds_plugin], label='true',
@@ -147,6 +197,10 @@ def plot_excu_plugin(grid, ground_truth, means, sigmas,
 
     # Plost observation points.
     ax.scatter(pts_x ,pts_y, color="red", facecolors='none', linewidths=1.5)
+
+    # Remove the axis text, since we don't care in presentations.
+    ax.xaxis.set_ticklabels([])
+    ax.yaxis.set_ticklabels([])
 
     ymin = np.min([-4, ymin])
     ymax = np.max([4, ymax])
@@ -197,7 +251,7 @@ def plot_excu_coverage(grid, ground_truth, means, sigmas,
     ax2.tick_params(axis='y', labelcolor=color)
     ax2.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8])
     ax2.set_ylim(0, 1)
-    ax2.plot(grid.cells.reshape(-1), coverage, lw=1.8, label='true',
+    ax2.plot(grid.cells.reshape(-1), coverage.detach(), lw=1.8, label='true',
             color=color, linestyle="solid")
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     # --------------------------------
@@ -251,7 +305,7 @@ def plot_excu_vorb_quantile(grid, ground_truth, means, sigmas,
     ax2.tick_params(axis='y', labelcolor=color)
     ax2.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8])
     ax2.set_ylim(0, 1)
-    ax2.plot(grid.cells.reshape(-1), coverage, lw=1.8, label='true',
+    ax2.plot(grid.cells.reshape(-1), coverage.detach(), lw=1.8, label='true',
             color=color, linestyle="solid")
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     # --------------------------------
@@ -300,7 +354,7 @@ def plot_excu_vorb_exp(grid, ground_truth, means, sigmas,
     ax2.tick_params(axis='y', labelcolor=color)
     ax2.set_yticks([0.0, 0.2, 0.4, 0.6, 0.8])
     ax2.set_ylim(0, 1)
-    ax2.plot(grid.cells.reshape(-1), coverage, lw=1.8, label='true',
+    ax2.plot(grid.cells.reshape(-1), coverage.detach(), lw=1.8, label='true',
             color=color, linestyle="solid")
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
     # --------------------------------
@@ -325,7 +379,7 @@ sigma_prior = myGP.sigma0**2 * torch.ones(
         (myGP.n_model, 1), dtype=torch.float32)
 
 plot_stds(my_problem.grid, ground_truth.reshape(-1),
-        m_prior.numpy().reshape(-1), sigma_prior.numpy().reshape(-1),
+        m_prior.detach().numpy().reshape(-1), sigma_prior.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
             outfile="./variance_prior.png")
@@ -336,11 +390,11 @@ i = 1
 m_post_m, m_post_d = myGP.condition_model(
             torch.tensor(G_pts),
             torch.tensor(d_pts), data_std)
-sigma_post = np.sqrt(myGP.posterior_variance())
+sigma_post = np.sqrt(myGP.posterior_variance().detach())
 
 
 plot_stds(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
             outfile="./variance_{}.png".format(i))
@@ -352,23 +406,28 @@ THRESHOLD = 1.0
 excu_inds_plugin, _ = np.argwhere(m_post_m >= THRESHOLD)
 coverage = myGP.coverage(THRESHOLD, upper=None)
 
+plot_excu_ground_truth(my_problem.grid, ground_truth.reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
+        pts_x, pts_y,
+        ymin, ymax,
+        excu_inds_plugin)
 plot_excu_plugin(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
         excu_inds_plugin)
 plot_excu_coverage(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
         excu_inds_plugin, coverage)
 plot_excu_vorb_quantile(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
         excu_inds_plugin, coverage)
 plot_excu_vorb_exp(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
         excu_inds_plugin, coverage)
@@ -383,9 +442,9 @@ i = 2
 m_post_m, m_post_d = myGP.condition_model(
             torch.tensor(G_tot),
             torch.tensor(d_tot), data_std)
-sigma_post = np.sqrt(myGP.posterior_variance())
+sigma_post = np.sqrt(myGP.posterior_variance().detach())
 plot_stds(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
             outfile="./variance_{}.png".format(i))
@@ -404,9 +463,9 @@ i = 3
 m_post_m, m_post_d = myGP.condition_model(
             torch.tensor(G_tot),
             torch.tensor(d_tot), data_std)
-sigma_post = np.sqrt(myGP.posterior_variance())
+sigma_post = np.sqrt(myGP.posterior_variance().detach())
 plot_stds(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
             outfile="./variance_{}.png".format(i))
@@ -425,9 +484,9 @@ i = 4
 m_post_m, m_post_d = myGP.condition_model(
             torch.tensor(G_tot),
             torch.tensor(d_tot), data_std)
-sigma_post = np.sqrt(myGP.posterior_variance())
+sigma_post = np.sqrt(myGP.posterior_variance().detach())
 plot_stds(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
             outfile="./variance_{}.png".format(i))
@@ -442,13 +501,49 @@ d_tot = np.vstack([d_pts,
             data_values_re[1:10, :], 
             data_values_im[1:10, :]])
 
+i = 6
+m_post_m, m_post_d = myGP.condition_model(
+            torch.tensor(G_tot),
+            torch.tensor(d_tot), data_std)
+sigma_post = np.sqrt(myGP.posterior_variance().detach())
+plot_stds(my_problem.grid, ground_truth.reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
+        pts_x, pts_y,
+        ymin, ymax,
+            outfile="./variance_{}.png".format(i))
+
+# 5) Add derivative data.
+# Quick and dirty hack: mimick derivative data at 0 by adding 
+# lots of observations around.
+G_deriv = np.zeros((6, my_problem.grid.cells.shape[0]), dtype=np.float32)
+G_deriv[0, 497] = 1.0
+G_deriv[1, 498] = 1.0
+G_deriv[2, 499] = 1.0
+G_deriv[3, 501] = 1.0
+G_deriv[4, 502] = 1.0
+G_deriv[5, 503] = 1.0
+data_std = 0.01
+
+d_deriv = G_deriv @ ground_truth
+
+G_tot = np.vstack([G_pts,
+        my_problem.G_re[0, :].reshape(1, -1), 
+        my_problem.G_re[1:3, :], 
+        my_problem.G_im[1:3, :],
+        G_deriv])
+d_tot = np.vstack([d_pts,
+            data_values_re[0, :].reshape(1, -1), 
+            data_values_re[1:3, :], 
+            data_values_im[1:3, :],
+            d_deriv])
+
 i = 5
 m_post_m, m_post_d = myGP.condition_model(
             torch.tensor(G_tot),
             torch.tensor(d_tot), data_std)
-sigma_post = np.sqrt(myGP.posterior_variance())
+sigma_post = np.sqrt(myGP.posterior_variance().detach())
 plot_stds(my_problem.grid, ground_truth.reshape(-1),
-        m_post_m.numpy().reshape(-1), sigma_post.numpy().reshape(-1),
+        m_post_m.detach().numpy().reshape(-1), sigma_post.detach().numpy().reshape(-1),
         pts_x, pts_y,
         ymin, ymax,
             outfile="./variance_{}.png".format(i))
