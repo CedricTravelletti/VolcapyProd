@@ -202,7 +202,9 @@ class UniversalUpdatableGP(UpdatableGP):
         # Compute with correlation matrix by setting sigma to 1.
         pushfwd = self.covariance.compute_prior_pushfwd(G).float()
 
-        R = self.covariance.sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+        R = (
+                self.covariance.sigma0.float()**2 * G @ pushfwd
+                + data_std**2 * torch.eye(G.shape[0], device=DEVICE))
         R_inv = torch.inverse(R)
         beta_hat = (
                 torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
@@ -499,7 +501,7 @@ class UniversalUpdatableGP(UpdatableGP):
                 @ (y - G @ prior_mean))
         return nll
 
-    def neg_log_likelihood_universal(self, lambda0, sigma0, G, y, data_std):
+    def neg_log_likelihood_universal(self, lambda0, sigma0, G, y, data_std, cached_pushfwd=None):
         """ Log-likelihood in the universal kriging (uniform prior) setting. 
         There, the coeff_cov matrix is ignored and coeff_mean is replaced by beta_hat.
 
@@ -515,12 +517,19 @@ class UniversalUpdatableGP(UpdatableGP):
             The data vector.
         data_std: float
             Noise variance, if not provided, then defaults to 0.
+        cached_pushfwd: (n_model, n_data) Tensorj, defaults to None
+            If provided, then do not compute the covariance pushforward but 
+            used the provided Tensor. 
+            This can be used to speeed up computations when lambda0 hasn't changed, 
+            since the the pushforward is the same.
 
         Returns
         -------
         NLL: Tensor
-        sigma_hat: Tensor
         beta_hat: Tensor
+        R_inv: (n_data, n_data) Tensor
+            Inverse matrix used in all the prediction equations.
+            Returned for convenience.
 
         """
         if not G.device == DEVICE: G = G.to(DEVICE)
@@ -532,71 +541,73 @@ class UniversalUpdatableGP(UpdatableGP):
         y = y.reshape(-1, 1)
         n = y.shape[0]
 
+        if cached_ is None:
+            pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0)
+        else: pushfwd = cached_pushfwd
 
-        # Do everything in floats.
-        pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0)
-        R = sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+        R = (
+                sigma0.float()**2 * G @ pushfwd 
+                + data_std**2 * torch.eye(G.shape[0], device=DEVICE))
         R_inv = torch.inverse(R)
         beta_hat = (
                 torch.inverse(self.coeff_F.float().t() @ G.t() @ R_inv @ G @ self.coeff_F.float())
                 @
                 self.coeff_F.float().t() @ G.t() @ R_inv @ y
                 )
-        sigma_hat_2 = (1 / n) * (
-                (y - G @ self.coeff_F @ beta_hat).t()
-                @ 
-                R_inv 
-                @ 
-                (y - G @ self.coeff_F @ beta_hat)
-                )[0]
-        NLL = n * torch.log(sigma_hat_2) + torch.logdet(R) + n
-        return (NLL, torch.sqrt(sigma_hat_2), beta_hat)
+        nll = (
+                torch.logdet(R)
+                + 
+                (y - G @ prior_mean).t() 
+                @ R_inv 
+                @ (y - G @ prior_mean))
+        return (nll, beta_hat, R_inv)
 
-    def train(self, lambda0s, kappa_s, data_std, G, y, out_path):
-        """ Given lambda0, optimize the two remaining hyperparams via MLE.
-        Here, instead of giving lambda0, we give a (stripped) covariance
-        matrix. Stripped means without sigma0.
+    def train_MLE(self, lambda0s, sigma0s, data_std, G, y, out_path):
+        """ Train (by grid search) the hyperparameters using MLE. 
+        The user should provide a list of grid values for lambda0 and sigma0.
 
         This method is only valid for uniform trend priors.
-
-        The user can choose between CPU and GPU.
 
         Parameters
         ----------
         lambda0s: Iterable
-            List of prior lengthscale for which to optimize the two other hyperparams.
-        kappa_s
-        data_std
+            List of prior lengthscale for which to optimize..
+        sigma0s: Iterable
+            List of prior stadnard deviations. for which to optimize..
+        data_std: float
+            Observational noise standard deviation.
         G: tensor
             Measurement matrix
         y: (n_data, 1) Tensor
             Observed data. Has to be column vector.
         out_path: string
-            Path for training results.
-
-        Returns
-        -------
-        (sigma0, nll, train_RMSE)
+            Path for storing training results.
 
         """
         start = timer()
         # Store results in Pandas DataFrame.
-        df = pd.DataFrame(columns=['lambda0', 'kappa', 'sigma0', 'beta0', 'nll', 'train RMSE'])
+        df = pd.DataFrame(columns=['lambda0', 'sigma0', 'beta_hat', 'nll', 'train RMSE'])
 
         for lambda0 in lambda0s:
-            for kappa in kappa_s:
-                kappa_2 = kappa**2
-                (NLL, sigma0, beta0) = self.concentrated_NLL(lambda0, G, y, kappa_2)
+            # Only compute pushforward once per loop, since only depends on 
+            # lambda0.
+            pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0)
+            for sigma0 in sigma0s:
+                nll, beta_hat, R_inv = self.neg_log_likelihood_universal(
+                        lambda0, sigma0, G, y, data_std, cached_pushfwd=pushfwd)
 
                 # Compute prediction error on train dataset.
-                pred = self.predict_uniform(G, y, data_std)
-                data_pred = G @ pred
+                post_mean = (
+                    self.coeff_F @ beta_hat
+                    + sigma0**2 * pushfwd @ R_inv @
+                    (y - G @ self.coeff_F @ beta_hat))
+
+                data_pred = G @ post_mean
                 rmse = torch.sqrt(torch.mean((data_pred.reshape(-1) - y.reshape(-1))**2))
 
-                print(pred)
-                df = df.append({'lambda0': lambda0, 'kappa': kappa, 
-                    'sigma0': sigma0.cpu().numpy(), 'beta0': beta0.cpu().numpy(),
-                    'nll': NLL.cpu().numpy(),
+                df = df.append({'lambda0': lambda0, 'sigma0': sigma0.cpu().numpy(),
+                    'beta_hat': beta_hat.cpu().numpy(),
+                    'nll': nll.cpu().numpy(),
                     'train RMSE': rmse.cpu().numpy()}, ignore_index=True)
             # Save after each lambda0.
             df.to_pickle(out_path)
