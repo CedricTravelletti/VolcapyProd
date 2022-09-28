@@ -284,17 +284,18 @@ class UniversalUpdatableGP(UpdatableGP):
         residual_cov = block_1
         return residual, residual_cov
 
-    def leave_1_out_residuals((self, G, y, data_std, sigma0=None, use_cached_pushfwd=False):
-            """ Return the vector of leave-one-out cross-validation erros.
+    def leave_1_out_residuals(self, G, y, data_std, sigma0=None, use_cached_pushfwd=False):
+        """ Return the vector of leave-one-out cross-validation erros.
 
-            """
+        """
         K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd, sigma0)
         K_tilde_inv = torch.inverse(K_tilde)
 
         residuals = torch.zeros(y.shape)
         # Loop over data points.
         for i in range(y.shape[0]):
-            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, np.array(out_inds))
+            out_inds = np.array([i]).reshape(1, 1)
+            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, out_inds)
             residuals[i] = residual.item()
 
         return residuals
@@ -466,17 +467,22 @@ class UniversalUpdatableGP(UpdatableGP):
                 @ (y - G @ prior_mean))
         return nll
 
-    def concentrated_NLL(self, lambda0, G, y, kappa_2):
-        """ Concentrated negative log-likelihood for the universal kriging 
-        (improper uniform prior) model.
+    def neg_log_likelihood_universal(self, lambda0, sigma0, G, y, data_std):
+        """ Log-likelihood in the universal kriging (uniform prior) setting. 
+        There, the coeff_cov matrix is ignored and coeff_mean is replaced by beta_hat.
 
         Parameters
         ----------
-        lambda0
-        G
-        y
-        kappa_2: float
-            (squared) noise to variance ratio.
+        lambda0: Tensor
+            Lengthscale parameter.
+        sigma0: Tensor
+            Prior standard deviation.
+        G: Tensor (n_data, n_model)
+            Observation operator.
+        y: Tensor (n_data)
+            The data vector.
+        data_std: float
+            Noise variance, if not provided, then defaults to 0.
 
         Returns
         -------
@@ -488,28 +494,25 @@ class UniversalUpdatableGP(UpdatableGP):
         if not G.device == DEVICE: G = G.to(DEVICE)
         if not y.device == DEVICE: y = y.to(DEVICE)
 
+        G = G.float()
+        y = y.float()
+
         y = y.reshape(-1, 1)
         n = y.shape[0]
 
         # Compute with correlation matrix by setting sigma to 1.
         pushfwd = self.covariance.compute_prior_pushfwd(
-                G, lambda0,
-                sigma0=1.0, ignore_trend=True)
-        R = G @ pushfwd + kappa_2 * torch.eye(G.shape[0], device=DEVICE)
+                G, lambda0=lambda0, sigma0=1.0, ignore_trend=True).float()
+
+        # Do everything in floats.
+        R = self.covariance.sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
         R_inv = torch.inverse(R)
         beta_hat = (
-                torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
+                torch.inverse(self.coeff_F.float().t() @ G.t() @ R_inv @ G @ self.coeff_F.float())
                 @
-                self.coeff_F.t() @ G.t() @ R_inv @ y
+                self.coeff_F.float().t() @ G.t() @ R_inv @ y
                 )
-        sigma_hat_2 = (1 / n) * (
-                (y - G @ self.coeff_F @ beta_hat).t()
-                @ 
-                R_inv 
-                @ 
-                (y - G @ self.coeff_F @ beta_hat)
-                )
-        NLL = n * torch.log(sigma_hat_2) + torch.logdet(R) + n
+
         return (NLL, torch.sqrt(sigma_hat_2), beta_hat)
 
     def train(self, lambda0s, kappa_s, G, y, out_path):
