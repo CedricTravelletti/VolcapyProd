@@ -54,40 +54,45 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
 
         """
         super().__init__(cov_module, lambda0, sigma0, cells_coords, n_chunks, n_flush)
-        self.coeff_F = coeff_F
-        self.coeff_prior_cov = coeff_cov
-        self.coeff_prior_mean = coeff_mean
+        self.coeff_F = coeff_F.float().to(DEVICE)
+        self.coeff_prior_cov = coeff_cov.float().to(DEVICE)
+        self.coeff_prior_mean = coeff_mean.float().to(DEVICE)
 
         # Pre compute some stuff.
-        self.sigma_Ft = coeff_cov @ coeff_F.t()
+        self.sigma_Ft = (coeff_cov @ coeff_F.t()).to(DEVICE)
 
-    def compute_prior_pushfwd(self, G, lambda0=None, sigma0=None, ignore_trend=False):
-        """ Given an operator G, compute the covariance pushforward K_0 G^T,
+    def compute_prior_pushfwd(self, G, lambda0=None, ignore_trend=True):
+        """ Given an operator G, compute the covariance pushforward (1 / sigma0^2) * K_0 G^T,
         i.e. the pushforward with respect to the prior.
+
+        Note that the sigma0 is stripped.
 
         Parameters
         ----------
         G: (n_data, self.n_cells) Tensor
+        lambda0: float or Tensor (1)
+            Covariance kernel lengthscale parameter.
+            Can be specified to override the one specified in the GP. 
+            If not provided, then use the one of the GP.
+        ignored_trend: bool, defaults to True
+            If set to False, then include the trend part. This is 
+            used when computing the posterior in the fully Bayesian case.
 
         Returns
         -------
         pushfwd: (self.n_cells, n_data) Tensor
 
         """
+        # If not defined, use the one from the GP.
         if lambda0 is None: lambda0 = self.lambda0
-        if sigma0 is None: sigma0 = self.sigma0
 
         if not torch.is_tensor(lambda0):
             lambda0 = torch.tensor([lambda0])
-        if not torch.is_tensor(sigma0):
-            sigma0 = torch.tensor([sigma0])
 
         # If both devices not equal, fallback to standard device.
         if not G.device == DEVICE: G = G.to(DEVICE)
 
         if lambda0 is None: lambda0 = self.lambda0
-        if sigma0 is None: sigma0 = self.sigma0
-        sigma0 = sigma0.to(DEVICE)
 
         pushfwd = self.cov_module.compute_cov_pushforward(
                 lambda0, G, self.cells_coords, DEVICE,
@@ -95,14 +100,14 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
                 n_flush=self.n_flush)
         if ignore_trend is True:
             # Caching.
-            self._pushfwd_cache = sigma0**2 * pushfwd
-            return sigma0**2 * pushfwd
+            self._pushfwd_cache = pushfwd
+            return pushfwd
         else:
             # Trend part.
             trend_pushfwd = self.coeff_F @ (self.sigma_Ft @ G.t())
             # Caching.
-            self._pushfwd_cache = sigma0**2 * pushfwd + trend_pushfwd
-            return sigma0**2 * pushfwd + trend_pushfwd
+            self._pushfwd_cache = pushfwd + trend_pushfwd
+            return pushfwd + trend_pushfwd
 
     def extract_variance(self):
         """ Extracts the pointwise variance from an UpdatableCovariane module.
@@ -186,6 +191,31 @@ class UniversalUpdatableGP(UpdatableGP):
 
         self.n_cells = cells_coords.shape[0]
 
+    def predict_uniform(self, G, y, data_std):
+        if not G.device == DEVICE: G = G.to(DEVICE)
+        if not y.device == DEVICE: y = y.to(DEVICE)
+        G = G.float()
+        y = y.float()
+        y = y.reshape(-1, 1)
+        n = y.shape[0]
+
+        # Compute with correlation matrix by setting sigma to 1.
+        pushfwd = self.covariance.compute_prior_pushfwd(G).float()
+
+        R = self.covariance.sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+        R_inv = torch.inverse(R)
+        beta_hat = (
+                torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
+                @
+                self.coeff_F.t() @ G.t() @ R_inv @ y
+                )
+
+        post_mean = (
+                self.coeff_F @ beta_hat
+                + self.covariance.sigma0.float()**2 * pushfwd @ R_inv @
+                (y - G @ self.coeff_F @ beta_hat))
+        return post_mean.cpu()
+
     # TODO: Finish implementing in update form.
     def update_uniform(self, G, y, data_std):
         """ Compute posterior in the case where the trend prior 
@@ -194,16 +224,13 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         if not G.device == DEVICE: G = G.to(DEVICE)
         if not y.device == DEVICE: y = y.to(DEVICE)
-
         G = G.float()
         y = y.float()
-
         y = y.reshape(-1, 1)
         n = y.shape[0]
 
         # Compute with correlation matrix by setting sigma to 1.
-        pushfwd = self.covariance.compute_prior_pushfwd(
-                G, sigma0=1.0, ignore_trend=True).float()
+        pushfwd = self.covariance.compute_prior_pushfwd(G).float()
 
         # Do everything in floats.
         R = self.covariance.sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
@@ -246,8 +273,7 @@ class UniversalUpdatableGP(UpdatableGP):
         if use_cached_pushfwd is True:
             pushfwd = self.covariance._pushfwd_cache.double()
         else:
-            pushfwd = self.covariance.compute_prior_pushfwd(
-                G, sigma0=1.0, ignore_trend=True).double()
+            pushfwd = self.covariance.compute_prior_pushfwd(G).double()
         R = (
                 sigma0**2 * G.double() @ pushfwd
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE).double())
@@ -278,8 +304,16 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         if not y.device == DEVICE: y = y.to(DEVICE)
 
+        print(out_inds)
+        print(K_tilde_inv[out_inds, :])
+        print(K_tilde_inv[out_inds, :][:, out_inds])
+
         block_1 = torch.inverse(K_tilde_inv[out_inds, :][:, out_inds])
-        block_2 = (K_tilde_inv[:, :y.shape[0]] @ y.double())[out_inds, :]
+        if out_inds.shape[0] > 1:
+            block_2 = (K_tilde_inv[:, :y.shape[0]] @ y.double())[out_inds, :]
+        else:
+            block_2 = (K_tilde_inv[:, :y.shape[0]] @ y.double())[out_inds]
+
         residual = block_1 @ block_2
         residual_cov = block_1
         return residual, residual_cov
@@ -294,7 +328,7 @@ class UniversalUpdatableGP(UpdatableGP):
         residuals = torch.zeros(y.shape)
         # Loop over data points.
         for i in range(y.shape[0]):
-            out_inds = np.array([i]).reshape(1, 1)
+            out_inds = np.array([i]).reshape(1,)
             residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, out_inds)
             residuals[i] = residual.item()
 
@@ -374,8 +408,7 @@ class UniversalUpdatableGP(UpdatableGP):
         for lambda0 in lambda0s:
             # Compute the pushforward once lambda0 has changed, 
             # so that then we can use the cached version.
-            pushfwd = self.covariance.compute_prior_pushfwd(
-                G, sigma0=1.0, ignore_trend=True).double()
+            pushfwd = self.covariance.compute_prior_pushfwd(G).double()
 
             for sigma0 in sigma0s:
                 print(sigma0)
@@ -450,8 +483,7 @@ class UniversalUpdatableGP(UpdatableGP):
 
         y = y.reshape(-1, 1)
 
-        pushfwd = self.covariance.compute_prior_pushfwd(
-                G, lambda0, sigma0, ignore_trend=True).cpu()
+        pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0).cpu()
         data_cov = (
                 G @ pushfwd
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
@@ -500,22 +532,27 @@ class UniversalUpdatableGP(UpdatableGP):
         y = y.reshape(-1, 1)
         n = y.shape[0]
 
-        # Compute with correlation matrix by setting sigma to 1.
-        pushfwd = self.covariance.compute_prior_pushfwd(
-                G, lambda0=lambda0, sigma0=1.0, ignore_trend=True).float()
 
         # Do everything in floats.
-        R = self.covariance.sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
+        pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0)
+        R = sigma0.float()**2 * G @ pushfwd + data_std**2 * torch.eye(G.shape[0], device=DEVICE)
         R_inv = torch.inverse(R)
         beta_hat = (
                 torch.inverse(self.coeff_F.float().t() @ G.t() @ R_inv @ G @ self.coeff_F.float())
                 @
                 self.coeff_F.float().t() @ G.t() @ R_inv @ y
                 )
-
+        sigma_hat_2 = (1 / n) * (
+                (y - G @ self.coeff_F @ beta_hat).t()
+                @ 
+                R_inv 
+                @ 
+                (y - G @ self.coeff_F @ beta_hat)
+                )[0]
+        NLL = n * torch.log(sigma_hat_2) + torch.logdet(R) + n
         return (NLL, torch.sqrt(sigma_hat_2), beta_hat)
 
-    def train(self, lambda0s, kappa_s, G, y, out_path):
+    def train(self, lambda0s, kappa_s, data_std, G, y, out_path):
         """ Given lambda0, optimize the two remaining hyperparams via MLE.
         Here, instead of giving lambda0, we give a (stripped) covariance
         matrix. Stripped means without sigma0.
@@ -528,6 +565,8 @@ class UniversalUpdatableGP(UpdatableGP):
         ----------
         lambda0s: Iterable
             List of prior lengthscale for which to optimize the two other hyperparams.
+        kappa_s
+        data_std
         G: tensor
             Measurement matrix
         y: (n_data, 1) Tensor
@@ -542,15 +581,23 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         start = timer()
         # Store results in Pandas DataFrame.
-        df = pd.DataFrame(columns=['lambda0', 'kappa', 'sigma0', 'beta0', 'nll'])
+        df = pd.DataFrame(columns=['lambda0', 'kappa', 'sigma0', 'beta0', 'nll', 'train RMSE'])
 
         for lambda0 in lambda0s:
             for kappa in kappa_s:
                 kappa_2 = kappa**2
                 (NLL, sigma0, beta0) = self.concentrated_NLL(lambda0, G, y, kappa_2)
+
+                # Compute prediction error on train dataset.
+                pred = self.predict_uniform(G, y, data_std)
+                data_pred = G @ pred
+                rmse = torch.sqrt(torch.mean((data_pred.reshape(-1) - y.reshape(-1))**2))
+
+                print(pred)
                 df = df.append({'lambda0': lambda0, 'kappa': kappa, 
-                    'sigma0': sigma0.cpu(), 'beta0': beta0.cpu(),
-                    'nll': NLL.cpu()}, ignore_index=True)
+                    'sigma0': sigma0.cpu().numpy(), 'beta0': beta0.cpu().numpy(),
+                    'nll': NLL.cpu().numpy(),
+                    'train RMSE': rmse.cpu().numpy()}, ignore_index=True)
             # Save after each lambda0.
             df.to_pickle(out_path)
         end = timer()
