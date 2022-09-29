@@ -205,6 +205,7 @@ class UniversalUpdatableGP(UpdatableGP):
         R = (
                 self.covariance.sigma0.float()**2 * G @ pushfwd
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE))
+        """
         R_inv = torch.inverse(R)
         beta_hat = (
                 torch.inverse(self.coeff_F.t() @ G.t() @ R_inv @ G @ self.coeff_F)
@@ -216,6 +217,21 @@ class UniversalUpdatableGP(UpdatableGP):
                 self.coeff_F @ beta_hat
                 + self.covariance.sigma0.float()**2 * pushfwd @ R_inv @
                 (y - G @ self.coeff_F @ beta_hat))
+        """
+        # TODO: Here try a more numerically stable implementation.
+        R_inv_G = torch.linalg.solve(R, G)
+        R_inv_y = torch.linalg.solve(R, y)
+        beta_hat = (
+                torch.inverse(self.coeff_F.t() @ G.t() @ R_inv_G @ self.coeff_F)
+                @
+                self.coeff_F.t() @ G.t() @ R_inv_y
+                )
+        R_inv_misfit = torch.linalg.solve(R, y - G @ self.coeff_F @ beta_hat)
+        post_mean = (
+                self.coeff_F @ beta_hat
+                + self.covariance.sigma0.float()**2 * pushfwd @
+                R_inv_misfit)
+
         return post_mean.cpu()
 
     # TODO: Finish implementing in update form.
@@ -306,17 +322,21 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         if not y.device == DEVICE: y = y.to(DEVICE)
 
+        """
         print(out_inds)
         print(K_tilde_inv[out_inds, :])
         print(K_tilde_inv[out_inds, :][:, out_inds])
+        """
 
-        block_1 = torch.inverse(K_tilde_inv[out_inds, :][:, out_inds])
         if out_inds.shape[0] > 1:
-            block_2 = (K_tilde_inv[:, :y.shape[0]] @ y.double())[out_inds, :]
+            block_1 = torch.inverse(K_tilde_inv[out_inds, :][:, out_inds])
+            block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
+            residual = block_1 @ block_2
         else:
-            block_2 = (K_tilde_inv[:, :y.shape[0]] @ y.double())[out_inds]
+            block_1 = 1 / (K_tilde_inv[out_inds, out_inds])
+            block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
+            residual = block_1 *  block_2
 
-        residual = block_1 @ block_2
         residual_cov = block_1
         return residual, residual_cov
 
@@ -324,7 +344,8 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Return the vector of leave-one-out cross-validation erros.
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd, sigma0)
+        K_tilde = self.compute_cv_matrix(G, y, data_std,
+                sigma0=sigma0, use_cached_pushfwd=use_cached_pushfwd)
         K_tilde_inv = torch.inverse(K_tilde)
 
         residuals = torch.zeros(y.shape)
@@ -541,12 +562,12 @@ class UniversalUpdatableGP(UpdatableGP):
         y = y.reshape(-1, 1)
         n = y.shape[0]
 
-        if cached_ is None:
+        if cached_pushfwd is None:
             pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0)
         else: pushfwd = cached_pushfwd
 
         R = (
-                sigma0.float()**2 * G @ pushfwd 
+                sigma0**2 * G @ pushfwd 
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE))
         R_inv = torch.inverse(R)
         beta_hat = (
@@ -554,6 +575,8 @@ class UniversalUpdatableGP(UpdatableGP):
                 @
                 self.coeff_F.float().t() @ G.t() @ R_inv @ y
                 )
+
+        prior_mean = self.coeff_F @ beta_hat
         nll = (
                 torch.logdet(R)
                 + 
@@ -588,6 +611,13 @@ class UniversalUpdatableGP(UpdatableGP):
         # Store results in Pandas DataFrame.
         df = pd.DataFrame(columns=['lambda0', 'sigma0', 'beta_hat', 'nll', 'train RMSE'])
 
+        # Some preprocessing.
+        if not G.device == DEVICE: G = G.to(DEVICE)
+        if not y.device == DEVICE: y = y.to(DEVICE)
+        G = G.float()
+        y = y.float()
+        y = y.reshape(-1, 1)
+
         for lambda0 in lambda0s:
             # Only compute pushforward once per loop, since only depends on 
             # lambda0.
@@ -605,9 +635,9 @@ class UniversalUpdatableGP(UpdatableGP):
                 data_pred = G @ post_mean
                 rmse = torch.sqrt(torch.mean((data_pred.reshape(-1) - y.reshape(-1))**2))
 
-                df = df.append({'lambda0': lambda0, 'sigma0': sigma0.cpu().numpy(),
+                df = df.append({'lambda0': lambda0, 'sigma0': sigma0,
                     'beta_hat': beta_hat.cpu().numpy(),
-                    'nll': nll.cpu().numpy(),
+                    'nll': nll.cpu().numpy()[0, 0],
                     'train RMSE': rmse.cpu().numpy()}, ignore_index=True)
             # Save after each lambda0.
             df.to_pickle(out_path)
