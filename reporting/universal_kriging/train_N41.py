@@ -1,4 +1,4 @@
-""" Train a universal GP on Niklas Stromboli data.
+""" Train a universal GP on Niklas Stromboli data with a planar basis function along N41.
 
 Here the training w.r.t kappa is handled via ...
 
@@ -50,11 +50,29 @@ def main():
     y0 = volcano_coords[:, 1].mean()
     z0 = volcano_coords[:, 2].mean()
 
+    """
+    # Build a sheaf of basis funtions.
+    origin_offsets = [-500, -250, 0, 250, 500]
+    angles = [120, 125, 130, 135, 140, 145, 150]
+    theta = 90 # equatorial plane.
+    basis_fns = [torch.ones(volcano_coords.shape[0], 1)] # Already contains the constant.
+    for origin_offset in origin_offsets:
+        for phi in angles:
+            basis_fns.append(planar(volcano_coords, x0 + origin_offset, y0, z0, phi, theta).reshape(-1, 1))
+
+    coeff_F = torch.hstack(basis_fns).float()
+    """
+    origin_offset = 0
+    theta = 90 # equatorial plane.
+    phi = 135
+    dists_N41 = planar(volcano_coords, x0, y0, z0, phi, theta,
+                    # cutoff_phi=45, cutoff_theta=90,
+                    # cutoff_x0=x0-300, cutoff_y0=y0-300, cutoff_z0=z0, fill_value=6000
+                    )
+    basis_fn_N41 = tanh_sigmoid(dists_N41, saturation_length=2500, inverted=True)
     coeff_F = torch.hstack([
         torch.ones(volcano_coords.shape[0], 1),
-        cylindrical(
-            volcano_coords,
-            x0, y0).reshape(-1, 1)
+        basis_fn_N41.reshape(-1, 1)
         ]).float()
 
     # Model with trend.
@@ -67,7 +85,7 @@ def main():
     sigma0s = np.linspace(1, 1400, 40)
 
     updatable_gp.train_MLE(lambda0s, sigma0s, data_std, G, data_values,
-            out_path=os.path.join(results_folder, "./train_res_universal.pkl"))
+            out_path=os.path.join(results_folder, "./train_res_N41.pkl"))
 
 
 if __name__ == "__main__":
