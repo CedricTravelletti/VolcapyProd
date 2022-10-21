@@ -1,4 +1,4 @@
-0 386 {'hdist': 0, 'vdist': 0, 'path_attribute': 'boat'}
+0 358 {'hdist': 0, 'vdist': 0, 'path_attribute': 'boat'}
 0 1 {'hdist': 52.725968805783424, 'vdist': -0.07230928087257382, 'path_attribute': 'trail'}
 0 21 {'hdist': 144.67874642642653, 'vdist': -0.7706817448347607, 'path_attribute': 'trail'}
 1 0 {'hdist': 52.725968805783424, 'vdist': 0.07230928087257382, 'path_attribute': 'trail'}
@@ -172,6 +172,7 @@
 86 85 {'hdist': 52.883371978375735, 'vdist': 4.436484444242215, 'path_attribute': 'trail'}
 86 20 {'hdist': 82.79500065730548, 'vdist': -16.259062440545975, 'path_attribute': 'trail'}
 358 359 {'hdist': 103.19988114943531, 'vdist': 14.885388563650322, 'path_attribute': 'trail'}
+358 0 {'hdist': 0, 'vdist': 0, 'path_attribute': 'boat'}
 359 358 {'hdist': 103.19988114943531, 'vdist': -14.885388563650322, 'path_attribute': 'trail'}
 359 360 {'hdist': 99.65518936981468, 'vdist': 3.5280777249946595, 'path_attribute': 'trail'}
 360 359 {'hdist': 99.65518936981468, 'vdist': -3.5280777249946595, 'path_attribute': 'trail'}
@@ -223,4 +224,3 @@
 385 384 {'hdist': 50.96702159279727, 'vdist': -24.85025521302407, 'path_attribute': 'trail'}
 385 386 {'hdist': 33.335666901891784, 'vdist': 4.664006324196521, 'path_attribute': 'trail'}
 386 385 {'hdist': 33.335666901891784, 'vdist': -4.664006324196521, 'path_attribute': 'trail'}
-386 0 {'hdist': 0, 'vdist': 0, 'path_attribute': 'boat'}
