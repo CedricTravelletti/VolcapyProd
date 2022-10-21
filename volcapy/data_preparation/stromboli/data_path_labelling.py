@@ -10,12 +10,12 @@ import seaborn
 import matplotlib.pyplot as plt
 
 
-output_path = "/home/cedric/PHD/Dev/VolcapySIAM/volcapy/data_preparation/data_path_labelling"
-data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/inversion_data_dsm_coarse"
+output_path = "/home/cedric/PHD/Dev/VolcapySIAM/volcapy/data_preparation/stromboli/data_path_labelling/"
+data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_173018/"
 
 def main():
     # Load
-    data_coords = np.load(os.path.join(data_folder,"niklas_data_coords.npy"))
+    data_coords = np.load(os.path.join(data_folder,"niklas_data_coords_corrected_final.npy"))
 
     # Plot full set.
     fig, ax = plt.subplots()
@@ -36,6 +36,7 @@ def main():
         plt.scatter(data_coords[i, 0], data_coords[i, 1], s=80, c="red")
         plt.title("Cell {} / {}".format(i, data_coords.shape[0]))
         plt.savefig(os.path.join(output_path, "fig_{}.png".format(i)))
+        plt.close()
 
 if __name__ == "__main__":
     main()
