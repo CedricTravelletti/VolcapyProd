@@ -32,7 +32,7 @@ class ToyFourier2d():
         self.G = np.stack([G_re, G_im], axis=1)
 
         # Add point observations.
-        self.G_pt = np.eye(self.G_re.shape[1])
+        # self.G_pt = np.eye(self.G_re.shape[1])
 
     @classmethod
     def build_problem(cls, n_cells_1d, forward_cutoff=None):

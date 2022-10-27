@@ -212,7 +212,9 @@ def get_plotly_surface(x_mesh, y_mesh,z_mesh, vals_mesh):
                       y=y_mesh,
                       z=z_mesh,
                       surfacecolor=vals_mesh,
-                      coloraxis='coloraxis')
+                      coloraxis='coloraxis',
+                      # opacityscale=[[0, 0.0], [0.1, 1], [1, 1]]
+                      )
 
 def plot_surfaces(slices, title="", cmap='jet', vmin=None, vmax=None):
     """ Plots the surfaces obtained from get_plotly_surface.
