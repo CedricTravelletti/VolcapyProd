@@ -1,9 +1,12 @@
 """ Cost functions for path on data-collection graphs.
 
 """
+import math
 import numpy as np
+from numba import float_, bool_, jit
 
 
+@jit(float_(float_), nopython=True)
 def tobler_hiking_pace(slope):
     """ Returns the pace for walking on the given slope, 
     according to Tobler's model.
@@ -24,7 +27,35 @@ def tobler_hiking_pace(slope):
         Pace in seconds per meters.
     
     """
-    return 0.6 * np.exp(3.5 * np.abs(slope + 0.05))
+    return 0.6 * math.exp(3.5 * abs(slope + 0.05))
+
+def _walking_cost_fn_edge(start_node, end_node, edge_attrs, symmetric=False):
+    """ Helper function, see documentation of walking_cost_fn_edge.
+
+    Parameters
+    ----------
+    symmetric: bool, defaults to False.
+        If True, the negative slopes are treated as positive ones.
+
+    """
+    hdist, vdist, path_attr = edge_attrs['hdist'], edge_attrs['vdist'], edge_attrs['path_attribute']
+
+    if path_attr == 'override':
+        return edge_attrs['cost_override']
+    elif path_attr == 'trail':
+        return _walking_cost_fn_edge_jit(vdist, hdist, symmetric, scale_factor=1.0)
+    else: 
+        return _walking_cost_fn_edge_jit(vdist, hdist, symmetric, scale_factor=1.6666666666666667)
+
+@jit(float_(float_, float_, bool_, float_), nopython=True)
+def _walking_cost_fn_edge_jit(vdist, hdist, symmetric, scale_factor):
+    slope = vdist / hdist
+    if symmetric is True:
+        slope = abs(slope)
+    pace = tobler_hiking_pace(slope)
+    dist = math.sqrt(hdist**2 + vdist**2)
+    time = dist * pace
+    return scale_factor * time
 
 def walking_cost_fn_edge(start_node, end_node, edge_attrs):
     """ Cost function for walking from node to node along a given edge. The cost of walking 
@@ -55,15 +86,14 @@ def walking_cost_fn_edge(start_node, end_node, edge_attrs):
         Cost to travel from start_node to end_node.
 
     """
-    hdist, vdist, path_attr = edge_attrs['hdist'], edge_attrs['vdist'], edge_attrs['path_attribute']
+    return _walking_cost_fn_edge(start_node, end_node, edge_attrs, symmetric=False)
 
-    if path_attr == 'override':
-        return edge_attrs['cost_override']
-    elif path_attr == 'trail': scale_factor = 1.0
-    else: scale_factor = 5 / 3
-    
-    slope = vdist / hdist
-    pace = tobler_hiking_pace(slope)
-    dist = np.sqrt(hdist**2 + vdist**2)
-    time = dist * pace
-    return scale_factor * time
+def symmetric_walking_cost_fn_edge(start_node, end_node, edge_attrs):
+    """ Same as walking_cost_fn_edge, but ignores negative slopes (treats them 
+    as positive). 
+
+    This function is used to make the travelling salesman problem symmetric, 
+    which allows to use powerful approximate algorithms (Christofides 1976).
+
+    """
+    return _walking_cost_fn_edge(start_node, end_node, edge_attrs, symmetric=True)
