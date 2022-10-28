@@ -2,6 +2,9 @@
 general strategy, the only thing that varies among the different ones is how we
 select the next point.
 
+This class provides the boilerplate code to run data collection strategies, 
+taking care of the loading, the saving and so on.
+
 """
 from abc import ABC, abstractmethod
 from scipy.spatial import KDTree
@@ -328,6 +331,9 @@ class StrategyABC(ABC):
         candidate location.
 
         """
+        raise NotImplementedError("The current implementation only considers 
+        straight euclidean distance between the nodes. Modify the implementation 
+        if you want to used this function.")
         dist = self.candidates[source_ind] - self.candidates[target_ind]
 
     def compute_inclusion_probability(self, candidate_set_inds):
