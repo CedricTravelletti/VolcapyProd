@@ -72,6 +72,12 @@ def generate_TSP_graph(accessibility_graph, nodes_inds, cost_fn):
     graph that describes the travelling salesman problem between these nodes. 
     That is, generate the complete graph of shortes paths between the nodes.
 
+    Parameters
+    ----------
+    cost_fn: callable or string
+        Either a cost function defining the cost of a given edge, or a string 
+        defining which edge attribute should be used as weight/distance for that edge.
+
     """
     G = nx.Graph()
     # Add nodes iteratively.
@@ -83,3 +89,13 @@ def generate_TSP_graph(accessibility_graph, nodes_inds, cost_fn):
                     source=node_ind, target=end_node, weight=cost_fn)
             G.add_edge(node_ind, end_node, weight=shortest_path_length)
     return G
+
+def weight_graph_with_cost(graph, cost_fn):
+    """ Given a cost function and a graph, weight each edge with the corrsponding cost.
+    This is useful for pre-computing costs before solving travelling salesman problems. 
+
+    """
+    weights = []
+    for e in graph.edges(data=True):
+        nx.set_edge_attributes(graph, values={(e[0], e[1]): cost_fn(*e)}, name = 'weight')
+    return graph
