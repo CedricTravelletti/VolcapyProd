@@ -89,7 +89,13 @@ def static_blind_path_selection(
     best_costs = [costs[i] for i in best_designs_inds]
     best_paths = [paths[i] for i in best_designs_inds]
     """
-
+    # Save at the end
+    df = pd.DataFrame.from_dict(
+                    {'design': evaluated_designs,
+                    'reward': rewards, 'cost': costs, 'path': paths})
+    df_accuracy_metric = pd.DataFrame(accuracy_metrics).to_dict(orient="list") 
+    df = pd.concat([df, df_accuracy_metric], axis=1)
+    df.to_pickle(output_path)
     return df
 
 
@@ -117,13 +123,3 @@ def iterative_bisection_refinement(base_node):
 
             cost_leg1 = nx.path_weight(accessibility_graph, path_leg_1, weight='weight')
             cost_leg12= nx.path_weight(accessibility_graph, path_leg_2, weight='weight')
-
-    # Save at the end
-    df = pd.DataFrame.from_dict(
-                    {'design': evaluated_designs,
-                    'reward': rewards, 'cost': costs, 'path': paths})
-    df_accuracy_metric = pd.DataFrame(accuracy_metrics).to_dict(orient="list") 
-    df = pd.concat([df, df_accuracy_metric], axis=1)
-    df.to_pickle(output_path)
-    return df
->>>>>>> 10641632ee6abfa5941063677bb3298706578d6d
