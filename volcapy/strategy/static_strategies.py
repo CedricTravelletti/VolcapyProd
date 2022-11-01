@@ -56,7 +56,7 @@ def static_blind_path_selection(
     # Sample candidate designs.
     candidate_designs = design_sampler(list(accessibility_graph.nodes), n_starting_designs)
 
-    evaluated_designs, rewards, costs, paths, accuracy_metrics = [], [], [], [], []
+    evaluated_designs, rewards, rewards_metadata, costs, paths, accuracy_metrics = [], [], [], [], [], []
     for i, design in enumerate(candidate_designs):
         print("Evaluating design nr. {} with {} locations.".format(i, len(design)))
         path, cost = solve_TSP(accessibility_graph, design, cost_fn='weight')
@@ -68,7 +68,9 @@ def static_blind_path_selection(
             continue
         else:
             evaluated_designs.append(design)
-            rewards.append(compute_blind_reward(design, belief))
+            result = compute_blind_reward(design, belief)
+            rewards.append(result['reward'])
+            rewards_metadata.append(result['reward_metadata'])
             accuracy_metrics.append(compute_accuracy_metric(design, belief))
             costs.append(cost); paths.append(path)
 
@@ -76,7 +78,8 @@ def static_blind_path_selection(
         if i % 20 == 0:
             df = pd.DataFrame.from_dict(
                     {'design': evaluated_designs,
-                    'reward': rewards, 'cost': costs, 'path': paths})
+                        'reward': rewards, 'reward_metadata': rewards_metadata, 
+                        'cost': costs, 'path': paths})
             df_accuracy_metric = pd.DataFrame(accuracy_metrics)
             df = pd.concat([df, df_accuracy_metric], axis=1)
             df.to_pickle(output_path)
@@ -92,7 +95,7 @@ def static_blind_path_selection(
     # Save at the end
     df = pd.DataFrame.from_dict(
                     {'design': evaluated_designs,
-                    'reward': rewards, 'cost': costs, 'path': paths})
+                        'reward': rewards, 'reward_metadata': rewards_metadata, 'cost': costs, 'path': paths})
     df_accuracy_metric = pd.DataFrame(accuracy_metrics)
     df = pd.concat([df, df_accuracy_metric], axis=1)
     df.to_pickle(output_path)
@@ -101,7 +104,7 @@ def static_blind_path_selection(
 
 def iterative_bisection_refinement(base_node):
     # Sampler for the base designs, sampling 2 points at random and a fixed base.
-    base_sampler = 
+    base_sampler = sampler()
     for i in range(n_starting_designs):
         x1, x2, x3 = base_sampler()
         path1 = nx.shortest_path(accessibility_graph, x1, x2, weight='weight')
