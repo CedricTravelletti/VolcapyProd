@@ -94,7 +94,7 @@ def static_blind_path_selection(
     df = pd.DataFrame.from_dict(
                     {'design': evaluated_designs,
                     'reward': rewards, 'cost': costs, 'path': paths})
-    df_accuracy_metric = pd.DataFrame(accuracy_metrics).to_dict(orient="list") 
+    df_accuracy_metric = pd.DataFrame(accuracy_metrics)
     df = pd.concat([df, df_accuracy_metric], axis=1)
     df.to_pickle(output_path)
     return df
