@@ -56,7 +56,7 @@ def static_blind_path_selection(
     # Sample candidate designs.
     candidate_designs = design_sampler(list(accessibility_graph.nodes), n_starting_designs)
 
-    rewards, costs, paths, accuracy_metrics = [], [], [], []
+    evaluated_designs, rewards, costs, paths, accuracy_metrics = [], [], [], [], []
     for i, design in enumerate(candidate_designs):
         print("Evaluating design nr. {} with {} locations.".format(i, len(design)))
         path, cost = solve_TSP(accessibility_graph, design, cost_fn='weight')
@@ -67,6 +67,7 @@ def static_blind_path_selection(
             print("Cost exceeds budget.")
             continue
         else:
+            evaluated_designs.append(design)
             rewards.append(compute_blind_reward(design, belief))
             accuracy_metrics.append(compute_accuracy_metric(design, belief))
             costs.append(cost); paths.append(path)
@@ -74,9 +75,9 @@ def static_blind_path_selection(
         # Save from time to time.
         if i % 20 == 0:
             df = pd.DataFrame.from_dict(
-                    {'design': candidate_designs[:i+1],
+                    {'design': evaluated_designs,
                     'reward': rewards, 'cost': costs, 'path': paths})
-            df_accuracy_metric = pd.DataFrame(accuracy_metrics).to_dict(orient="list") 
+            df_accuracy_metric = pd.DataFrame(accuracy_metrics)
             df = pd.concat([df, df_accuracy_metric], axis=1)
             df.to_pickle(output_path)
 
@@ -90,7 +91,7 @@ def static_blind_path_selection(
     """
     # Save at the end
     df = pd.DataFrame.from_dict(
-                    {'design': candidate_designs[:i+1],
+                    {'design': evaluated_designs,
                     'reward': rewards, 'cost': costs, 'path': paths})
     df_accuracy_metric = pd.DataFrame(accuracy_metrics).to_dict(orient="list") 
     df = pd.concat([df, df_accuracy_metric], axis=1)
