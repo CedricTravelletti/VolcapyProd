@@ -8,6 +8,7 @@ import math
 import heapq
 import pandas as pd
 from volcapy.path_planning import sample_design_locations, solve_TSP, weight_graph_with_cost
+from volcapy.set_sampling import uniform_size_uniform_sample
 
 
 # TODO: Get rid of the cost function and instead accept weighted directect 
@@ -101,9 +102,11 @@ def static_blind_path_selection(
 
 def iterative_bisection_refinement(base_node):
     # Sampler for the base designs, sampling 2 points at random and a fixed base.
-    base_sampler = 
-    for i in range(n_starting_designs):
-        x1, x2, x3 = base_sampler()
+    base_designs = uniform_size_uniform_sample(
+            list(accessibility_graph.node), size=n_starting_designs,
+            min_size=2, max_size=2, fixed_node=base_node)
+    for base_design in base_designs:
+        x1, x2, x3 = base_design[0], base_design[1], base_design[2]
         path1 = nx.shortest_path(accessibility_graph, x1, x2, weight='weight')
         cost1 = nx.path_weight(accessibility_graph, path1, weight='weight')
         path2 = nx.shortest_path(accessibility_graph, x1, x2, weight='weight')
