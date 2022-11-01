@@ -6,15 +6,18 @@ First drafted: 28th October 2022.
 """
 import math
 import heapq
-from volcapy.path_planning import sample_design_locations, solve_TSP
+import pandas as pd
+from volcapy.path_planning import sample_design_locations, solve_TSP, weight_graph_with_cost
 
 
 # TODO: Get rid of the cost function and instead accept weighted directect 
 # graph, so that the cost structure is already included.
 def static_blind_path_selection(
-        compute_blind_reward,
+        compute_blind_reward, compute_accuracy_metric,
         belief, budget, N_refine, 
-        accessibility_graph, cost_fn, design_sampler):
+        accessibility_graph, cost_fn, design_sampler, 
+        n_starting_designs,
+        output_path):
     """ Compute optimal designs using static blind path selection 
     (see companion paper). Here blind means that the optimization does not look 
     at the (potentially) observed data and static means that there is no adaptation 
@@ -51,31 +54,43 @@ def static_blind_path_selection(
     accessibility_graph = weight_graph_with_cost(accessibility_graph, cost_fn)
 
     # Sample candidate designs.
-    candidate_designs = design_sampler(n_starting_designs)
+    candidate_designs = design_sampler(list(accessibility_graph.nodes), n_starting_designs)
 
-    rewards, costs, paths = [], [], []
-    for design in candidate_designs:
+    evaluated_designs, rewards, costs, paths, accuracy_metrics = [], [], [], [], []
+    for i, design in enumerate(candidate_designs):
+        print("Evaluating design nr. {} with {} locations.".format(i, len(design)))
         path, cost = solve_TSP(accessibility_graph, design, cost_fn='weight')
 
         # Don't waste time computing the reward if the path exceeds 
         # the budget.
         if cost > budget:
-            reward = -maht.inf
-        else: reward = compute_blind_reward(design, belief)
+            print("Cost exceeds budget.")
+            continue
+        else:
+            evaluated_designs.append(design)
+            rewards.append(compute_blind_reward(design, belief))
+            accuracy_metrics.append(compute_accuracy_metric(design, belief))
+            costs.append(cost); paths.append(path)
 
-        # Store results.
-        rewards.append(reward)
-        costs.append(cost)
-        paths.append(cost)
+        # Save from time to time.
+        if i % 20 == 0:
+            df = pd.DataFrame.from_dict(
+                    {'design': evaluated_designs,
+                    'reward': rewards, 'cost': costs, 'path': paths})
+            df_accuracy_metric = pd.DataFrame(accuracy_metrics)
+            df = pd.concat([df, df_accuracy_metric], axis=1)
+            df.to_pickle(output_path)
 
+    """
     # Get N_refine largest.
     best_designs_inds = heapq.nlargest(N_refine, range(len(rewards)), rewards.__getitem__)
     best_designs = [candidate_designs[i] for i in best_designs_inds]
     best_rewards = [rewards[i] for i in best_designs_inds]
     best_costs = [costs[i] for i in best_designs_inds]
     best_paths = [paths[i] for i in best_designs_inds]
+    """
 
-    return (best_designs, best_rewards, best_costs, best_paths)
+    return df
 
 
 def iterative_bisection_refinement(base_node):
@@ -103,3 +118,12 @@ def iterative_bisection_refinement(base_node):
             cost_leg1 = nx.path_weight(accessibility_graph, path_leg_1, weight='weight')
             cost_leg12= nx.path_weight(accessibility_graph, path_leg_2, weight='weight')
 
+    # Save at the end
+    df = pd.DataFrame.from_dict(
+                    {'design': evaluated_designs,
+                    'reward': rewards, 'cost': costs, 'path': paths})
+    df_accuracy_metric = pd.DataFrame(accuracy_metrics).to_dict(orient="list") 
+    df = pd.concat([df, df_accuracy_metric], axis=1)
+    df.to_pickle(output_path)
+    return df
+>>>>>>> 10641632ee6abfa5941063677bb3298706578d6d

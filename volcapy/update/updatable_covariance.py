@@ -304,9 +304,10 @@ class UpdatableCovariance:
         prior_variances = self.sigma0**2 * self.cov_module.compute_diagonal(
                 self.lambda0, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks, n_flush=50)
+        prior_variances = prior_variances.cpu()
 
         for p, r in zip(self.pushforwards, self.inversion_ops):
-            prior_variances -= torch.einsum("ij,jk,ik->i",p,r.float(),p)
+            prior_variances -= torch.einsum("ij,jk,ik->i",p.cpu(),r.cpu().float(),p.cpu())
 
         return prior_variances
 
@@ -861,8 +862,9 @@ class UpdatableGP():
             at every cell.
 
         """
-        variance = self.covariance.extract_variance()
-        mean = self.mean_vec
+        variance = self.covariance.extract_variance().cpu()
+        mean = self.mean_vec.cpu()
+        lower = lower.cpu()
 
         if lower is not None:
             lower = torch.tensor([lower])
@@ -1057,5 +1059,4 @@ class UpdatableGP():
         """
         self.covariance.pushforwards = self.covariance.pushforwards[:step]
         self.covariance.inversion_ops = self.covariance.inversion_ops[:step]
-
-        # self.mean.m = 
+        self.mean.m = self.prior_mean_vec
