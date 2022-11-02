@@ -20,15 +20,16 @@ def prepare_experiment_data(sample_nr, local=False):
 
     if local is True:
         data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_173018/"
+        # data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_165991_cells/"
         ground_truth_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/AISTATS_results_v2/FINAL/final_samples_matern32/"
 
     # Load static data.
-    G = torch.from_numpy(
+    accessible_G = torch.from_numpy(
             np.load(os.path.join(data_folder, "F_full_surface.npy"))).float().detach()
-    grid = Grid.load(os.path.join(data_folder,
+    volcano_grid = Grid.load(os.path.join(data_folder,
                     "grid.pickle"))
-    volcano_coords = torch.from_numpy(grid.cells).float().detach()
-    data_coords = torch.from_numpy(
+    volcano_coords = torch.from_numpy(volcano_grid.cells).float().detach()
+    accessible_data_coords = torch.from_numpy(
             np.load(os.path.join(data_folder,"surface_data_coords.npy"))).float()
 
     # Load generated data.
@@ -47,8 +48,8 @@ def prepare_experiment_data(sample_nr, local=False):
     start_ind = 4478
 
     # Prepare data.
-    data_values = G @ ground_truth
-    data_feed = lambda x: data_values[x]
+    accessible_data_values = accessible_G @ ground_truth
+    accessible_data_feed = lambda x: accessible_data_values[x]
 
     # -------------------------------------
     # GP model trained on field data.
@@ -57,7 +58,7 @@ def prepare_experiment_data(sample_nr, local=False):
     sigma0_matern32 = 284.66
     m0_matern32 = 2139.1
     lambda0_matern32 = 651.58
-    trainded_gp_model = UpdatableGP(cl, lambda0_matern32, sigma0_matern32, m0_matern32,
+    trained_gp_model = UpdatableGP(cl, lambda0_matern32, sigma0_matern32, m0_matern32,
             volcano_coords, n_chunks=200)
 
     # Load the data collection graphs.
@@ -74,7 +75,7 @@ def prepare_experiment_data(sample_nr, local=False):
     accessibility_graph = weight_graph_with_cost(accessibility_graph, symmetric_walking_cost_fn_edge)
 
     
-    return (trained_gp_model, ground_truth,
+    return (trained_gp_model, ground_truth, volcano_grid,
             accessible_data_coords, accessible_G, accessible_data_feed,
             accessibility_graph, base_station_node,
             THRESHOLD_small, THRESHOLD_big,
