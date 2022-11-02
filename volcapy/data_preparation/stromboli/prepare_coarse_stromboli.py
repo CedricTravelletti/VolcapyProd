@@ -13,10 +13,10 @@ from scipy.spatial import KDTree
 ORIGINAL_NIKLAS_DATA_PATH =  "/home/cedric/PHD/Dev/VolcapySIAM/data/original/Cedric.mat"   
 DEFAULT_OUTPATH = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas"
 
-def prepare_stromboli(input_path, output_path, z_step):
-    dsm_x = np.load(os.path.join(input_path, "dsm_stromboli_x.npy"))
-    dsm_y = np.load(os.path.join(input_path, "dsm_stromboli_y.npy"))
-    dsm_z = np.load(os.path.join(input_path, "dsm_stromboli_z.npy"))
+def prepare_stromboli(dsm_path, niklas_data_path, output_path, z_step):
+    dsm_x = np.load(os.path.join(dsm_path, "dsm_stromboli_x.npy"))
+    dsm_y = np.load(os.path.join(dsm_path, "dsm_stromboli_y.npy"))
+    dsm_z = np.load(os.path.join(dsm_path, "dsm_stromboli_z.npy"))
     
     my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-800, z_step=z_step)
     print("Grid with {} cells.".format(my_grid.shape[0]))
@@ -63,7 +63,7 @@ def prepare_stromboli(input_path, output_path, z_step):
 
     # Also load locations of Niklas data points.
     from volcapy.loading import load_niklas
-    niklas_data = load_niklas(ORIGINAL_NIKLAS_DATA_PATH)
+    niklas_data = load_niklas(niklas_data_path)
     niklas_data_coords = np.array(niklas_data["data_coords"])[1:]
     niklas_data_values = np.array(niklas_data["d"])
 
@@ -141,6 +141,6 @@ def prepare_stromboli(input_path, output_path, z_step):
     
 
 if __name__ == "__main__":
-    print("Usage: prepare_stromboli.py input_path z_step")
-    input_path, z_step = sys.argv[1], float(sys.argv[2])
-    prepare_stromboli(input_path, output_path=DEFAULT_OUTPATH, z_step=z_step)
+    print("Usage: prepare_stromboli.py dsm_path niklas_data_path, output_path z_step")
+    dsm_path, niklas_data_path, output_path, z_step = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
+    prepare_stromboli(dsm_path, niklas_data_path, output_path, z_step=z_step)
