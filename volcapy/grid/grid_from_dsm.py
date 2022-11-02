@@ -21,10 +21,10 @@ class Grid():
         self.res_y = sorted_unique_y[1] - sorted_unique_y[0]
         self.res_z = sorted_unique_z[1] - sorted_unique_z[0]
 
+        self.X_mesh, self.Y_mesh, self.Z_mesh = self.build_mesh()
+
         if mesh_index_table is None: mesh_index_table = self.gen_mesh_index_table()
         self.mesh_index_table = mesh_index_table
-
-        self.X_mesh, self.Y_mesh, self.Z_mesh = self.build_mesh()
 
     @classmethod
     def build_grid(cls, dsm_x, dsm_y, dsm_z, z_low, z_step):
@@ -118,7 +118,7 @@ class Grid():
                 return
             for ind_mesh in range(start_ind_mesh, mesh_size):
                 # Indices in meshed array.
-                i, j, k = np.unravel_index(ind_mesh, X_mesh.shape)
+                i, j, k = np.unravel_index(ind_mesh, self.X_mesh.shape)
                 pt_mesh = np.array([self.X_mesh[i, j, k], self.Y_mesh[i, j, k], self.Z_mesh[i, j, k]])
 
                 # If close enough break the search.
