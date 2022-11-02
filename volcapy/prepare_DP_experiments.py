@@ -7,7 +7,6 @@ of the Tobler hiking function.
 """
 import os
 import numpy as np
-import torch
 import volcapy.covariance.matern32 as cl
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.update.updatable_covariance import UpdatableGP
@@ -24,25 +23,22 @@ def prepare_experiment_data(sample_nr, local=False):
         ground_truth_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/AISTATS_results_v2/FINAL/final_samples_matern32/"
 
     # Load static data.
-    accessible_G = torch.from_numpy(
-            np.load(os.path.join(data_folder, "F_full_surface.npy"))).float().detach()
+    accessible_G = np.load(os.path.join(data_folder, "F_full_surface.npy"))
     volcano_grid = Grid.load(os.path.join(data_folder,
                     "grid.pickle"))
-    volcano_coords = torch.from_numpy(volcano_grid.cells).float().detach()
+    volcano_coords = volcano_grid.cells
     """
     accessible_data_coords = torch.from_numpy(
             np.load(os.path.join(data_folder,"surface_data_coords.npy"))).float()
     """
     # TODO: This is a fix for an error in prepare_coarse_stromboli that is fixed now.
     # The original script did not use the currect cells roofs.
-    accessible_data_coords = torch.from_numpy(
-            np.load(os.path.join(data_folder,"surface_data_coords_fine_dsm.npy"))).float()
+    accessible_data_coords = np.load(os.path.join(data_folder,"surface_data_coords_fine_dsm.npy"))
 
     # Load generated data.
     ground_truth_path = os.path.join(ground_truth_folder,
             "prior_sample_{}.npy".format(sample_nr))
-    ground_truth = torch.from_numpy(
-            np.load(ground_truth_path))
+    ground_truth = np.load(ground_truth_path)
 
     # --------------------------------
     # DEFINITION OF THE EXCURSION SET.
