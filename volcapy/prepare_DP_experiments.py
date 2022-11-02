@@ -29,8 +29,14 @@ def prepare_experiment_data(sample_nr, local=False):
     volcano_grid = Grid.load(os.path.join(data_folder,
                     "grid.pickle"))
     volcano_coords = torch.from_numpy(volcano_grid.cells).float().detach()
+    """
     accessible_data_coords = torch.from_numpy(
             np.load(os.path.join(data_folder,"surface_data_coords.npy"))).float()
+    """
+    # TODO: This is a fix for an error in prepare_coarse_stromboli that is fixed now.
+    # The original script did not use the currect cells roofs.
+    accessible_data_coords = torch.from_numpy(
+            np.load(os.path.join(data_folder,"surface_data_coords_fine_dsm.npy"))).float()
 
     # Load generated data.
     ground_truth_path = os.path.join(ground_truth_folder,
