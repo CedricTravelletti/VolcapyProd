@@ -19,7 +19,6 @@ def prepare_stromboli(input_path, output_path, z_step):
     dsm_z = np.load(os.path.join(input_path, "dsm_stromboli_z.npy"))
     
     my_grid = Grid.build_grid(dsm_x, dsm_y, dsm_z, z_low=-800, z_step=z_step)
-    my_grid.save(os.path.join(output_path, "grid.pickle"))
     print("Grid with {} cells.".format(my_grid.shape[0]))
 
     # Name the output directory with the number of cells.
@@ -27,6 +26,8 @@ def prepare_stromboli(input_path, output_path, z_step):
     output_path = os.path.join(output_path, dir_name)
     os.makedirs(output_path, exist_ok=True)
     
+    my_grid.save(os.path.join(output_path, "grid.pickle"))
+
     # Determines which cells lie deep inside the volcano (i.e. away from the
     # surface).
     # This is useful when using IVR to select new datapoints, since we are mostly
