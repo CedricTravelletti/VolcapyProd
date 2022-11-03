@@ -6,6 +6,7 @@ First drafted: 28th October 2022.
 """
 import math
 import heapq
+import numpy as np
 import pandas as pd
 from volcapy.path_planning import sample_design_locations, solve_TSP, weight_graph_with_cost
 from volcapy.set_sampling import uniform_size_uniform_sample
@@ -103,43 +104,53 @@ def static_blind_path_selection(
     return df
 
 
-def iterative_bisection_refinement(base_node, 
+def iterative_bisection_refinement(accessibility_graph, base_node, 
+        n_starting_designs,
+        compute_global_criterion,
+        sample_refinement_point,
         global_cost_cutoff_ratio=1.0):
     # Sampler for the base designs, sampling 2 points at random and a fixed base.
     base_designs = uniform_size_uniform_sample(
-            list(accessibility_graph.node), size=n_starting_designs,
+            list(accessibility_graph.node), sample_size=n_starting_designs,
             min_size=2, max_size=2, fixed_node=base_node)
 
-    for base_design in base_designs:
-        x1, x2, x3 = base_design[0], base_design[1], base_design[2]
+    generations = [[base_designs]]
+    for k in range(n_generations):
+        new_generation = []
+        for design in generations[k]:
+            for l in range(n_mutations):
+                new_design = []
+                for segment in design:
+                    # Endpoints.
+                    s1, s2 = segment[0], segment[-1]
+                    # Sample refinement point.
+                    s_prime = sample_refinement_point(accessibility_graph, segment)
 
-        path1 = nx.shortest_path(accessibility_graph, x1, x2, weight='weight')
-        cost1 = nx.path_weight(accessibility_graph, path1, weight='weight')
-        path2 = nx.shortest_path(accessibility_graph, x1, x2, weight='weight')
-        cost2 = nx.path_weight(accessibility_graph, path1, weight='weight')
-        path3 = nx.shortest_path(accessibility_graph, x1, x2, weight='weight')
-        cost3 = nx.path_weight(accessibility_graph, path1, weight='weight')
-
-        cost = cost1 + cost2 + cost3
-    
-        # If cost already exceeded, go to the next design.
-        # In fact, since we will add waypoints, the cost will necessarily increase, 
-        # so we want to be quite lower than the budget.
-        if cost > global_cost_cutoff_ratio * budget:
-            print("Budget exceeded.")
-            continue
-
-        # Compute the global criterion.
-        global_criterion = compute_global_criterion(base_design)
-
-        paths = [p1, p2, p3]
-        for path in paths:
-            x_prime = sample_refinement_point(accessibility_graph, path)
-            path_leg_1 = nx.path_weight(accessibility_graph, path[0], weight='weight')
-            path_leg_2 = nx.path_weight(accessibility_graph, path[-1], weight='weight')
-
-            cost_leg1 = nx.path_weight(accessibility_graph, path_leg_1, weight='weight')
-            cost_leg12= nx.path_weight(accessibility_graph, path_leg_2, weight='weight')
+                    # Replace segment by mutated segment.
+                    path_leg1 = nx.shortest_path(accessibility_graph,
+                            s1, s_prime, weight='weight')
+                    path_leg2 = nx.shortest_path(accessibility_graph,
+                            s_prime, s2, weight='weight')
+                    new_design.append(path_leg1)
+                    new_design.append(path_leg2)
+                # Check if new design is within cost.
+                cost_new_design = np.sum([
+                    nx.path_weight(accessibility_graph, path_leg, weight='weight')
+                    for path_leg in new_design])
+                if cost_new_design < budget:
+                    new_generation.append(new_design)
+        # If not mutations have been generated, then stop.
+        if len(new_generation) == 0:
+            return generations
+        else:
+            generations.append(new_generation)
 
 def sample_refinement_point(accessibility_graph, path):
+    # Built the ego graphs around the endpoints and intersect them.
+
+    # Sample one point at random in the intersection.
+    refinement_point  = uniform_size_uniform_sample(
+            list(intersection_graph.node), sample_size=1,
+            min_size=2, max_size=2, fixed_node=base_node)
+    return refinement_point
     raise NotImplementedError
