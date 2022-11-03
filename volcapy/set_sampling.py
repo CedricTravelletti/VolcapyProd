@@ -47,10 +47,11 @@ def uniform_size_uniform_sample(input_set, size, min_size=1, max_size=None, fixe
 
     """
     if max_size is None:
-        max_size = len(input_set) + 1
+        high_bound = len(input_set) + 1
+    else: high_bound = max_size + 1
 
     # Sample sizes uniformly.
-    sizes = np.random.randint(low=min_size, high=max_size, size=size)
+    sizes = np.random.randint(low=min_size, high=high_bound, size=size)
     # Sample random points and add the fixed node.
     sampled_sets = [np.concatenate([
         np.array([fixed_node]),
