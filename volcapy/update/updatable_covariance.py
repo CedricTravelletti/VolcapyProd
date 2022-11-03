@@ -227,6 +227,9 @@ class UpdatableCovariance:
             Standard deviation of data noise, assumed to be iid centered gaussian.
 
         """
+        if not torch.is_tensor(G):
+            G = torch.from_numpy(G)
+
         # Pushforwards are big, so store in single precision.
         # But keep in double for the inversion operator.
         current_pushfwd = self.mul_right(G.t(), strip=True).cpu()
@@ -336,6 +339,9 @@ class UpdatableCovariance:
             Integrated variance reduction resulting from the observation of G.    
 
         """
+        if not torch.is_tensor(G):
+            G = torch.from_numpy(G)
+
         if integration_inds is None:
             integration_inds = list(range(self.n_cells))
 
@@ -412,6 +418,9 @@ class UpdatableCovariance:
             Covariance pushforward for the considered potential observation.
 
         """
+        if not torch.is_tensor(G):
+            G = torch.from_numpy(G)
+
         # First subdivide the model cells in subgroups.
         chunked_indices = torch.chunk(torch.tensor(list(range(self.n_cells))),
                 self.n_chunks)
@@ -541,7 +550,12 @@ class UpdatableMean:
             gaussian.
 
         """
+        if not torch.is_tensor(G):
+            G = torch.from_numpy(G)
+
         y = _make_column_vector(y)
+        if not torch.is_tensor(y):
+            y = torch.from_numpy(y)
 
         # Get the latest conditioning operators.
         K_dash = self.cov_module.pushforwards[-1]
@@ -864,12 +878,13 @@ class UpdatableGP():
         """
         variance = self.covariance.extract_variance().cpu()
         mean = self.mean_vec.cpu()
-        lower = lower.cpu()
 
         if lower is not None:
             lower = torch.tensor([lower])
+            lower = lower.cpu()
         if upper is not None:
             upper = torch.tensor([upper])
+            upper = upper.cpu()
 
         coverage = gaussian_cdf(mean, variance.reshape(-1, 1),
                 lower=lower, upper=upper)
