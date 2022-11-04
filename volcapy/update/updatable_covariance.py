@@ -518,9 +518,11 @@ class UpdatableMean:
 
         """
         prior = _make_column_vector(prior)
+        if not torch.is_tensor(prior):
+            prior = torch.from_numpy(prior)
 
         self.prior = prior
-        self.m = prior # Current value of conditional mean.
+        self.m = prior.detach().clone() # Current value of conditional mean.
 
         self.n_cells = prior.shape[0]
         self.cov_module = cov_module
@@ -1072,6 +1074,29 @@ class UpdatableGP():
         """ Go back to a certain step.
         
         """
-        self.covariance.pushforwards = self.covariance.pushforwards[:step]
-        self.covariance.inversion_ops = self.covariance.inversion_ops[:step]
-        self.mean.m = self.prior_mean_vec
+        # TODO: We only know how to restore the mean to its original state, 
+        # not to any intermediate one (since we do not store the updates to the mean.
+        if not step == 0:
+            raise NotImplementedError
+        else:
+            self.covariance.pushforwards = self.covariance.pushforwards[:step]
+            self.covariance.inversion_ops = self.covariance.inversion_ops[:step]
+            self.mean.m = self.prior_mean_vec
+
+    def copy(self):
+        print("Copying. WARNING: please do not modify quantities that shouldn't, since they are copied only by reference across GPs.")
+        # Gather characterstics. These won't be modify, so we do not copy.
+        cov_module, sigma0, lambda0 = self.covariance.cov_module, self.covariance.sigma0, self.covariance.lambda0
+        cells_coords, n_chunks = self.covariance.cells_coords, self.covariance.n_chunks
+        m0 = self.mean.prior.detach().clone()
+
+        # Create base GP with same characteristics.
+        new_gp = Updatable_GP(cov_module, lambda0, sigma0, m0,
+            cells_coords, n_chunks)
+
+        # Copy the updates. We only copy by reference, since those are not supposed be modified.
+        new_gp.covariance.pushforwards = self.covariance.pushforwards
+        new_gp.covariance.inversion_ops = self.covariance.inversion_ops
+        new_gp.mean.m = self.mean.m.detach().clone()
+
+        return new_gp
