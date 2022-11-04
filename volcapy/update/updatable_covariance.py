@@ -93,20 +93,21 @@ class UpdatableCovariance:
             Default is 50.
 
         """
-        self.cov_module = cov_module
-        self.sigma0 = sigma0
-        self.lambda0 = lambda0
-        
-        if not torch.is_tensor(cells_coords):
-            cells_coords = torch.from_numpy(cells_coords)
-        self.cells_coords = cells_coords.to(DEVICE)
-        self.n_cells = cells_coords.shape[0]
-
-        self.n_chunks = n_chunks
-        self.n_flush = n_flush
-
-        self.pushforwards = []
-        self.inversion_ops = []
+        with torch.no_grad():
+            self.cov_module = cov_module
+            self.sigma0 = sigma0
+            self.lambda0 = lambda0
+            
+            if not torch.is_tensor(cells_coords):
+                cells_coords = torch.from_numpy(cells_coords)
+            self.cells_coords = cells_coords.to(DEVICE)
+            self.n_cells = cells_coords.shape[0]
+    
+            self.n_chunks = n_chunks
+            self.n_flush = n_flush
+    
+            self.pushforwards = []
+            self.inversion_ops = []
 
     @property
     def lambda0(self):
@@ -118,17 +119,19 @@ class UpdatableCovariance:
 
     @lambda0.setter
     def lambda0(self, val):
-        if not torch.is_tensor(val):
-            val = torch.tensor([val])
-        val = val.to(DEVICE)
-        self._lambda0 = val
+        with torch.no_grad():
+            if not torch.is_tensor(val):
+                val = torch.tensor([val])
+            val = val.to(DEVICE)
+            self._lambda0 = val
 
     @sigma0.setter
     def sigma0(self, val):
-        if not torch.is_tensor(val):
-            val = torch.tensor([val])
-        val = val.to(DEVICE)
-        self._sigma0 = val
+        with torch.no_grad():
+            if not torch.is_tensor(val):
+                val = torch.tensor([val])
+            val = val.to(DEVICE)
+            self._sigma0 = val
 
     def mul_right(self, A, strip=False):
         """ Multiply covariance matrix from the right.
@@ -154,36 +157,37 @@ class UpdatableCovariance:
             (GPU if available).
 
         """
-        start = time.time()
-        # If both devices not equal, fallback to standard device.
-        if not A.device == DEVICE: A = A.to(DEVICE)
-
-        # First compute the level 0 pushforward.
-        # Warning: the original covariance pushforward method was used to
-        # comput K G^T, taking G as an argument, i.e. it does transposing in
-        # the background. We hence have to feed it A.t.
-
-        # Note this is on GPU.
-        cov_pushfwd_0 = self.compute_prior_pushfwd(A.t()).double()
-
-        temp = torch.zeros(cov_pushfwd_0.shape, dtype=torch.float64, device=DEVICE)
-
-        # Do the big computation on GPU.
-        for p, r in zip(self.pushforwards, self.inversion_ops):
-            p = p.to(DEVICE).double()
-            temp -= p @ (r.to(DEVICE) @ (p.t() @ A.double()))
-
-        end = time.time()
-        print((end - start) / 60.0)
-        torch.cuda.empty_cache()
-        # Note the first term (the one with C_0 alone) only has one sigma0**2
-        # factor associated with it, whereas all other terms in the updating
-        # have two one.
-        if strip:
-            return cov_pushfwd_0 + temp.to(DEVICE)
-        else:
-            return cov_pushfwd_0 + temp.to(DEVICE)
-
+        with torch.no_grad():
+            start = time.time()
+            # If both devices not equal, fallback to standard device.
+            if not A.device == DEVICE: A = A.to(DEVICE)
+    
+            # First compute the level 0 pushforward.
+            # Warning: the original covariance pushforward method was used to
+            # comput K G^T, taking G as an argument, i.e. it does transposing in
+            # the background. We hence have to feed it A.t.
+    
+            # Note this is on GPU.
+            cov_pushfwd_0 = self.compute_prior_pushfwd(A.t()).double()
+    
+            temp = torch.zeros(cov_pushfwd_0.shape, dtype=torch.float64, device=DEVICE)
+    
+            # Do the big computation on GPU.
+            for p, r in zip(self.pushforwards, self.inversion_ops):
+                p = p.to(DEVICE).double()
+                temp -= p @ (r.to(DEVICE) @ (p.t() @ A.double()))
+    
+            end = time.time()
+            print((end - start) / 60.0)
+            torch.cuda.empty_cache()
+            # Note the first term (the one with C_0 alone) only has one sigma0**2
+            # factor associated with it, whereas all other terms in the updating
+            # have two one.
+            if strip:
+                return cov_pushfwd_0 + temp.to(DEVICE)
+            else:
+                return cov_pushfwd_0 + temp.to(DEVICE)
+    
     # TODO: DEPRECATED. Not adapted to new stripped pushforwards.
     # TODO: Is this ever used?
     def sandwich(self, A):
@@ -227,41 +231,43 @@ class UpdatableCovariance:
             Standard deviation of data noise, assumed to be iid centered gaussian.
 
         """
-        if not torch.is_tensor(G):
-            G = torch.from_numpy(G)
-
-        # Pushforwards are big, so store in single precision.
-        # But keep in double for the inversion operator.
-        current_pushfwd = self.mul_right(G.t(), strip=True).cpu()
-        self.pushforwards.append(current_pushfwd.float())
-
-        # Get inversion op.
-        K_d = G.double() @ current_pushfwd
-        inversion_op, _ = self._inversion_helper(K_d, data_std)
-
-        self.inversion_ops.append(inversion_op)
+        with torch.no_grad():
+            if not torch.is_tensor(G):
+                G = torch.from_numpy(G)
+    
+            # Pushforwards are big, so store in single precision.
+            # But keep in double for the inversion operator.
+            current_pushfwd = self.mul_right(G.t(), strip=True).cpu()
+            self.pushforwards.append(current_pushfwd.float())
+    
+            # Get inversion op.
+            K_d = G.double() @ current_pushfwd
+            inversion_op, _ = self._inversion_helper(K_d, data_std)
+    
+            self.inversion_ops.append(inversion_op)
 
     def _inversion_helper(self, K_d, data_std):
-        data_std_orig = data_std
-        # Try to invert.
-        MAX_ATTEMPTS = 200
-        for attempt in range(MAX_ATTEMPTS):
-            try:
-                inversion_op = torch.inverse(K_d + data_std *
-                        torch.eye(K_d.shape[0], dtype=torch.float64))
-            except RuntimeError:
-                print("Inversion failed: Singular Matrix.")
-                # Increase noise in steps of 5%.
-                data_std += 0.05 * data_std
-                print(
-                        "Increasing data std from original {} to {} and retrying.".format(
-                        data_std_orig, data_std))
-            else:
-                return inversion_op.double(), data_std
-        # If didnt manage to invert.
-        raise ValueError(
-            "Impossible to invert matrix, even at noise std {}".format(self.data_std))
-        return -1, data_std
+        with torch.no_grad():
+            data_std_orig = data_std
+            # Try to invert.
+            MAX_ATTEMPTS = 200
+            for attempt in range(MAX_ATTEMPTS):
+                try:
+                    inversion_op = torch.inverse(K_d + data_std *
+                            torch.eye(K_d.shape[0], dtype=torch.float64))
+                except RuntimeError:
+                    print("Inversion failed: Singular Matrix.")
+                    # Increase noise in steps of 5%.
+                    data_std += 0.05 * data_std
+                    print(
+                            "Increasing data std from original {} to {} and retrying.".format(
+                            data_std_orig, data_std))
+                else:
+                    return inversion_op.double(), data_std
+            # If didnt manage to invert.
+            raise ValueError(
+                "Impossible to invert matrix, even at noise std {}".format(self.data_std))
+            return -1, data_std
 
     def compute_prior_pushfwd(self, G, lambda0=None, sigma0=None):
         """ Given an operator G, compute the covariance pushforward K_0 G^T,
@@ -280,18 +286,19 @@ class UpdatableCovariance:
             (GPU if available).
 
         """
-        # If both devices not equal, fallback to standard device.
-        if not G.device == DEVICE: G = G.to(DEVICE)
-
-        if lambda0 is None: lambda0 = self.lambda0
-        if sigma0 is None: sigma0 = self.sigma0
-        sigma0 = sigma0.to(DEVICE)
-
-        pushfwd = self.cov_module.compute_cov_pushforward(
-                lambda0, G, self.cells_coords, DEVICE,
-                n_chunks=self.n_chunks,
-                n_flush=self.n_flush)
-        return sigma0**2 * pushfwd
+        with torch.no_grad():
+            # If both devices not equal, fallback to standard device.
+            if not G.device == DEVICE: G = G.to(DEVICE)
+    
+            if lambda0 is None: lambda0 = self.lambda0
+            if sigma0 is None: sigma0 = self.sigma0
+            sigma0 = sigma0.to(DEVICE)
+    
+            pushfwd = self.cov_module.compute_cov_pushforward(
+                    lambda0, G, self.cells_coords, DEVICE,
+                    n_chunks=self.n_chunks,
+                    n_flush=self.n_flush)
+            return sigma0**2 * pushfwd
 
     def extract_variance(self):
         """ Extracts the pointwise variance from an UpdatableCovariance module. 
@@ -303,16 +310,17 @@ class UpdatableCovariance:
             Variance at each point.
     
         """
-        # Without the sigma0 factor.
-        prior_variances = self.sigma0**2 * self.cov_module.compute_diagonal(
-                self.lambda0, self.cells_coords, DEVICE,
-                n_chunks=self.n_chunks, n_flush=50)
-        prior_variances = prior_variances.cpu()
-
-        for p, r in zip(self.pushforwards, self.inversion_ops):
-            prior_variances -= torch.einsum("ij,jk,ik->i",p.cpu(),r.cpu().float(),p.cpu())
-
-        return prior_variances
+        with torch.no_grad():
+            # Without the sigma0 factor.
+            prior_variances = self.sigma0**2 * self.cov_module.compute_diagonal(
+                    self.lambda0, self.cells_coords, DEVICE,
+                    n_chunks=self.n_chunks, n_flush=50)
+            prior_variances = prior_variances.cpu()
+    
+            for p, r in zip(self.pushforwards, self.inversion_ops):
+                prior_variances -= torch.einsum("ij,jk,ik->i",p.cpu(),r.cpu().float(),p.cpu())
+    
+            return prior_variances
 
     def IVR(self, G, data_std, integration_inds=None, weights=None):
         """ Compute the (integrated) variance reduction (IVR) that would
@@ -339,36 +347,37 @@ class UpdatableCovariance:
             Integrated variance reduction resulting from the observation of G.    
 
         """
-        if not torch.is_tensor(G):
-            G = torch.from_numpy(G)
-
-        if integration_inds is None:
-            integration_inds = list(range(self.n_cells))
-
-        # First subdivide the cells in subgroups.
-        chunked_indices = torch.chunk(torch.tensor(integration_inds).long(),
-                self.n_chunks)
-
-        # Compute the current pushforward.
-        G_dash = self.mul_right(G.t()).cpu()
-
-
-        # Get inversion op.
-        R = G.double() @ G_dash.double()
-        inversion_op, _ = self._inversion_helper(R, data_std)
-
-        IVR = 0
-        if weights is None:
-            for inds in chunked_indices:
-                G_part = G_dash[inds,:]
-                V = G_part.float() @ inversion_op.float() @ G_part.t().float()
-                IVR += torch.sum(V.diag())
-        else:
-            for inds in chunked_indices:
-                G_part = G_dash[inds,:]
-                V = G_part.float() @ inversion_op.float() @ G_part.t().float()
-                IVR += torch.sum(V.diag() * weights[inds])
-        return IVR.item()
+        with torch.no_grad():
+            if not torch.is_tensor(G):
+                G = torch.from_numpy(G)
+    
+            if integration_inds is None:
+                integration_inds = list(range(self.n_cells))
+    
+            # First subdivide the cells in subgroups.
+            chunked_indices = torch.chunk(torch.tensor(integration_inds).long(),
+                    self.n_chunks)
+    
+            # Compute the current pushforward.
+            G_dash = self.mul_right(G.t()).cpu()
+    
+    
+            # Get inversion op.
+            R = G.double() @ G_dash.double()
+            inversion_op, _ = self._inversion_helper(R, data_std)
+    
+            IVR = 0
+            if weights is None:
+                for inds in chunked_indices:
+                    G_part = G_dash[inds,:]
+                    V = G_part.float() @ inversion_op.float() @ G_part.t().float()
+                    IVR += torch.sum(V.diag())
+            else:
+                for inds in chunked_indices:
+                    G_part = G_dash[inds,:]
+                    V = G_part.float() @ inversion_op.float() @ G_part.t().float()
+                    IVR += torch.sum(V.diag() * weights[inds])
+            return IVR.item()
 
     def compute_fantasy_variance(self, G, data_std):
         """ Compute the posterior variance that would
@@ -391,11 +400,12 @@ class UpdatableCovariance:
             Covariance pushforward for the considered potential observation.
 
         """
-        # Compute variance reduction.
-        VR, G_dash = self.compute_VR(G, data_std)
-        variance = self.extract_variance()
-
-        return (variance - VR, G_dash)
+        with torch.no_grad():
+            # Compute variance reduction.
+            VR, G_dash = self.compute_VR(G, data_std)
+            variance = self.extract_variance()
+    
+            return (variance - VR, G_dash)
 
     def compute_VR(self, G, data_std):
         """ Compute the variance reduction (VR) (no integral) that would
@@ -418,26 +428,27 @@ class UpdatableCovariance:
             Covariance pushforward for the considered potential observation.
 
         """
-        if not torch.is_tensor(G):
-            G = torch.from_numpy(G)
-
-        # First subdivide the model cells in subgroups.
-        chunked_indices = torch.chunk(torch.tensor(list(range(self.n_cells))),
-                self.n_chunks)
-
-        # Compute the current pushforward.
-        G_dash = self.mul_right(G.t()).cpu()
-
-        # Get inversion op.
-        R = G.double() @ G_dash.double()
-        inversion_op, _ = self._inversion_helper(R, data_std)
-
-        VR = torch.zeros(self.n_cells)
-        for inds in chunked_indices:
-            G_part = G_dash[inds,:]
-            V = G_part.float() @ inversion_op.float() @ G_part.t().float()
-            VR[inds] = V.diag()
-        return (VR, G_dash)
+        with torch.no_grad():
+            if not torch.is_tensor(G):
+                G = torch.from_numpy(G)
+    
+            # First subdivide the model cells in subgroups.
+            chunked_indices = torch.chunk(torch.tensor(list(range(self.n_cells))),
+                    self.n_chunks)
+    
+            # Compute the current pushforward.
+            G_dash = self.mul_right(G.t()).cpu()
+    
+            # Get inversion op.
+            R = G.double() @ G_dash.double()
+            inversion_op, _ = self._inversion_helper(R, data_std)
+    
+            VR = torch.zeros(self.n_cells)
+            for inds in chunked_indices:
+                G_part = G_dash[inds,:]
+                V = G_part.float() @ inversion_op.float() @ G_part.t().float()
+                VR[inds] = V.diag()
+            return (VR, G_dash)
 
     def condition_fantasy_data(self, prior, stacked_G, fantasy_ys,
             splitted_inds):
@@ -476,16 +487,17 @@ class UpdatableCovariance:
             Conditional mean, conditional on the provided data.
 
         """
-        conditional_mean = prior.double()
-        for i, inds in enumerate(splitted_inds):
-            y = _make_column_vector(fantasy_ys[inds]).double()
-            K_dash = self.pushforwards[i].double()
-            R = self.inversion_ops[i]
-            conditional_mean = (
-                    conditional_mean.double()
-                    + K_dash @ R @ 
-                    (y - stacked_G[inds, :].double() @ conditional_mean).double())
-        return conditional_mean.float()
+        with torch.no_grad():
+            conditional_mean = prior.double()
+            for i, inds in enumerate(splitted_inds):
+                y = _make_column_vector(fantasy_ys[inds]).double()
+                K_dash = self.pushforwards[i].double()
+                R = self.inversion_ops[i]
+                conditional_mean = (
+                        conditional_mean.double()
+                        + K_dash @ R @ 
+                        (y - stacked_G[inds, :].double() @ conditional_mean).double())
+            return conditional_mean.float()
 
     def __dict__(self):
         state_dict = {
@@ -517,21 +529,22 @@ class UpdatableMean:
         cov_module: UpdatableCovariance
 
         """
-        prior = _make_column_vector(prior)
-        if not torch.is_tensor(prior):
-            prior = torch.from_numpy(prior)
-
-        self.prior = prior
-        self.m = prior.detach().clone() # Current value of conditional mean.
-
-        self.n_cells = prior.shape[0]
-        self.cov_module = cov_module
-        
-        if not (self.n_cells == cov_module.n_cells):
-            raise ValueError(
-                "Model size for mean: {} does not agree with "\
-                "model size for covariance {}.".format(
-                        self.n_cells, cov_module.n_cells))
+        with torch.no_grad():
+            prior = _make_column_vector(prior)
+            if not torch.is_tensor(prior):
+                prior = torch.from_numpy(prior)
+    
+            self.prior = prior
+            self.m = prior.detach().clone() # Current value of conditional mean.
+    
+            self.n_cells = prior.shape[0]
+            self.cov_module = cov_module
+            
+            if not (self.n_cells == cov_module.n_cells):
+                raise ValueError(
+                    "Model size for mean: {} does not agree with "\
+                    "model size for covariance {}.".format(
+                            self.n_cells, cov_module.n_cells))
         
     # TODO: Find a better design patter. This subtlety of having to make sure
     # that the covariance_module has been updated first is dangerous. Maybe an
@@ -552,19 +565,20 @@ class UpdatableMean:
             gaussian.
 
         """
-        if not torch.is_tensor(G):
-            G = torch.from_numpy(G)
-
-        y = _make_column_vector(y)
-        if not torch.is_tensor(y):
-            y = torch.from_numpy(y)
-
-        # Get the latest conditioning operators.
-        K_dash = self.cov_module.pushforwards[-1]
-        R = self.cov_module.inversion_ops[-1]
-        self.m = (self.m.double() 
-                + K_dash.double() @ R.double() @ (y - G @
-                self.m).double()).float()
+        with torch.no_grad():
+            if not torch.is_tensor(G):
+                G = torch.from_numpy(G)
+    
+            y = _make_column_vector(y)
+            if not torch.is_tensor(y):
+                y = torch.from_numpy(y)
+    
+            # Get the latest conditioning operators.
+            K_dash = self.cov_module.pushforwards[-1]
+            R = self.cov_module.inversion_ops[-1]
+            self.m = (self.m.double() 
+                    + K_dash.double() @ R.double() @ (y - G @
+                    self.m).double()).float()
 
     def __dict__(self):
         state_dict = {
@@ -770,12 +784,13 @@ class UpdatableGP():
 
         """
         import volcapy.covariance.sample as Rinterface
-        sigma0 = self.covariance.sigma0.detach().cpu().item()
-        lambda0 = self.covariance.lambda0
-
-        centred_sample = Rinterface.sample(self.covariance.cov_module, sigma0, lambda0,
-                0.0, self.cells_coords)
-        return centred_sample + self.prior_mean_vec
+        with torch.no_grad():
+            sigma0 = self.covariance.sigma0.detach().cpu().item()
+            lambda0 = self.covariance.lambda0
+    
+            centred_sample = Rinterface.sample(self.covariance.cov_module, sigma0, lambda0,
+                    0.0, self.cells_coords)
+            return centred_sample + self.prior_mean_vec
 
     # TODO: Finish implementation.
     def sample_conditional(self, G, y, data_std):
@@ -848,17 +863,18 @@ class UpdatableGP():
             Integrated variance reduction resulting from the observation of G.    
 
         """
-        variance = self.covariance.extract_variance()
-        mean = self.mean_vec
-
-        if lower is not None:
-            lower = torch.tensor([lower])
-        if upper is not None:
-            upper = torch.tensor([upper])
-
-        weights = gaussian_cdf(mean, variance.reshape(-1, 1),
-                lower=lower, upper=upper)
-        return self.IVR(G, data_std, weights=weights)
+        with torch.no_grad():
+            variance = self.covariance.extract_variance()
+            mean = self.mean_vec
+    
+            if lower is not None:
+                lower = torch.tensor([lower])
+            if upper is not None:
+                upper = torch.tensor([upper])
+    
+            weights = gaussian_cdf(mean, variance.reshape(-1, 1),
+                    lower=lower, upper=upper)
+            return self.IVR(G, data_std, weights=weights)
 
     def coverage(self, lower=None, upper=None):
         """ Compute (current) coverage function.
@@ -878,34 +894,36 @@ class UpdatableGP():
             at every cell.
 
         """
-        variance = self.covariance.extract_variance().cpu()
-        mean = self.mean_vec.cpu()
-
-        if lower is not None:
-            lower = torch.tensor([lower])
-            lower = lower.cpu()
-        if upper is not None:
-            upper = torch.tensor([upper])
-            upper = upper.cpu()
-
-        coverage = gaussian_cdf(mean, variance.reshape(-1, 1),
-                lower=lower, upper=upper)
-        return coverage
+        with torch.no_grad():
+            variance = self.covariance.extract_variance().cpu()
+            mean = self.mean_vec.cpu()
+    
+            if lower is not None:
+                lower = torch.tensor([lower])
+                lower = lower.cpu()
+            if upper is not None:
+                upper = torch.tensor([upper])
+                upper = upper.cpu()
+    
+            coverage = gaussian_cdf(mean, variance.reshape(-1, 1),
+                    lower=lower, upper=upper)
+            return coverage
 
     def concentrate_mean(self, lambda0, sigma0, G, y, m0=None, data_std=0.0):
-        y = y.reshape(-1, 1)
-        pushfwd = self.covariance.compute_prior_pushfwd(
-                G, lambda0, sigma0).cpu()
-        data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
-        inv = torch.inverse(data_cov)
-
-        id = torch.ones(G.shape[1], 1)
-        m0 = (
-                torch.inverse(id.t() @ G.t() @ inv @ G @ id)
-                @
-                y.t() @ inv @ G @ id)
-
-        return m0
+        with torch.no_grad():
+            y = y.reshape(-1, 1)
+            pushfwd = self.covariance.compute_prior_pushfwd(
+                    G, lambda0, sigma0).cpu()
+            data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
+            inv = torch.inverse(data_cov)
+    
+            id = torch.ones(G.shape[1], 1)
+            m0 = (
+                    torch.inverse(id.t() @ G.t() @ inv @ G @ id)
+                    @
+                    y.t() @ inv @ G @ id)
+    
+            return m0
 
     def neg_log_likelihood(self, lambda0, sigma0, G, y, m0=None, data_std=0.0):
         """ Compute the negative log-likelihood (up to a constant and a factor 1/2).
@@ -930,29 +948,30 @@ class UpdatableGP():
         neg_log_likelihood: Tensor
 
         """
-        y = y.reshape(-1, 1)
-
-        pushfwd = self.covariance.compute_prior_pushfwd(
-                G, lambda0, sigma0).cpu()
-        data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
-        inv = torch.inverse(data_cov)
-
-        # If not provided, use concentration identity.
-        if m0 is None:
-            id = torch.ones(G.shape[1], 1)
-            m0 = (
-                    torch.inverse(id.t() @ G.t() @ inv @ G @ id)
-                    @
-                    y.t() @ inv @ G @ id)
-
-        prior_mean = m0 * torch.ones(G.shape[1], 1)
-        nll = (
-                torch.logdet(data_cov)
-                + 
-                (y - G @ prior_mean).t() 
-                @ inv 
-                @ (y - G @ prior_mean))
-        return nll
+        with torch.no_grad():
+            y = y.reshape(-1, 1)
+    
+            pushfwd = self.covariance.compute_prior_pushfwd(
+                    G, lambda0, sigma0).cpu()
+            data_cov = G @ pushfwd + data_std**2 * torch.eye(G.shape[0])
+            inv = torch.inverse(data_cov)
+    
+            # If not provided, use concentration identity.
+            if m0 is None:
+                id = torch.ones(G.shape[1], 1)
+                m0 = (
+                        torch.inverse(id.t() @ G.t() @ inv @ G @ id)
+                        @
+                        y.t() @ inv @ G @ id)
+    
+            prior_mean = m0 * torch.ones(G.shape[1], 1)
+            nll = (
+                    torch.logdet(data_cov)
+                    + 
+                    (y - G @ prior_mean).t() 
+                    @ inv 
+                    @ (y - G @ prior_mean))
+            return nll
 
     def neg_predictive_log_density(self, y, G, data_std=0, svd=False):
         """ Compute the likelihood of a given data batch under the current model.
@@ -972,41 +991,42 @@ class UpdatableGP():
         neg_predictive_log_density: Tensor
 
         """
-        y = y.reshape(-1, 1).double()
-
-        current_mean = self.mean_vec.double()
-        pushfwd = self.covariance.mul_right(G.t()).cpu()
-        R = G.double() @ pushfwd.double() + data_std**2 * torch.eye(G.shape[0]).double()
-
-        # Compute using SVD instead of standard Cholesky.
-        if svd is True:
-            u, s, v = torch.svd(R)
-            inv = torch.mm(
-                    torch.mm(v, torch.diag(torch.div(torch.ones(s.shape).double(), s))),
-                    u.t())
-            # logdet = torch.log(torch.prod(s))
-            logdet = torch.sum(torch.log(s))
-        # Else use standard Cholesky.
-        else:
-            inv = torch.inverse(R)
-            logdet = torch.logdet(R)
-
-        neg_predictive_log_density = (1/2) * (
-                logdet 
-                +
-                (y - G.double() @ current_mean).t() 
-                @ inv 
-                @ (y - G.double() @ current_mean)
-                + 
-                G.shape[0] * torch.log(2 * torch.tensor([np.pi]).double())
-                )
-        # If get nan, then re-run with increased noise.
-        if torch.any(torch.isnan(neg_predictive_log_density)):
-            # Increase noise by 50%.
-            data_std = 1.5 * data_std
-            print("WARNING: singular covariance. Increasing noise to: {}.".format(data_std))
-            return self.neg_predictive_log_density(y, G, data_std)
-        else: return neg_predictive_log_density.float()
+        with torch.no_grad():
+            y = y.reshape(-1, 1).double()
+    
+            current_mean = self.mean_vec.double()
+            pushfwd = self.covariance.mul_right(G.t()).cpu()
+            R = G.double() @ pushfwd.double() + data_std**2 * torch.eye(G.shape[0]).double()
+    
+            # Compute using SVD instead of standard Cholesky.
+            if svd is True:
+                u, s, v = torch.svd(R)
+                inv = torch.mm(
+                        torch.mm(v, torch.diag(torch.div(torch.ones(s.shape).double(), s))),
+                        u.t())
+                # logdet = torch.log(torch.prod(s))
+                logdet = torch.sum(torch.log(s))
+            # Else use standard Cholesky.
+            else:
+                inv = torch.inverse(R)
+                logdet = torch.logdet(R)
+    
+            neg_predictive_log_density = (1/2) * (
+                    logdet 
+                    +
+                    (y - G.double() @ current_mean).t() 
+                    @ inv 
+                    @ (y - G.double() @ current_mean)
+                    + 
+                    G.shape[0] * torch.log(2 * torch.tensor([np.pi]).double())
+                    )
+            # If get nan, then re-run with increased noise.
+            if torch.any(torch.isnan(neg_predictive_log_density)):
+                # Increase noise by 50%.
+                data_std = 1.5 * data_std
+                print("WARNING: singular covariance. Increasing noise to: {}.".format(data_std))
+                return self.neg_predictive_log_density(y, G, data_std)
+            else: return neg_predictive_log_density.float()
 
     def __dict__(self):
         return {'mean': self.mean.__dict__(),
@@ -1085,18 +1105,20 @@ class UpdatableGP():
 
     def copy(self):
         print("Copying. WARNING: please do not modify quantities that shouldn't, since they are copied only by reference across GPs.")
-        # Gather characterstics. These won't be modify, so we do not copy.
-        cov_module, sigma0, lambda0 = self.covariance.cov_module, self.covariance.sigma0, self.covariance.lambda0
-        cells_coords, n_chunks = self.covariance.cells_coords, self.covariance.n_chunks
-        m0 = self.mean.prior.detach().clone()
-
-        # Create base GP with same characteristics.
-        new_gp = Updatable_GP(cov_module, lambda0, sigma0, m0,
-            cells_coords, n_chunks)
-
-        # Copy the updates. We only copy by reference, since those are not supposed be modified.
-        new_gp.covariance.pushforwards = self.covariance.pushforwards
-        new_gp.covariance.inversion_ops = self.covariance.inversion_ops
-        new_gp.mean.m = self.mean.m.detach().clone()
-
-        return new_gp
+        print("WARNING: This causes memory leak. So far, we have not been able to identify the cause of the leaks.")
+        with torch.no_grad():
+            # Gather characterstics. These won't be modify, so we do not copy.
+            cov_module, sigma0, lambda0 = self.covariance.cov_module, self.covariance.sigma0, self.covariance.lambda0
+            cells_coords, n_chunks = self.covariance.cells_coords, self.covariance.n_chunks
+            m0 = self.mean.prior.detach().clone()
+    
+            # Create base GP with same characteristics.
+            new_gp = UpdatableGP(cov_module, lambda0, sigma0, m0,
+                cells_coords, n_chunks)
+    
+            # Copy the updates. We only copy by reference, since those are not supposed be modified.
+            new_gp.covariance.pushforwards = self.covariance.pushforwards
+            new_gp.covariance.inversion_ops = self.covariance.inversion_ops
+            new_gp.mean.m = self.mean.m.detach().clone()
+    
+            return new_gp
