@@ -35,6 +35,9 @@ def prepare_experiment_data(sample_nr, local=False):
     # The original script did not use the currect cells roofs.
     accessible_data_coords = np.load(os.path.join(data_folder,"surface_data_coords_fine_dsm.npy"))
 
+    # Niklas data from field compaign.
+    niklas_data_inds_insurf = np.load(os.path.join(data_folder,"niklas_data_inds_insurf.npy"))[1:] # Remove base station.
+
     # Load generated data.
     ground_truth_path = os.path.join(ground_truth_folder,
             "prior_sample_{}.npy".format(sample_nr))
@@ -78,7 +81,7 @@ def prepare_experiment_data(sample_nr, local=False):
 
     
     return (trained_gp_model, ground_truth, volcano_grid,
-            accessible_data_coords, accessible_G, accessible_data_feed,
+            accessible_data_coords, accessible_G, accessible_data_feed, niklas_data_inds_insurf,
             accessibility_graph, base_station_node,
             THRESHOLD_small, THRESHOLD_big,
             base_results_folder)
