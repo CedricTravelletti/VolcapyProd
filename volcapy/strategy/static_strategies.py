@@ -17,7 +17,7 @@ from volcapy.set_sampling import uniform_size_uniform_sample
 def static_blind_path_selection(
         compute_blind_reward, compute_accuracy_metric,
         belief, budget, N_refine, 
-        accessibility_graph, cost_fn, design_sampler, 
+        accessibility_graph, design_sampler, 
         n_starting_designs,
         output_path):
     """ Compute optimal designs using static blind path selection 
@@ -37,11 +37,7 @@ def static_blind_path_selection(
     N_refine: int
         TODO
     accessibility_graph: nx.Graph
-        A labelled graph defining the data collection landscape.
-    cost_fn: function(star_node, end_node, edge_attrs)
-        Function defining the cost of a given edge in the accessibility_graph.
-    cost_fn: function(star_node, end_node, edge_attrs)
-        Function defining the cost of a given edge in the accessibility_graph.
+        A weighted graph defining the data collection landscape.
     design_sampler: function(n_samples)
         Function that randomly samples designs (see volcapy.set_sampling).
     n_starting_designs: int
@@ -52,9 +48,6 @@ def static_blind_path_selection(
     designs
 
     """
-    # Precompute the cost of each edges to accelerate the next computations.
-    accessibility_graph = weight_graph_with_cost(accessibility_graph, cost_fn)
-
     # Sample candidate designs.
     candidate_designs = design_sampler(list(accessibility_graph.nodes), n_starting_designs)
 
