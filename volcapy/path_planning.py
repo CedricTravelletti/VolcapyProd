@@ -2,6 +2,8 @@
 
 """
 import networkx as nx
+from functools import partial
+import multiprocessing
 
 
 def sample_design_locations(accessibility_graph, n_samples, node_weights=None, size_sampler=None):
@@ -79,16 +81,51 @@ def generate_TSP_graph(accessibility_graph, nodes_inds, cost_fn):
         defining which edge attribute should be used as weight/distance for that edge.
 
     """
-    G = nx.Graph()
     # Add nodes iteratively.
+    pool = multiprocessing.Pool(4)
+    partial_graphs = pool.map(partial(
+        _gen_TSP_graph_worker_fn,
+        nodes_inds=nodes_inds, accessibility_graph=accessibility_graph,
+        cost_fn=cost_fn), range(len(nodes_inds)))
+    """
     for i, node_ind in enumerate(nodes_inds):
-        # Loop over folowing nodes to connect them with shortes path.
+        # Loop over folowing nodes to connect them with shortest path.
         # Only consider following ones, so we don't double count paths.
         for end_node in nodes_inds[i+1:]:
             shortest_path_length = nx.shortest_path_length(accessibility_graph,
                     source=node_ind, target=end_node, weight=cost_fn)
             G.add_edge(node_ind, end_node, weight=shortest_path_length)
+    """
+    # Merge the resulting graphs.
+    G = nx.compose_all(partial_graphs)
     return G
+
+def _gen_TSP_graph_worker_fn(i, nodes_inds, accessibility_graph, cost_fn):
+    """ Worker function for parallization of generate_TSP_graph.
+
+    """
+    G = nx.Graph()
+
+    for end_node in nodes_inds[i+1:]:
+        node_ind = nodes_inds[i]
+        shortest_path_length = nx.shortest_path_length(accessibility_graph,
+                    source=node_ind, target=end_node, weight=cost_fn)
+        G.add_edge(node_ind, end_node, weight=shortest_path_length)
+
+    return G
+
+def add_node_to_TSP_graph(new_node, TSP_graph, base_graph, cost_fn):
+    # Connect the new node to all the nodes belongina to the TSP graph.
+    for end_node in list(TSP_graph.nodes):
+        shortest_path_length = nx.shortest_path_length(base_graph,
+                    source=new_node, target=end_node, weight=cost_fn)
+        TSP_graph.add_edge(new_node, end_node, weight=shortest_path_length)
+
+    return TSP_graph
+
+def del_node_from_TSP_graph(node_to_del, TSP_graph):
+    TSP_graph.remove_node(node_to_del)
+    return TSP_graph
 
 def weight_graph_with_cost(graph, cost_fn):
     """ Given a cost function and a graph, weight each edge with the corrsponding cost.
