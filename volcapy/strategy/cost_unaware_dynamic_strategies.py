@@ -1,4 +1,3 @@
-
 """ This submodule collects all the cost-unaware dynamic strategies, 
 defined as part of the Cornell-IMSV collaboration. 
 
@@ -18,17 +17,32 @@ import networkx as nx
 
 data_std = 0.1 
 
-# TODO: Get rid of the cost function and instead accept weighted directect 
-# graph, so that the cost structure is already included.
 def cost_unaware_wIVR(belief, budget, accessibility_graph,
-        base_station_node, starting_node, G, data_feed,
+        base_station_node, waypoint_node, G, data_feed,
         lower_threshold):
-    # First go to the starting station, then start optimizing from there.
-    current_node = starting_node
-    current_path = nx.shortest_path(accessibility_graph, base_station_node,
-            current_node, weight='weight')
-    cost_first_leg = nx.path_weight(accessibility_graph, current_path,
+    """ Run the cost unaware strategy. 
+
+    This strategy first gathers data by travelling from the base_station_node 
+    to the starting node, then starts travelling adaptively by following the wIVR 
+    criterion and finally walks back to base (gathering data) when the budget is reached 
+    (we take into account the fact that travelling back to base has a cost).
+
+    """
+    # First leg: Ingest data from base node to starting node.
+    first_leg_nodes = nx.shortest_path(accessibility_graph, base_station_node,
+            waypoint_node, weight='weight')
+    cost_first_leg = nx.path_weight(accessibility_graph, first_leg_nodes,
                 weight='weight')
+    if cost_first_leg > budget: raise ValueError("Node not reacheable.")
+
+    G_first_leg = G[first_leg_nodes,:]
+    if len(G_first_leg.shape) <= 1: G_first_leg = G_first_leg.reshape(1, -1)
+    y_first_leg = data_feed(first_leg_nodes)
+    belief.update(G_first_leg, y_first_leg, data_std)
+
+    # First go to the starting station, then start optimizing from there.
+    current_node = waypoint_node
+    current_path = first_leg_nodes.copy()
     remaining_budget = budget - cost_first_leg
 
     observed_data, data_collection_nodes = [], []
@@ -106,7 +120,15 @@ def cost_unaware_wIVR(belief, budget, accessibility_graph,
             print("New data ingested.")
 
     # Add the return leg to the path.
+    return_leg_nodes = nx.shortest_path(accessibility_graph, current_path[-1],
+            base_station_node, weight='weight')
     current_path.extend(
-        nx.shortest_path(accessibility_graph, current_path[-1],
-            base_station_node, weight='weight')[1:]) # We remove the start node cause already in the list.
-    return current_path, observed_data, data_collection_nodes
+        return_leg_nodes[1:]) # We remove the start node cause already in the list.
+
+    # Observe the data on the return leg.
+    G_return_leg = G[return_leg_nodes,:]
+    if len(G_return_leg.shape) <= 1: G_return_leg = G_return_leg.reshape(1, -1)
+    y_return_leg = data_feed(return_leg_nodes)
+    belief.update(G_return_leg, y_return_leg, data_std)
+
+    return current_path, observed_data, data_collection_nodes, y_first_leg, first_leg_nodes, y_return_leg, return_leg_nodes
