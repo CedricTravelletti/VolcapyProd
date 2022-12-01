@@ -81,6 +81,12 @@ def generate_TSP_graph(accessibility_graph, nodes_inds, cost_fn):
         defining which edge attribute should be used as weight/distance for that edge.
 
     """
+    # Special case.
+    if len(nodes_inds) == 1:
+        G = nx.Graph()
+        G.add_node(nodes_inds[0])
+        return G
+
     # Add nodes iteratively.
     pool = multiprocessing.Pool(4)
     partial_graphs = pool.map(partial(
