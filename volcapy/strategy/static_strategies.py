@@ -8,6 +8,7 @@ import math
 import heapq
 import numpy as np
 import pandas as pd
+import networkx as nx
 from volcapy.path_planning import sample_design_locations, solve_TSP, weight_graph_with_cost
 from volcapy.set_sampling import uniform_size_uniform_sample
 
@@ -105,16 +106,31 @@ def static_blind_path_selection(
 
 
 def iterative_bisection_refinement(accessibility_graph, base_node, 
+        budget,
         n_starting_designs,
+        n_generations,
+        n_mutations,
         compute_global_criterion,
         sample_refinement_point,
         global_cost_cutoff_ratio=1.0):
     # Sampler for the base designs, sampling 2 points at random and a fixed base.
     base_designs = uniform_size_uniform_sample(
-            list(accessibility_graph.node), sample_size=n_starting_designs,
+            list(accessibility_graph.nodes), sample_size=n_starting_designs,
             min_size=2, max_size=2, fixed_node=base_node)
 
-    generations = [[base_designs]]
+    # Case where we have only one design.
+    if n_starting_designs == 1:
+        base_designs = [base_designs]
+
+    # Base generation contains a bunch of designs, made of three paths.
+    base_generation = [
+        [
+            nx.shortest_path(accessibility_graph, design[0], design[1], weight='weight'),
+            nx.shortest_path(accessibility_graph, design[1], design[2], weight='weight'),
+            nx.shortest_path(accessibility_graph, design[2], design[0], weight='weight')
+        ]
+        for design in base_designs]
+    generations = [base_generation]
     for k in range(n_generations):
         new_generation = []
         for design in generations[k]:
@@ -144,13 +160,20 @@ def iterative_bisection_refinement(accessibility_graph, base_node,
             return generations
         else:
             generations.append(new_generation)
+    return generations
 
 def sample_refinement_point(accessibility_graph, path):
-    # Built the ego graphs around the endpoints and intersect them.
+    cost_growth_factor = 1.0
+    path_cost = nx.path_weight(accessibility_graph, path, weight='weight')
 
-    # Sample one point at random in the intersection.
-    refinement_point  = uniform_size_uniform_sample(
-            list(intersection_graph.node), sample_size=1,
-            min_size=2, max_size=2, fixed_node=base_node)
-    return refinement_point
-    raise NotImplementedError
+    start, end = path[0], path[-1]
+    ## Compute graphs of nodes within a given distance.
+    ego_start = nx.ego_graph(accessibility_graph, start, radius=cost_growth_factor*path_cost, center=False, distance='weight')
+    ego_end = nx.ego_graph(accessibility_graph, end, radius=path_cost, center=False, distance='weight')
+
+    # Intersect to get graph that are within given distance for both nodes.
+    ego_intersection = nx.intersection(ego_start, ego_end)
+
+    # Randomly choose one node in there as a refinement.
+    refinement_node = np.random.choice(list(ego_intersection.nodes()), size=1, replace=False)[0]
+    return refinement_node
