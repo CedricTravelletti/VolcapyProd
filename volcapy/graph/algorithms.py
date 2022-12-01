@@ -5,7 +5,8 @@ import multiprocessing
 import numpy as np
 import networkx as nx
 from functools import partial
-
+from volcapy.path_planning import generate_TSP_graph, add_node_to_TSP_graph, del_node_from_TSP_graph, solve_TSP
+from volcapy.set_sampling import uniform_size_uniform_sample
 
 def recursive_greedy_SOP(graph, budget, start_node, end_node, reward_fn, max_recursion_depth):
     """ Solve the SOP problem using the recursive greedy algorithm from Chekuri and Pal (2005).
@@ -182,3 +183,210 @@ def highest_level_subroutine(
             best_reward = reward
             best_path = path
     return path
+
+def gcb_algorithm(graph, budget, reward_fn, cost_fn):
+    """ Runs the generalized cost-benefit algorithm from Zhang and Vorobeychik (2016) 
+    "Submodular Optimization with Routing Constraints".
+
+    """
+    current_design = []
+    feasible_nodes = list(graph.nodes).copy()
+    count = 0
+    while len(feasible_nodes) > 0:
+        base_reward = reward_fn(current_design)
+        base_cost = cost_fn(current_design)
+
+        costs, rewards = [], []
+        for node in feasible_nodes:
+            cost = cost_fn(current_design + [node])
+            reward = reward_fn(current_design + [node])
+            costs.append(cost)
+            rewards.append(reward)
+
+        # TODO: we could implement this if we had the real cost function. 
+        # problem here is that we are only working with a 3/2 approximation (Christofides).
+        # We know the cost can only increase as we add more points, 
+        # so already remove the ones we don't need.
+
+        # Find best.
+        costs, rewards = np.array(costs), np.array(rewards)
+        deltas = (rewards - base_reward) / (costs - base_cost)
+        best_node = feasible_nodes[np.argmax(deltas)]
+
+        new_cost = cost_fn(current_design + [best_node])
+        if new_cost < budget:
+            current_design.append(best_node)
+
+        # No need to consider that node anymore.
+        feasible_nodes.remove(best_node)
+        count += 1
+        print(current_design)
+        print(new_cost / 60)
+    return current_design
+
+def raor_algorithm(graph, budget, reward_fn, sampler, base_station_node):
+    """ Runs the randomized anytime orienteering algorithm from Arora 
+    and Scherer (2017).
+
+    """
+    nodes = np.array(list(graph.nodes))
+    init_design = sampler(nodes)
+
+    # Generate the base TSP graph.
+    TSP_graph = generate_TSP_graph(graph, init_design, cost_fn='weight')
+
+    # Compute the base cost.
+    init_path = nx.algorithms.approximation.christofides(TSP_graph)
+    init_cost = nx.path_weight(TSP_graph, init_path, weight='weight')
+
+    init_reward = reward_fn(init_design)
+    current_design = init_design
+
+    # Check if satisfies budget.
+    if init_cost <= budget:
+        best_reward = init_reward
+    else: best_reward = 0
+
+    for i in range(3 * len(nodes)):
+        print(i)
+        print("Current best reward: {}.".format(best_reward))
+        # Randomly sample a node.
+        new_node = np.random.choice(nodes)
+        
+        # If already in design, then delete, else add to design.
+        if new_node in current_design:
+            current_design = np.delete(current_design, np.where(current_design == new_node))
+            TSP_graph = del_node_from_TSP_graph(new_node, TSP_graph)
+        else:
+            current_design = np.append(current_design, [new_node])
+            TSP_graph = add_node_to_TSP_graph(new_node, TSP_graph, graph,
+                    cost_fn='weight')
+
+        new_reward = reward_fn(current_design)
+
+        # Solve TSP.
+        new_path = nx.algorithms.approximation.christofides(TSP_graph)
+        new_cost = nx.path_weight(TSP_graph, new_path, weight='weight')
+        print("New cost: {} hrs.".format(new_cost / (60**2)))
+
+        if ((new_cost <= budget) and (new_reward > best_reward)):
+            best_reward = new_reward
+            best_designs = current_design
+
+    return best_design
+
+def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node, max_iter=1e6, n_starting_designs=20):
+    """ Runs the randomized anytime orienteering algorithm from Arora 
+    and Scherer (2017) in its greedy variant.
+
+    """
+    nodes = np.array(list(graph.nodes))
+
+    # Keep a list of all the feasible designs found.
+    feasible_designs = [np.array([base_station_node])] # Start with trivial design.
+    feasible_designs_rewards = [reward_fn(np.array([base_station_node]))]
+
+    # Before starting, see the set of feasible designs with a bunch of two points designs.
+    for i in range(n_starting_designs):
+        new_node = np.random.choice(nodes)
+        if nx.shortest_path_length(graph, base_station_node, new_node, weight='weight') <= budget:
+            feasible_designs.append(np.array([base_station_node, new_node]))
+            feasible_designs_rewards.append(reward_fn(np.array([base_station_node, new_node])))
+
+    # Find a starting set that satisfies the constraints.
+    init_design = sampler(nodes)
+
+    # Generate the base TSP graph.
+    TSP_graph = generate_TSP_graph(graph, init_design, cost_fn='weight')
+
+    # Compute the base cost.
+    init_path = nx.algorithms.approximation.christofides(TSP_graph)
+    init_cost = nx.path_weight(TSP_graph, init_path, weight='weight')
+
+    if init_cost <= budget:
+        current_design = init_design
+        best_reward = reward_fn(init_design)
+        feasible_designs.append(current_design)
+        feasible_designs_rewards.append(best_reward)
+    # Otherwise seed with just the base station.
+    else: 
+        current_design = np.array([base_station_node])
+        best_reward = reward_fn(current_design)
+
+    # Generate the TSP graphs for the feasible designs.
+    feasible_designs_TSP_graphs = [
+            generate_TSP_graph(graph, design, cost_fn='weight')
+            for design in feasible_designs]
+
+    for i in range(3 * len(nodes)):
+        if i >= max_iter: return feasible_designs
+        print(i)
+        print("Current best reward: {}.".format(best_reward))
+        # Randomly sample a node.
+        new_node = np.random.choice(nodes)
+        
+        # If already in design, then delete, else add to design.
+        if new_node in current_design:
+            current_design = np.delete(current_design, np.where(current_design == new_node))
+            TSP_graph = del_node_from_TSP_graph(new_node, TSP_graph)
+        else:
+            current_design = np.append(current_design, [new_node])
+            TSP_graph = add_node_to_TSP_graph(new_node, TSP_graph, graph,
+                    cost_fn='weight')
+
+        new_reward = reward_fn(current_design)
+
+        # Solve TSP.
+        new_path = nx.algorithms.approximation.christofides(TSP_graph)
+        new_cost = nx.path_weight(TSP_graph, new_path, weight='weight')
+        print("New cost: {} hrs.".format(new_cost / (60**2)))
+
+        if new_cost <= budget:
+            # Found new feasible design.
+            feasible_designs.append(current_design)
+            feasible_designs_rewards.append(new_reward)
+            feasible_designs_TSP_graphs.append(TSP_graph)
+
+        feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs = refine_feasible_designs(
+                new_node, graph,
+                feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs,
+                budget, reward_fn)
+        print(feasible_designs)
+
+    return feasible_designs
+
+def refine_feasible_designs(new_node, graph,
+        feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs,
+        budget, reward_fn):
+
+    # Compute the new costs.
+    new_feasible_designs_TSP_graphs = [
+            add_node_to_TSP_graph(new_node, TSP_graph, graph,
+                    cost_fn='weight')
+            for TSP_graph in feasible_designs_TSP_graphs]
+    # Solve TSP.
+    new_paths = [nx.algorithms.approximation.christofides(TSP_graph) 
+            for TSP_graph in new_feasible_designs_TSP_graphs]
+    new_costs = np.array([nx.path_weight(TSP_graph, new_path, weight='weight')
+            for new_path, TSP_graph in zip(new_paths, new_feasible_designs_TSP_graphs)])
+
+    # If all exceed budget, then nothing left to do.
+    if np.all(new_costs > budget):
+        return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs
+
+    new_rewards = np.zeros(new_costs.shape)
+    # Only compute rewards where we havent exceeded budget.
+    new_rewards[new_costs <= budget] = np.array(
+            [reward_fn(np.append(feasible_designs[i], [new_node]))
+                for i, x in enumerate(new_costs <= budget) if x])
+
+    # Keep the one that produces the best marginal increment.
+    best_design_ind = np.argmax(
+            (new_rewards - feasible_designs_rewards) / new_costs)
+
+    # Replace the chosen design by its modified version.
+    modified_design = np.append(feasible_designs[best_design_ind], [new_node])
+    feasible_designs[best_design_ind] = modified_design
+    feasible_designs_rewards[best_design_ind] = new_rewards[best_design_ind]
+
+    return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs
