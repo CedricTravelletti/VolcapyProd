@@ -275,20 +275,35 @@ def raor_algorithm(graph, budget, reward_fn, sampler, base_station_node):
 
     return best_design
 
-def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node, max_iter=1e6, n_starting_designs=20):
+def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node,
+        max_iter=1e6, n_starting_designs=10):
     """ Runs the randomized anytime orienteering algorithm from Arora 
     and Scherer (2017) in its greedy variant.
+
+    Parameters
+    ----------
+    n_starting_designs: int, defaults to 20.
 
     """
     nodes = np.array(list(graph.nodes))
 
     # Keep a list of all the feasible designs found.
+    # TODO: This time do not include the base station node alone, 
+    # since will create problem (one node graph) when solving TSP.
+    """
     feasible_designs = [np.array([base_station_node])] # Start with trivial design.
     feasible_designs_rewards = [reward_fn(np.array([base_station_node]))]
+    """
+    feasible_designs, feasible_designs_rewards = [], []
 
-    # Before starting, see the set of feasible designs with a bunch of two points designs.
+    # Before starting, seed the set of feasible designs with a bunch of two points designs.
+    # Only select point within the budget.
+    nodes_within_budget = np.array(list(
+        nx.ego_graph(graph, base_station_node,
+                radius=budget/2, center=False, distance='weight').nodes))
+
     for i in range(n_starting_designs):
-        new_node = np.random.choice(nodes)
+        new_node = np.random.choice(nodes_within_budget)
         if nx.shortest_path_length(graph, base_station_node, new_node, weight='weight') <= budget:
             feasible_designs.append(np.array([base_station_node, new_node]))
             feasible_designs_rewards.append(reward_fn(np.array([base_station_node, new_node])))
@@ -351,7 +366,6 @@ def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node, max_i
                 new_node, graph,
                 feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs,
                 budget, reward_fn)
-        print(feasible_designs)
 
     return feasible_designs
 
@@ -360,33 +374,54 @@ def refine_feasible_designs(new_node, graph,
         budget, reward_fn):
 
     # Compute the new costs.
-    new_feasible_designs_TSP_graphs = [
+    feasible_designs_TSP_graphs = [
             add_node_to_TSP_graph(new_node, TSP_graph, graph,
                     cost_fn='weight')
             for TSP_graph in feasible_designs_TSP_graphs]
     # Solve TSP.
     new_paths = [nx.algorithms.approximation.christofides(TSP_graph) 
-            for TSP_graph in new_feasible_designs_TSP_graphs]
+            for TSP_graph in feasible_designs_TSP_graphs]
     new_costs = np.array([nx.path_weight(TSP_graph, new_path, weight='weight')
-            for new_path, TSP_graph in zip(new_paths, new_feasible_designs_TSP_graphs)])
+            for new_path, TSP_graph in zip(new_paths, feasible_designs_TSP_graphs)])
+
+    # Now return TSP graphs to their original state.
+    feasible_designs_TSP_graphs = [
+            del_node_from_TSP_graph(new_node, TSP_graph)
+            for TSP_graph in feasible_designs_TSP_graphs]
+
+    # Solve old TSP.
+    old_paths = [nx.algorithms.approximation.christofides(TSP_graph) 
+            for TSP_graph in feasible_designs_TSP_graphs]
+    old_costs = np.array([nx.path_weight(TSP_graph, old_path, weight='weight')
+            for old_path, TSP_graph in zip(old_paths, feasible_designs_TSP_graphs)])
+
+    print((1 / 60**2) * old_costs)
+    print((1 / 60**2) * new_costs)
 
     # If all exceed budget, then nothing left to do.
     if np.all(new_costs > budget):
+        print("No design can be refined.")
         return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs
 
-    new_rewards = np.zeros(new_costs.shape)
-    # Only compute rewards where we havent exceeded budget.
-    new_rewards[new_costs <= budget] = np.array(
-            [reward_fn(np.append(feasible_designs[i], [new_node]))
-                for i, x in enumerate(new_costs <= budget) if x])
+    # Otherwise, add to the best candidate.
+    else:
+        new_rewards = np.zeros(new_costs.shape)
+        # Only compute rewards where we havent exceeded budget.
+        new_rewards[new_costs <= budget] = np.array(
+                [reward_fn(np.append(feasible_designs[i], [new_node]))
+                    for i, x in enumerate(new_costs <= budget) if x])
+    
+        # Keep the one that produces the best marginal increment.
+        best_design_ind = np.argmax(
+                (new_rewards - feasible_designs_rewards) / new_costs)
+    
+        # Replace the chosen design by its modified version.
+        modified_design = np.append(feasible_designs[best_design_ind], [new_node])
+        feasible_designs[best_design_ind] = modified_design
+        feasible_designs_rewards[best_design_ind] = new_rewards[best_design_ind]
 
-    # Keep the one that produces the best marginal increment.
-    best_design_ind = np.argmax(
-            (new_rewards - feasible_designs_rewards) / new_costs)
-
-    # Replace the chosen design by its modified version.
-    modified_design = np.append(feasible_designs[best_design_ind], [new_node])
-    feasible_designs[best_design_ind] = modified_design
-    feasible_designs_rewards[best_design_ind] = new_rewards[best_design_ind]
-
-    return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs
+        # Update its TSP graph.
+        feasible_designs_TSP_graphs[best_design_ind] = add_node_to_TSP_graph(
+                new_node, feasible_designs_TSP_graphs[best_design_ind], graph, cost_fn='weight')
+    
+        return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs
