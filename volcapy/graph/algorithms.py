@@ -275,8 +275,8 @@ def raor_algorithm(graph, budget, reward_fn, sampler, base_station_node):
 
     return best_design
 
-def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node,
-        max_iter=1e6, n_starting_designs=10):
+def raor_G_algorithm(graph, budget, reward_fn, init_design_sampler, base_station_node,
+        max_iter=1000, n_starting_designs=10):
     """ Runs the randomized anytime orienteering algorithm from Arora 
     and Scherer (2017) in its greedy variant.
 
@@ -286,6 +286,7 @@ def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node,
 
     """
     nodes = np.array(list(graph.nodes))
+    fail_count = 0
 
     # Keep a list of all the feasible designs found.
     # TODO: This time do not include the base station node alone, 
@@ -309,7 +310,7 @@ def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node,
             feasible_designs_rewards.append(reward_fn(np.array([base_station_node, new_node])))
 
     # Find a starting set that satisfies the constraints.
-    init_design = sampler(nodes)
+    init_design = init_design_sampler(nodes)
 
     # Generate the base TSP graph.
     TSP_graph = generate_TSP_graph(graph, init_design, cost_fn='weight')
@@ -362,10 +363,15 @@ def raor_G_algorithm(graph, budget, reward_fn, sampler, base_station_node,
             feasible_designs_rewards.append(new_reward)
             feasible_designs_TSP_graphs.append(TSP_graph)
 
-        feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs = refine_feasible_designs(
+        feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs, found_refinement = refine_feasible_designs(
                 new_node, graph,
                 feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs,
                 budget, reward_fn)
+        # Allow for a maximum of 5 failed refinements.
+        if found_refinement is False:
+            fail_count += 1
+        if fail_count >= 5:
+            return feasible_designs
 
     return feasible_designs
 
@@ -401,7 +407,8 @@ def refine_feasible_designs(new_node, graph,
     # If all exceed budget, then nothing left to do.
     if np.all(new_costs > budget):
         print("No design can be refined.")
-        return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs
+        found_refinement = False
+        return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs, found_refinement
 
     # Otherwise, add to the best candidate.
     else:
@@ -424,4 +431,5 @@ def refine_feasible_designs(new_node, graph,
         feasible_designs_TSP_graphs[best_design_ind] = add_node_to_TSP_graph(
                 new_node, feasible_designs_TSP_graphs[best_design_ind], graph, cost_fn='weight')
     
-        return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs
+        found_refinement = True
+        return feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs, found_refinement

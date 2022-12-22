@@ -6,12 +6,15 @@ import torch
 import networkx as nx
 from volcapy.grid.grid_from_dsm import Grid
 from volcapy.uq.set_estimation import vorobev_expectation_inds
+from volcapy.path_planning import sample_design_locations, solve_TSP, weight_graph_with_cost
+from volcapy.graph.utils import compute_path_through_nodes
+from volcapy.graph.algorithms import raor_G_algorithm
 
 
 # Load Niklas data.
 # data_folder = "/home/cedric/PHD/Dev/VolcapySIAM/data/InversionDatas/stromboli_173018/"
 data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018/"
-output_folder = "/storage/homefs/ct19x463/Volcano_DP_results/experiments/cost_unaware_dynamic_strategy/"
+output_folder = "/storage/homefs/ct19x463/Volcano_DP_results/experiments/raor_g/"
 
 data_coords = np.load(os.path.join(data_folder,"niklas_data_coords_corrected_final.npy"))
 data_coords_inds_insurf = np.load(os.path.join(data_folder,"niklas_data_inds_insurf.npy"))[1:] # Remove base station.
@@ -38,11 +41,13 @@ data_std = 0.1
 
 G_full_surface = torch.from_numpy(G)
 
-def compute_blind_wIVR(design, belief):                                                                                                                                                                            
+def compute_blind_wIVR(design, belief):
+    belief.rewind(0)
     # Get the observation operator corresponding to the design.                     
     G = G_full_surface[np.array(design), :]                                                                                                                
     current_coverage = belief.coverage(lower_thresold, None)                        
-    variance_reduction, _ = belief.covariance.compute_VR(G, data_std)                                             
+    variance_reduction, _ = belief.covariance.compute_VR(G, data_std)
+    belief.rewind(0)
     wIVR = torch.sum(variance_reduction * current_coverage)
     IVR = torch.sum(variance_reduction)
 
@@ -102,69 +107,55 @@ from volcapy.strategy.cost_unaware_dynamic_strategies import cost_unaware_wIVR
 budget = 60 * 60 * 8 # 8 hours.  
 
 
-evaluated_designs, optimized_legs, rewards, rewards_metadata, costs, paths, first_legs, return_legs, accuracy_metrics = [], [], [], [], [], [], [], [], []
-starting_nodes = []
+evaluated_designs, rewards, rewards_metadata, costs, paths, accuracy_metrics = [], [], [], [], [], []
 
-# Sample a starting node at random.
+# Sample a base design with less than 10 nodes.
 from volcapy.set_sampling import uniform_size_uniform_sample
+init_design_sampler = lambda graph: uniform_size_uniform_sample(graph, sample_size=1, max_size=10, fixed_node=base_station_node)
 
-n_experiments = 30
-for i in range(n_experiments):
-    starting_node= uniform_size_uniform_sample(
-                list(accessibility_graph.nodes), sample_size=1,
-                min_size=1, max_size=1)[0]
-    # Skip if too far away.
-    cost_first_leg = nx.shortest_path_length(accessibility_graph, base_station_node,
-            starting_node, weight='weight')
-    if cost_first_leg > 0.4 * budget: continue
+reward_fn = lambda x: compute_blind_wIVR(x, belief)['reward']
 
-    
-    (full_path, observed_data, optimized_nodes,
-        y_first_leg, first_leg_nodes,
-        y_return_leg, return_leg_nodes) = cost_unaware_wIVR(
-        belief, budget, accessibility_graph, base_station_node, starting_node,
-        G, data_feed,
-        THRESHOLD_small)
-    
+feasible_designs = raor_G_algorithm(accessibility_graph, budget,
+        reward_fn, init_design_sampler, base_station_node,
+        max_iter=1e6, n_starting_designs=20)
+
+# Compute the a-posterior metrics.
+for i, design in enumerate(feasible_designs):
+    print("Evaluating design nr. {} with {} locations.".format(i, len(design)))
+    ordered_design, cost = solve_TSP(accessibility_graph, design, cost_fn='weight')
+    print(ordered_design)
+    print(cost)
+    full_path, cost = compute_path_through_nodes(accessibility_graph, ordered_design, cost_fn='weight')
+    print(full_path)
+    print(cost)
+
+    # Don't waste time computing the reward if the path exceeds 
+    # the budget.
+    if cost > budget:
+        print("Cost exceeds budget.")
+        continue
+
     # Arrange results to be saved.
-    optimized_legs.append(optimized_nodes)
     paths.append(full_path)
-    
-    first_legs.append(first_leg_nodes)
-    return_legs.append(return_leg_nodes)
-    
-    full_design = np.concatenate([first_leg_nodes, optimized_nodes, return_leg_nodes])
-    evaluated_designs.append(full_design)
-    
-    costs.append(nx.path_weight(accessibility_graph, full_path, weight='weight'))
-
-    starting_nodes.append(starting_node)
-    
-    with open(os.path.join(output_folder, 'optimized_legs.pkl'), 'wb') as f:
-        pickle.dump(optimized_legs, f)
-    with open(os.path.join(output_folder, 'first_legs.pkl'), 'wb') as f:
-        pickle.dump(first_legs, f)
-    with open(os.path.join(output_folder, 'return_legs.pkl'), 'wb') as f:
-        pickle.dump(return_legs, f)
+    evaluated_designs.append(design)
+    costs.append(cost)
         
-    accuracy_metric = compute_accuracy_metrics(ground_truth, design=full_design, belief=belief, already_updated=True)
+    accuracy_metric = compute_accuracy_metrics(ground_truth, design=full_path, belief=belief, already_updated=False)
     accuracy_metrics.append(accuracy_metric)
     
     # Have to reset belief to compute blind reward.
-    belief.rewind(0)
-    blind_reward = compute_blind_wIVR(full_design, belief)
+    blind_reward = compute_blind_wIVR(full_path, belief)
     
     rewards.append(blind_reward['reward'])                      
     rewards_metadata.append(blind_reward['reward_metadata'])
     
     df = pd.DataFrame.from_dict(
         {'design': evaluated_designs, 'reward': rewards, 'reward_metadata': rewards_metadata,
-         'cost': costs, 'path': paths, 
-         'starting_node': starting_nodes})                                                         
+         'cost': costs, 'path': paths})                                                         
     df_accuracy_metric = pd.DataFrame(accuracy_metrics)                                                                           
     df = pd.concat([df, df_accuracy_metric], axis=1)
     
-    df.to_pickle(os.path.join(output_folder, "results_cost_unaware_wIVR.pkl"))
+    df.to_pickle(os.path.join(output_folder, "results_raor_g.pkl"))
     
     # Rewind for the next.
     belief.rewind(0)

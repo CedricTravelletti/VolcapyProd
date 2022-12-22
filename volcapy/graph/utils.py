@@ -11,7 +11,9 @@ def compute_path_through_nodes(graph, nodes, cost_fn='weight'):
     path_costs = [nx.shortest_path_length(graph, nodes[i], nodes[i+1], weight=cost_fn) for i in range(len(nodes) - 1)]
 
     full_path = np.concatenate([x[:-1] for x in path_legs])
-    full_path = np.concatenate(full_path, np.array([path_legs[-1][-1]]))
+    print(path_legs[-1])
+    # Add the last node of the last path.
+    full_path = np.concatenate([full_path, np.array([path_legs[-1][-1]])])
     full_cost = np.sum(path_costs)
 
     return full_path, full_cost

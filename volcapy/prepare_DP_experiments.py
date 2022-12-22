@@ -64,7 +64,7 @@ def prepare_experiment_data(sample_nr, local=False):
     m0_matern32 = 2139.1
     lambda0_matern32 = 651.58
     trained_gp_model = UpdatableGP(cl, lambda0_matern32, sigma0_matern32, m0_matern32,
-            volcano_coords, n_chunks=200)
+            volcano_coords, n_chunks=1000)
 
     # Load the data collection graphs.
     from volcapy.graph.loading import load_Stromboli_graphs

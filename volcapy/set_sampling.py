@@ -61,6 +61,6 @@ def uniform_size_uniform_sample(input_set, sample_size, min_size=1, max_size=Non
             np.array([fixed_node]), s]) for s in sampled_sets]
 
     # If only one sample was requested, then do not return a list.
-    if len(sampled_sets) == 1:
+    if sample_size == 1:
         sampled_sets = sampled_sets[0]
     return sampled_sets
