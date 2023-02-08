@@ -221,7 +221,7 @@ def iterative_bisection_refinement(accessibility_graph, base_node, budget,
             # Compute costs and design points before returning.
             generations_costs = compute_generations_costs(accessibility_graph, generations_paths)
             generations_designs = compute_generations_design_points(generations_paths)
-            return generations, generations_designs, generations_costs
+            return generations_paths, generations_designs, generations_costs
         else:
             generations_paths.append(new_generation)
 
