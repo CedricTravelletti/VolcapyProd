@@ -131,8 +131,14 @@ def iterative_bisection_refinement(accessibility_graph, base_node, budget,
 
     Returns
     -------
-    designs: List[(int)]
-        Samples designs (list of tuples of nodes).
+    generations_paths: List[List[List[List]]]
+        For each generation (outer level) for each member of the generation, thee list of 
+        paths (list of nodes) constituting the design.
+    generations_designs: List[List[List]]
+        Same as above, but this time only contains the design points, not the paths 
+        connecting them.
+    generations_cost: List[List[float]]
+        Cost of each design in each generation.
 
     """
     # Sampler for the base designs, sampling 2 points at random and a fixed base.
@@ -165,13 +171,13 @@ def iterative_bisection_refinement(accessibility_graph, base_node, budget,
         print("None of the base designs was within cost.")
         return None, None, None
 
-    generations = [base_generation_with_budget]
+    generations_paths = [base_generation_with_budget]
 
     for k in range(n_generations):
-        print("Current generation (nr {}) has {} members.".format(k, len(generations[k])))
+        print("Current generation (nr {}) has {} members.".format(k, len(generations_paths[k])))
         new_generation = []
         # Mutate each member of the current generation.
-        for design in generations[k]:
+        for design in generations_paths[k]:
             # Each design gets mutated several times. 
             # Some mutations are not valid (exceed budget), so keep mutating 
             # till find valid mutations, or till max_mutations_iter is reached.
@@ -213,16 +219,16 @@ def iterative_bisection_refinement(accessibility_graph, base_node, budget,
         # If no mutations have been generated, then stop.
         if len(new_generation) == 0:
             # Compute costs and design points before returning.
-            generations_costs = compute_generations_costs(accessibility_graph, generations)
-            generations_designs = compute_generations_design_points(generations)
+            generations_costs = compute_generations_costs(accessibility_graph, generations_paths)
+            generations_designs = compute_generations_design_points(generations_paths)
             return generations, generations_designs, generations_costs
         else:
-            generations.append(new_generation)
+            generations_paths.append(new_generation)
 
     # Compute costs and design points before returning.
-    generations_costs = compute_generations_costs(accessibility_graph, generations)
-    generations_designs = compute_generations_design_points(generations)
-    return generations, generations_designs, generations_costs
+    generations_costs = compute_generations_costs(accessibility_graph, generations_paths)
+    generations_designs = compute_generations_design_points(generations_paths)
+    return generations_paths, generations_designs, generations_costs
 
 def sample_refinement_point(accessibility_graph, path, cost_growth_factor=1.0):
     """ Sample a refinement point for a given path. This function 
