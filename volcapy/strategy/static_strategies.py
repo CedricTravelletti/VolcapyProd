@@ -98,6 +98,7 @@ def static_blind_path_selection(
     return df
 
 
+# TODO: Should be able to specify the cost function.
 def iterative_bisection_refinement(accessibility_graph, base_node, budget,
         n_starting_designs, n_generations, n_mutations, cost_growth_factor=1.0,
         max_mutations_iter=20):
@@ -161,9 +162,7 @@ def iterative_bisection_refinement(accessibility_graph, base_node, budget,
     # Only allow those that are within budget.
     base_generation_with_budget = []
     for member in base_generation:
-        cost = np.sum([
-                    nx.path_weight(accessibility_graph, path_leg, weight='weight')
-                    for path_leg in member])
+        cost = cost_fn(member, accessibility_graph)
         if cost < budget:
             base_generation_with_budget.append(member)
 
@@ -207,9 +206,7 @@ def iterative_bisection_refinement(accessibility_graph, base_node, budget,
                     new_design.append(path_leg2)
 
                 # Check if new design is within cost.
-                cost_new_design = np.sum([
-                    nx.path_weight(accessibility_graph, path_leg, weight='weight')
-                    for path_leg in new_design])
+                cost_new_design = cost_fn(new_design, accessibility_graph)
 
                 # If within cost.
                 if cost_new_design < budget:
@@ -277,9 +274,7 @@ def compute_generations_costs(accessibility_graph, generations):
     for generation in generations:
         costs_current_generation = []
         for member in generation:
-            cost = np.sum([
-                    nx.path_weight(accessibility_graph, path_leg, weight='weight')
-                    for path_leg in member])
+            cost = cost_fn(member, accessibility_graph)
             costs_current_generation.append(cost)
         generations_costs.append(costs_current_generation)
 
@@ -300,3 +295,28 @@ def compute_generations_design_points(generations):
         generations_designs.append(designs_current_generation)
 
     return generations_designs
+
+def cost_fn(paths_list, accessibility_graph, base_observation_cost=5*60):
+    """ Compute cost of a design, specified as a list of paths (a path bein 
+    a list of nodes) connecting the design points.
+
+    Parameters
+    ----------
+    paths_list: List[List[int]]
+        List of paths between the nodes. Each path leg is a list of the 
+        indices of the traversed nodes.
+    accessibility_graph: nx.Graph
+    base_observation_cost: float
+        Cost (in seconds) of performing an observation.
+
+    Returns
+    -------
+    cost: float
+        The full cost of the design, defaults to 5 minutes.
+
+    """
+    cost = np.sum([
+            nx.path_weight(accessibility_graph, path_leg, weight='weight')
+            for path_leg in paths_list])
+    # Add the cost of each single design point (cost per measurement).
+    return cost
