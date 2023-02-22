@@ -1,6 +1,7 @@
 """ Submodule containing graph-related algorithms (optimization, ...).
 
 """
+import pickle 
 import multiprocessing
 import numpy as np
 import networkx as nx
@@ -276,7 +277,8 @@ def raor_algorithm(graph, budget, reward_fn, sampler, base_station_node):
     return best_design
 
 def raor_G_algorithm(graph, budget, reward_fn, init_design_sampler, base_station_node,
-        max_iter=1000, n_starting_designs=10):
+        tmp_save_file, 
+        max_iter=1000, n_starting_designs=10, base_observation_cost=5*60):
     """ Runs the randomized anytime orienteering algorithm from Arora 
     and Scherer (2017) in its greedy variant.
 
@@ -319,6 +321,9 @@ def raor_G_algorithm(graph, budget, reward_fn, init_design_sampler, base_station
     init_path = nx.algorithms.approximation.christofides(TSP_graph)
     init_cost = nx.path_weight(TSP_graph, init_path, weight='weight')
 
+    # Add the cost of the observations
+    init_cost += len(init_design) * base_observation_cost
+
     if init_cost <= budget:
         current_design = init_design
         best_reward = reward_fn(init_design)
@@ -334,6 +339,7 @@ def raor_G_algorithm(graph, budget, reward_fn, init_design_sampler, base_station
             generate_TSP_graph(graph, design, cost_fn='weight')
             for design in feasible_designs]
 
+    # MAIN LOOP. Try to refine the feasible designs.
     for i in range(3 * len(nodes)):
         if i >= max_iter: return feasible_designs
         print(i)
@@ -355,6 +361,9 @@ def raor_G_algorithm(graph, budget, reward_fn, init_design_sampler, base_station
         # Solve TSP.
         new_path = nx.algorithms.approximation.christofides(TSP_graph)
         new_cost = nx.path_weight(TSP_graph, new_path, weight='weight')
+
+        # Add cost of observations.
+        new_cost += len(current_design) * base_observation_cost
         print("New cost: {} hrs.".format(new_cost / (60**2)))
 
         if new_cost <= budget:
@@ -363,21 +372,28 @@ def raor_G_algorithm(graph, budget, reward_fn, init_design_sampler, base_station
             feasible_designs_rewards.append(new_reward)
             feasible_designs_TSP_graphs.append(TSP_graph)
 
+        # Also try to add the new node to one of the already known feasible designs.
         feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs, found_refinement = refine_feasible_designs(
                 new_node, graph,
                 feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs,
-                budget, reward_fn)
+                budget, reward_fn, base_observation_cost)
         # Allow for a maximum of 5 failed refinements.
         if found_refinement is False:
             fail_count += 1
         if fail_count >= 5:
             return feasible_designs
 
+        # Save once in a while.
+        save_dict = {'current_design': current_design, 'feasible_designs': feasible_designs,
+                'feasible_designs_rewards': feasible_designs_rewards}
+        with open(tmp_save_file, 'wb') as f:
+                pickle.dump(save_dict, f)
+
     return feasible_designs
 
 def refine_feasible_designs(new_node, graph,
         feasible_designs, feasible_designs_rewards, feasible_designs_TSP_graphs,
-        budget, reward_fn):
+        budget, reward_fn, base_observation_cost=5*60):
 
     # Compute the new costs.
     feasible_designs_TSP_graphs = [
@@ -387,8 +403,12 @@ def refine_feasible_designs(new_node, graph,
     # Solve TSP.
     new_paths = [nx.algorithms.approximation.christofides(TSP_graph) 
             for TSP_graph in feasible_designs_TSP_graphs]
-    new_costs = np.array([nx.path_weight(TSP_graph, new_path, weight='weight')
-            for new_path, TSP_graph in zip(new_paths, feasible_designs_TSP_graphs)])
+    # Compute costs, including observation costs.
+    new_costs = np.array([
+        (nx.path_weight(TSP_graph, new_path, weight='weight')
+            + (len(design) + 1) * base_observation_cost)
+        for new_path, TSP_graph, design in zip(
+            new_paths, feasible_designs_TSP_graphs, feasible_designs)])
 
     # Now return TSP graphs to their original state.
     feasible_designs_TSP_graphs = [
