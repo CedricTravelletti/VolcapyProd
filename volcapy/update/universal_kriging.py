@@ -387,6 +387,48 @@ class UniversalUpdatableGP(UpdatableGP):
             criterion += (residual**2).sum().item()
         return criterion
 
+    def k_fold_residuals(self, folds, G, y, data_std, use_cached_pushfwd=False):
+        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd)
+        K_tilde_inv = torch.inverse(K_tilde)
+
+        # Cache for later use.
+        self.K_tilde_inv = K_tilde_inv.cpu().numpy()
+
+        residuals = []
+        # Loop over folds.
+        for i, fold_inds in enumerate(folds):
+            print(i)
+            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, fold_inds)
+            residuals.append(residual.cpu().numpy())
+
+        return residuals
+
+
+    def _residuals_cov(self, inds_i, inds_j, K_tilde_inv):
+        # Get individual i-j blocks.
+        if inds_i.shape[0] > 1:
+            block_i = torch.inverse(K_tilde_inv[inds_i, :][:, inds_i])
+        else: 
+            block_i = 1 / (K_tilde_inv[inds_i, inds_i])
+        if inds_j.shape[0] > 1:
+            block_j = torch.inverse(K_tilde_inv[inds_j, :][:, inds_j])
+        else: 
+            block_j = 1 / (K_tilde_inv[inds_j, inds_j])
+
+        # Get cross i-j block.
+        block_ij = K_tilde_inv[inds_i, :][:, inds_j]
+
+        # Compute covariance.
+        if (inds_i.shape[0] > 1) and (inds_j.shape[0] > 1):
+            cov_ij = block_i @ block_ij @ block_j
+        elif (inds_i.shape[0] == 1) and (inds_j.shape[0] > 1):
+            cov_ij = block_i * block_ij @ block_j
+        elif (inds_i.shape[0] > 1) and (inds_j.shape[0] == 1):
+            cov_ij = block_i @ block_ij * block_j
+        else:
+            cov_ij = block_i * block_ij * block_j
+        return cov_ij
+
     def train_cv_criterion(self, lambda0s, sigma0s, G, y, data_std,
             criterion, k=None, folds=None, out_path=None):
         """ Compute the specified cross-validation criterion on a grid of covariance 
