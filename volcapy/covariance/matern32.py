@@ -64,10 +64,10 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
     
         # Transfer everything to device.
         if not torch.is_tensor(lambda0):
-            lambda0 = torch.from_numpy([lambda0])
-        lambda0 = lambda0.to(device).float()
-        F = F.to(device).float()
-        cells_coords = cells_coords.to(device).float()
+            lambda0 = torch.from_numpy(np.array([lambda0]))
+        lambda0 = lambda0.to(device).float().detach()
+        F = F.to(device).float().detach()
+        cells_coords = cells_coords.to(device).float().detach()
     
         # Flush to make sure everything clean.
         if torch.cuda.is_available():
