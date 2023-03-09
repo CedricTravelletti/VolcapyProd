@@ -226,6 +226,7 @@ class UniversalUpdatableGP(UpdatableGP):
                 @
                 self.coeff_F.t() @ G.t() @ R_inv_y
                 )
+        self.beta_hat = beta_hat
         R_inv_misfit = torch.linalg.solve(R, y - G @ self.coeff_F @ beta_hat)
         post_mean = (
                 self.coeff_F @ beta_hat
@@ -270,7 +271,7 @@ class UniversalUpdatableGP(UpdatableGP):
                 self.coeff_F @ beta_hat
                 + self.covariance.sigma0.float()**2 * pushfwd @ R_inv @ (y - G @ self.coeff_F.float() @ beta_hat))
 
-    def compute_cv_matrix(self, G, y, data_std, sigma0=None, use_cached_pushfwd=False):
+    def compute_cv_matrix(self, G, data_std, sigma0=None, use_cached_pushfwd=False):
         """ Compute the cross-validation matrix K_tilde.
 
         Parameters
@@ -299,6 +300,7 @@ class UniversalUpdatableGP(UpdatableGP):
             torch.hstack([R, G.double() @ self.coeff_F.double()]),
             torch.hstack([self.coeff_F.t().double() @ G.t().double(),
                 torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]), device=DEVICE).double()])])
+        print(K_tilde.shape)
         return K_tilde
 
     def compute_cv_residual(self, G, y, data_std, out_inds, sigma0=None):
@@ -316,7 +318,7 @@ class UniversalUpdatableGP(UpdatableGP):
         K_tilde_inv = torch.inverse(K_tilde)
         return _compute_cv_residual(K_tilde_inv, y, out_inds)
 
-    def _compute_cv_residual(self, K_tilde_inv, y ,out_inds):
+    def _compute_cv_residual(self, K_tilde_inv, y, out_inds):
         """ Helper function for cv residuals computation.
 
         """
@@ -329,13 +331,13 @@ class UniversalUpdatableGP(UpdatableGP):
         """
 
         if out_inds.shape[0] > 1:
-            block_1 = torch.inverse(K_tilde_inv[out_inds, :][:, out_inds])
+            block_1 = K_tilde_inv[out_inds, :][:, out_inds]
             block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
-            residual = block_1 @ block_2
+            residual = torch.linalg.solve(block_1, block_2)
         else:
             block_1 = 1 / (K_tilde_inv[out_inds, out_inds])
             block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
-            residual = block_1 *  block_2
+            residual = block_1 * block_2
 
         residual_cov = block_1
         return residual, residual_cov
@@ -344,7 +346,7 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Return the vector of leave-one-out cross-validation erros.
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std,
+        K_tilde = self.compute_cv_matrix(G, data_std,
                 sigma0=sigma0, use_cached_pushfwd=use_cached_pushfwd)
         K_tilde_inv = torch.inverse(K_tilde)
 
@@ -361,7 +363,7 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Compute the leave k out cross validation criterion (squared errors).
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd, sigma0)
+        K_tilde = self.compute_cv_matrix(G, data_std, use_cached_pushfwd, sigma0)
         K_tilde_inv = torch.inverse(K_tilde)
 
         criterion = 0
@@ -376,7 +378,7 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Compute the k fold cross validation criterion (squared errors).
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd)
+        K_tilde = self.compute_cv_matrix(G, data_std, use_cached_pushfwd)
         K_tilde_inv = torch.inverse(K_tilde)
 
         criterion = 0
@@ -388,7 +390,7 @@ class UniversalUpdatableGP(UpdatableGP):
         return criterion
 
     def k_fold_residuals(self, folds, G, y, data_std, use_cached_pushfwd=False):
-        K_tilde = self.compute_cv_matrix(G, y, data_std, use_cached_pushfwd)
+        K_tilde = self.compute_cv_matrix(G, data_std, use_cached_pushfwd)
         K_tilde_inv = torch.inverse(K_tilde)
 
         # Cache for later use.
@@ -663,8 +665,10 @@ class UniversalUpdatableGP(UpdatableGP):
         for lambda0 in lambda0s:
             # Only compute pushforward once per loop, since only depends on 
             # lambda0.
+            print(lambda0)
             pushfwd = self.covariance.compute_prior_pushfwd(G, lambda0)
             for sigma0 in sigma0s:
+                print(sigma0)
                 nll, beta_hat, R_inv = self.neg_log_likelihood_universal(
                         lambda0, sigma0, G, y, data_std, cached_pushfwd=pushfwd)
 
