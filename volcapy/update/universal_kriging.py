@@ -331,9 +331,16 @@ class UniversalUpdatableGP(UpdatableGP):
         """
 
         if out_inds.shape[0] > 1:
+            """
             block_1 = K_tilde_inv[out_inds, :][:, out_inds]
             block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
             residual = torch.linalg.solve(block_1, block_2)
+            """
+            inv = torch.inverse(K_tilde)
+            sub_inv = inv[out_inds, :][:, out_inds]
+            sub_inv_inv = torch.inverse(sub_inv)
+            tmp = inv[:y.shape[0],:y.shape[0]] @ y.double()
+            residual = sub_inv_inv @ tmp[out_inds]
         else:
             block_1 = 1 / (K_tilde_inv[out_inds, out_inds])
             block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
