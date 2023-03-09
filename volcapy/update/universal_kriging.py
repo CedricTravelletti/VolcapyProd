@@ -403,8 +403,12 @@ class UniversalUpdatableGP(UpdatableGP):
 
         return residuals
 
-
+    @classmethod
     def _residuals_cov(self, inds_i, inds_j, K_tilde_inv):
+        # Put everything in torch so that indexing works as intended.
+        if not torch.is_tensor(K_tilde_inv):
+            K_tilde_inv = torch.from_numpy(K_tilde_inv)
+
         # Get individual i-j blocks.
         if inds_i.shape[0] > 1:
             block_i = torch.inverse(K_tilde_inv[inds_i, :][:, inds_i])
@@ -427,7 +431,7 @@ class UniversalUpdatableGP(UpdatableGP):
             cov_ij = block_i @ block_ij * block_j
         else:
             cov_ij = block_i * block_ij * block_j
-        return cov_ij
+        return cov_ij.numpy()
 
     def train_cv_criterion(self, lambda0s, sigma0s, G, y, data_std,
             criterion, k=None, folds=None, out_path=None):
