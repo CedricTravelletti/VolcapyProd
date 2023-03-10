@@ -1,4 +1,5 @@
-""" Compute predictions from trained GP models (Stromboli data).
+""" Compute predictions from trained GP models (Stromboli data) and compare them 
+with LOOCV an k-fold (kMean k=10 clustering).
 
 """
 from volcapy.update.universal_kriging import UniversalUpdatableGP
