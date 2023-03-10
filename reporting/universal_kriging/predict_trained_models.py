@@ -95,35 +95,84 @@ updatable_gp_N41 = UniversalUpdatableGP(kernel, lambda0_N41, sigma0_N41,
         coeff_cov='uniform', coeff_mean='uniform',
         n_chunks=200)
 
+# Model with piecewise domains.
+lambda0_domains, sigma0_domains = 539.282051, 287.974359
+
+
+# Build the domain trends.
+from volcapy.utils import kMeans_folds
+# Compute folds via kMeans.
+k = 15 # number of clusters.
+folds = kMeans_folds(k, grid.cells)
+
+# Start with a constant trend.
+coeff_F_domains = torch.ones(volcano_coords.shape[0], 1)
+
+# Create the basis functions and stack.
+for i in range(k):
+    trend_fn = torch.zeros(grid.cells.shape[0])
+    trend_fn[folds[i]] = 1.0
+    coeff_F_domains = torch.hstack([
+    coeff_F_domains,
+    trend_fn.reshape(-1, 1)
+    ]).float()
+
+updatable_gp_domains = UniversalUpdatableGP(kernel, lambda0_domains, sigma0_domains,
+        volcano_coords,
+        coeff_F_domains,
+        coeff_cov='uniform', coeff_mean='uniform',
+        n_chunks=200)
+
 # Compute posterior means.
 post_mean_cyl = updatable_gp_cyl.predict_uniform(G, data_values, data_std)
 post_mean_cst = updatable_gp_cst.predict_uniform(G, data_values, data_std)
 post_mean_N41 = updatable_gp_N41.predict_uniform(G, data_values, data_std)
+post_mean_domains = updatable_gp_domains.predict_uniform(G, data_values, data_std)
 
 np.save(os.path.join(results_folder, "post_mean_cyl.npy"), post_mean_cyl.cpu().numpy())
 np.save(os.path.join(results_folder, "post_mean_cst.npy"), post_mean_cst.cpu().numpy())
 np.save(os.path.join(results_folder, "post_mean_N41.npy"), post_mean_N41.cpu().numpy())
+np.save(os.path.join(results_folder, "post_mean_domains.npy"), post_mean_domains.cpu().numpy())
 
 # Compute cross-validation residuals.
 residuals_loocv_cyl = updatable_gp_cyl.leave_1_out_residuals(G, data_values, data_std=0.1)
 residuals_loocv_cst = updatable_gp_cst.leave_1_out_residuals(G, data_values, data_std=0.1)
 residuals_loocv_N41 = updatable_gp_N41.leave_1_out_residuals(G, data_values, data_std=0.1)
+residuals_loocv_domains = updatable_gp_domains.leave_1_out_residuals(G, data_values, data_std=0.1)
 
 np.save(os.path.join(results_folder, "residuals_loocv_cyl.npy"), residuals_loocv_cyl.cpu().numpy())
 np.save(os.path.join(results_folder, "residuals_loocv_cst.npy"), residuals_loocv_cst.cpu().numpy())
 np.save(os.path.join(results_folder, "residuals_loocv_N41.npy"), residuals_loocv_N41.cpu().numpy())
+np.save(os.path.join(results_folder, "residuals_loocv_domains.npy"), residuals_loocv_domains.cpu().numpy())
 
 # Compute k-fold cross-validation for kMeans folds.
 from volcapy.utils import kMeans_folds
 k = 10 # number of clusters.
 folds = kMeans_folds(k, data_coords)
 residuals_kfolds_cyl = updatable_gp_cyl.k_fold_residuals(folds, G, data_values, data_std)
+k_tilde_inv_cyl = updatable_gp_cyl.K_tilde_inv
 residuals_kfolds_cst = updatable_gp_cst.k_fold_residuals(folds, G, data_values, data_std)
+k_tilde_inv_cst = updatable_gp_cst.K_tilde_inv
 residuals_kfolds_N41 = updatable_gp_N41.k_fold_residuals(folds, G, data_values, data_std)
+k_tilde_inv_N41 = updatable_gp_N41.K_tilde_inv
+residuals_kfolds_domains = updatable_gp_domains.k_fold_residuals(folds, G, data_values, data_std)
+k_tilde_inv_domains = updatable_gp_domains.K_tilde_inv
 
 np.save(os.path.join(results_folder, "residuals_kfolds_cyl.npy"), residuals_kfolds_cyl)
 np.save(os.path.join(results_folder, "residuals_kfolds_cst.npy"), residuals_kfolds_cst)
 np.save(os.path.join(results_folder, "residuals_kfolds_N41.npy"), residuals_kfolds_N41)
+np.save(os.path.join(results_folder, "residuals_kfolds_domains.npy"), residuals_kfolds_domains)
+
+# Store the K_tilde inverse matrix for later display of the residuals covariance.
+residuals_kfolds_cyl = updatable_gp_cyl.k_fold_residuals(folds, G, data_values, data_std)
+residuals_kfolds_cst = updatable_gp_cst.k_fold_residuals(folds, G, data_values, data_std)
+residuals_kfolds_N41 = updatable_gp_N41.k_fold_residuals(folds, G, data_values, data_std)
+residuals_kfolds_domains = updatable_gp_domains.k_fold_residuals(folds, G, data_values, data_std)
+
+np.save(os.path.join(results_folder, "k_tilde_inv_cyl.npy"), k_tilde_inv_cyl)
+np.save(os.path.join(results_folder, "k_tilde_inv_cst.npy"), k_tilde_inv_cst)
+np.save(os.path.join(results_folder, "k_tilde_inv_N41.npy"), k_tilde_inv_N41)
+np.save(os.path.join(results_folder, "k_tilde_inv_domains.npy"), k_tilde_inv_domains)
 
 # Save folds indices.
 with open(os.path.join(results_folder, "folds_inds.pkl"), "wb") as fp:
