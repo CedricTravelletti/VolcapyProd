@@ -62,7 +62,7 @@ def r_sequence(n_samples, dim, n_cells_1d):
         c[i, :] = (np.floor(n_cells_1d *z[i, :])).astype(int)
     return c
 
-def kMeans_clustering(k, data_coords):
+def kMeans_clustering(k, data_coords, init='k-means++', n_init=10, random_state=42):
     """ Cluster data points into k clusters using kMeans.
 
     Parameters
@@ -71,7 +71,9 @@ def kMeans_clustering(k, data_coords):
         Number of clusters.
     data_coords: array (n_data, n_dims)
         Coordinates of the points to cluster.
-
+    init: 'random' or 'k-means++', default is 'k-means++'
+        Specifies how to initialize the cluster centroids.
+        Use random to get different clusters.
     Returns
     -------
     cluster_labels: array (n_data)
@@ -80,12 +82,12 @@ def kMeans_clustering(k, data_coords):
 
     """
     if torch.is_tensor(data_coords): data_coords = data_coords.cpu().numpy()
-    kmeans = KMeans(init="random", n_clusters=k,
-            n_init=10, max_iter=300, random_state=42)
+    kmeans = KMeans(init=init, n_clusters=k,
+            n_init=n_init, max_iter=300, random_state=random_state,)
     kmeans.fit(data_coords)
     return kmeans.labels_
 
-def kMeans_folds(k, data_coords):
+def kMeans_folds(k, data_coords, init='k-means++', n_init=10, random_state=42):
     """ Computes folds using kMeans clustering. 
     Returns a list of folds, each fold being described by a list of 
     indices, corresponding to the points that belong to the cluster. 
@@ -106,7 +108,8 @@ def kMeans_folds(k, data_coords):
         belonging to a given fold.
 
     """
-    cluster_labels = kMeans_clustering(k, data_coords)
+    cluster_labels = kMeans_clustering(k, data_coords,
+            init=init, n_init=n_init, random_state=random_state)
     folds = []
     for i in range(k):
         fold_indices = np.argwhere(cluster_labels == i).flatten()
