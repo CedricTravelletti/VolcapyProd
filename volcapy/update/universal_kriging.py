@@ -292,18 +292,17 @@ class UniversalUpdatableGP(UpdatableGP):
         if use_cached_pushfwd is True:
             pushfwd = self.covariance._pushfwd_cache.double()
         else:
-            pushfwd = self.covariance.compute_prior_pushfwd(G).double()
+            pushfwd = self.covariance.compute_prior_pushfwd(G).double().to(DEVICE)
         R = (
-                sigma0**2 * G.double() @ pushfwd
+                sigma0.to(DEVICE)**2 * G.double() @ pushfwd
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE).double())
         K_tilde = torch.vstack([
             torch.hstack([R, G.double() @ self.coeff_F.double()]),
             torch.hstack([self.coeff_F.t().double() @ G.t().double(),
                 torch.zeros((self.coeff_F.shape[1], self.coeff_F.shape[1]), device=DEVICE).double()])])
-        print(K_tilde.shape)
         return K_tilde
 
-    def compute_cv_residual(self, G, y, data_std, out_inds, sigma0=None):
+    def compute_cv_residual(self, G, y, data_std, K_tilde, out_inds, sigma0=None):
         """ Compute cross-validation residual at left out indices out_inds.
 
         Returns
@@ -314,21 +313,7 @@ class UniversalUpdatableGP(UpdatableGP):
             Cross-validation predictor covariance.
 
         """
-        K_tilde = self.compute_cv_matrix(G, y, data_std, sigma0)
-        K_tilde_inv = torch.inverse(K_tilde)
-        return _compute_cv_residual(K_tilde_inv, y, out_inds)
-
-    def _compute_cv_residual(self, K_tilde_inv, y, out_inds):
-        """ Helper function for cv residuals computation.
-
-        """
         if not y.device == DEVICE: y = y.to(DEVICE)
-
-        """
-        print(out_inds)
-        print(K_tilde_inv[out_inds, :])
-        print(K_tilde_inv[out_inds, :][:, out_inds])
-        """
 
         if out_inds.shape[0] > 1:
             """
@@ -340,13 +325,16 @@ class UniversalUpdatableGP(UpdatableGP):
             sub_inv = inv[out_inds, :][:, out_inds]
             sub_inv_inv = torch.inverse(sub_inv)
             tmp = inv[:y.shape[0],:y.shape[0]] @ y.double()
-            residual = sub_inv_inv @ tmp[out_inds]
+            # residual = sub_inv_inv @ tmp[out_inds]
+            residual = torch.linalg.solve(sub_inv, tmp[out_inds])
+            residual_cov = sub_inv_inv
         else:
-            block_1 = 1 / (K_tilde_inv[out_inds, out_inds])
-            block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
-            residual = block_1 * block_2
+            inv = torch.inverse(K_tilde)
+            block_1 = 1 / (inv[out_inds, out_inds])
+            tmp = inv[:y.shape[0], :y.shape[0]] @ y.double()
+            residual = block_1 * tmp[out_inds]
+            residual_cov = block_1
 
-        residual_cov = block_1
         return residual, residual_cov
 
     def leave_1_out_residuals(self, G, y, data_std, sigma0=None, use_cached_pushfwd=False):
@@ -355,13 +343,12 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         K_tilde = self.compute_cv_matrix(G, data_std,
                 sigma0=sigma0, use_cached_pushfwd=use_cached_pushfwd)
-        K_tilde_inv = torch.inverse(K_tilde)
 
         residuals = torch.zeros(y.shape)
         # Loop over data points.
         for i in range(y.shape[0]):
             out_inds = np.array([i]).reshape(1,)
-            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, out_inds)
+            residual, residual_cov = self.compute_cv_residual(G, y, data_std, K_tilde, out_inds)
             residuals[i] = residual.item()
 
         return residuals
@@ -370,44 +357,25 @@ class UniversalUpdatableGP(UpdatableGP):
         """ Compute the leave k out cross validation criterion (squared errors).
 
         """
-        K_tilde = self.compute_cv_matrix(G, data_std, use_cached_pushfwd, sigma0)
-        K_tilde_inv = torch.inverse(K_tilde)
+        K_tilde = self.compute_cv_matrix(G, data_std, sigma0=sigma0, use_cached_pushfwd=use_cached_pushfwd)
 
         criterion = 0
         # Generate all subsets with k elements.
         for i, out_inds in enumerate(itertools.combinations(list(range(y.shape[0])), k)):
-            print(i)
-            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, np.array(out_inds))
-            criterion += (residual**2).sum().item()
-        return criterion
-
-    def k_fold_criterion(self, folds, G, y, data_std, use_cached_pushfwd=False):
-        """ Compute the k fold cross validation criterion (squared errors).
-
-        """
-        K_tilde = self.compute_cv_matrix(G, data_std, use_cached_pushfwd)
-        K_tilde_inv = torch.inverse(K_tilde)
-
-        criterion = 0
-        # Loop over folds.
-        for i, fold_inds in enumerate(folds):
-            print(i)
-            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, fold_inds)
+            residual, residual_cov = self.compute_cv_residual(G, y, data_std, K_tilde, np.array(out_inds))
             criterion += (residual**2).sum().item()
         return criterion
 
     def k_fold_residuals(self, folds, G, y, data_std, use_cached_pushfwd=False):
-        K_tilde = self.compute_cv_matrix(G, data_std, use_cached_pushfwd)
-        K_tilde_inv = torch.inverse(K_tilde)
+        K_tilde = self.compute_cv_matrix(G, data_std, use_cached_pushfwd=use_cached_pushfwd)
 
         # Cache for later use.
-        self.K_tilde_inv = K_tilde_inv.cpu().numpy()
+        self.K_tilde = K_tilde.cpu().numpy()
 
         residuals = []
         # Loop over folds.
         for i, fold_inds in enumerate(folds):
-            print(i)
-            residual, residual_cov = self._compute_cv_residual(K_tilde_inv, y, fold_inds)
+            residual, residual_cov = self.compute_cv_residual(G, y, data_std, K_tilde, fold_inds)
             residuals.append(residual.cpu().numpy())
 
         return residuals
@@ -442,6 +410,56 @@ class UniversalUpdatableGP(UpdatableGP):
             cov_ij = block_i * block_ij * block_j
         return cov_ij.numpy()
 
+    @classmethod
+    def get_column_extractor(self, inds, dim):
+        """ Compute the column extraction matrix for a given set of indices.
+
+        """
+        if isinstance(inds, int): inds = np.array([inds])
+        id_matrix = torch.eye(dim)
+        column_extractor = id_matrix[:, inds]
+        return column_extractor
+
+    @classmethod
+    def residual_cov_newimplementation(self, inds_i, inds_j, K_tilde):
+        """ Compute covariance matrix between batches of residuals.
+
+        Parameters
+        ----------
+        inds_i: array_like or int
+            List of indices include in the fold to consider, or 
+            single index if LOO.
+        inds_j: array_like or int
+            List of indices include in the fold to consider, or 
+            single index if LOO.
+        K_tilde: array_like
+            The fast CV helper matrix.
+
+        Returns
+        -------
+        residual_cov: array_like [inds_i.shape[0], inds_j.shape[0]]
+            Covariance matrix of the folds residuals.
+        
+        """
+        # First put everything in torch.
+        if not torch.is_tensor(K_tilde_inv):
+            K_tilde_inv = torch.from_numpy(K_tilde_inv)
+
+        # Promote scalars to tensors.
+        if isinstance(inds_i, int): inds_i = np.array([inds_i])
+        if isinstance(inds_i, int): inds_j = np.array([inds_j])
+
+        inds_i, inds_ = torch.from_numpy(inds_i), torch.from_numpy(inds_j)
+
+        # Extract lines and columns of the inverse.
+        K_inv_ij = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_j)
+        K_inv_ii = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_i)
+        K_inv_jj = col_extractor_j.T @ torch.linalg.solve(K_tilde, col_extractor_j)
+
+        second_term = torch.transpose(torch.linalg.solve(K_jj.T, K_inv_ij.T))
+        residual_cov = torch.linalg.solve(K_inv_ii, second_term)
+        return residual_cov
+
     def train_cv_criterion(self, lambda0s, sigma0s, G, y, data_std,
             criterion, k=None, folds=None, out_path=None):
         """ Compute the specified cross-validation criterion on a grid of covariance 
@@ -475,12 +493,13 @@ class UniversalUpdatableGP(UpdatableGP):
         # Store results in Pandas DataFrame.
         df = pd.DataFrame(columns=['lambda0', 'sigma0', 'sum squared residuals'])
 
+        # TODO: refactor since currently only works with k-fold criterion.
         # Pick the corresponding criterion function.
         if criterion == "leave k out":
             criterion_fn = lambda: self.leave_k_out_criterion(k, G, y, data_std,
                         use_cached_pushfwd=True)
         elif criterion == "k fold":
-            criterion_fn = lambda: self.k_fold_criterion(folds, G, y, data_std,
+            criterion_fn = lambda: self.k_fold_residuals(folds, G, y, data_std,
                     use_cached_pushfwd=True)
 
         for lambda0 in lambda0s:
@@ -494,10 +513,13 @@ class UniversalUpdatableGP(UpdatableGP):
                 self.lambda0 = lambda0
                 self.sigma0 = sigma0
 
-                sum_squared_residual = criterion_fn()
+                residuals = criterion_fn()
+
+                # Compute the average squared loss over each fold.
+                avg_sq_residuals = [np.mean(x_list**2) for x_list in residuals]
 
                 df = df.append({'lambda0': lambda0, 'sigma0': sigma0,
-                    'sum squared residuals': sum_squared_residual},
+                    'average squared residual': avg_sq_residuals},
                     ignore_index=True)
             # Save after each lambda0.
             df.to_pickle(out_path)
