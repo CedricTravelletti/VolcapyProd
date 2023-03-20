@@ -442,8 +442,8 @@ class UniversalUpdatableGP(UpdatableGP):
         
         """
         # First put everything in torch.
-        if not torch.is_tensor(K_tilde_inv):
-            K_tilde_inv = torch.from_numpy(K_tilde_inv)
+        if not torch.is_tensor(K_tilde):
+            K_tilde = torch.from_numpy(K_tilde)
 
         # Promote scalars to tensors.
         if isinstance(inds_i, int): inds_i = np.array([inds_i])
