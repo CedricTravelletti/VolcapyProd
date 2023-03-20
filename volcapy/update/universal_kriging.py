@@ -413,6 +413,20 @@ class UniversalUpdatableGP(UpdatableGP):
     @classmethod
     def get_column_extractor(self, inds, dim):
         """ Compute the column extraction matrix for a given set of indices.
+        The column extractor is a matrix E such that for any matrix A of 
+        suitable dimension, A @ E extracts the chosen columns of A.
+
+        Parameters
+        ----------
+        inds: array-like[int]
+            Array containing the indices of the columns to extract.
+        dim: int
+            Column dimension of the matrices for which we want a column 
+            extractor.
+
+        Returns
+        -------
+        col_extractor: array[dim, inds.shape[0]]
 
         """
         if isinstance(inds, int): inds = np.array([inds])
@@ -450,6 +464,10 @@ class UniversalUpdatableGP(UpdatableGP):
         if isinstance(inds_i, int): inds_j = np.array([inds_j])
 
         inds_i, inds_ = torch.from_numpy(inds_i), torch.from_numpy(inds_j)
+
+        # Get the column extraction matrices.
+        col_extractor_i = self.get_column_extractor(inds_i, dim)
+        col_extractor_j = self.get_column_extractor(inds_j, dim)
 
         # Extract lines and columns of the inverse.
         K_inv_ij = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_j)
