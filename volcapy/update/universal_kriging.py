@@ -466,6 +466,7 @@ class UniversalUpdatableGP(UpdatableGP):
         inds_i, inds_ = torch.from_numpy(inds_i), torch.from_numpy(inds_j)
 
         # Get the column extraction matrices.
+        dim = K_tilde.shape[1]
         col_extractor_i = self.get_column_extractor(inds_i, dim)
         col_extractor_j = self.get_column_extractor(inds_j, dim)
 
