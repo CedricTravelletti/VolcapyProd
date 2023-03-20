@@ -475,7 +475,7 @@ class UniversalUpdatableGP(UpdatableGP):
         K_inv_ii = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_i)
         K_inv_jj = col_extractor_j.T @ torch.linalg.solve(K_tilde, col_extractor_j)
 
-        second_term = torch.transpose(torch.linalg.solve(K_inv_jj.T, K_inv_ij.T)).T
+        second_term = torch.linalg.solve(K_inv_jj.T, K_inv_ij.T).T
         residual_cov = torch.linalg.solve(K_inv_ii, second_term)
         return residual_cov
 
