@@ -22,7 +22,7 @@ def compute_cov_dist(d, lambda0):
 
 
 def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
-        n_flush=50):
+        n_flush=50, double=False):
     """ Compute the covariance pushforward.
 
     The covariance pushforward is just KF^T, where K is the model
@@ -65,9 +65,15 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         # Transfer everything to device.
         if not torch.is_tensor(lambda0):
             lambda0 = torch.from_numpy(np.array([lambda0]))
-        lambda0 = lambda0.to(device).float().detach()
-        F = F.to(device).float().detach()
-        cells_coords = cells_coords.to(device).float().detach()
+
+        if double is True.
+            lambda0 = lambda0.to(device).double().detach()
+            F = F.to(device).double().detach()
+            cells_coords = cells_coords.to(device).double().detach()
+        else:
+            lambda0 = lambda0.to(device).float().detach()
+            F = F.to(device).float().detach()
+            cells_coords = cells_coords.to(device).float().detach()
     
         # Flush to make sure everything clean.
         if torch.cuda.is_available():
