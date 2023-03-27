@@ -61,7 +61,7 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
         # Pre compute some stuff.
         self.sigma_Ft = (coeff_cov @ coeff_F.t()).to(DEVICE)
 
-    def compute_prior_pushfwd(self, G, lambda0=None, ignore_trend=True):
+    def compute_prior_pushfwd(self, G, lambda0=None, ignore_trend=True, double=False):
         """ Given an operator G, compute the covariance pushforward (1 / sigma0^2) * K_0 G^T,
         i.e. the pushforward with respect to the prior.
 
@@ -97,7 +97,7 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
         pushfwd = self.cov_module.compute_cov_pushforward(
                 lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
-                n_flush=self.n_flush)
+                n_flush=self.n_flush, double)
         if ignore_trend is True:
             # Caching.
             self._pushfwd_cache = pushfwd
@@ -292,7 +292,7 @@ class UniversalUpdatableGP(UpdatableGP):
         if use_cached_pushfwd is True:
             pushfwd = self.covariance._pushfwd_cache.double()
         else:
-            pushfwd = self.covariance.compute_prior_pushfwd(G).double().to(DEVICE)
+            pushfwd = self.covariance.compute_prior_pushfwd(G.double(), double=True).double().to(DEVICE)
         R = (
                 sigma0.to(DEVICE)**2 * G.double() @ pushfwd
                 + data_std**2 * torch.eye(G.shape[0], device=DEVICE).double())
@@ -478,6 +478,108 @@ class UniversalUpdatableGP(UpdatableGP):
         second_term = torch.linalg.solve(K_inv_jj.T, K_inv_ij.T).T
         residual_cov = torch.linalg.solve(K_inv_ii, second_term)
         return residual_cov
+
+    @classmethod
+    def concatenated_residuals_cov(self, folds, K_tilde, additional_noise=0):
+        """ Compute covariance matrix of the concatenated vector of residuals.
+
+        Parameters
+        ----------
+        folds: List[array[int]]
+            Folds definition, given as a list of arrays, each array giving 
+            the indices of the datapoints belonging to the corresponding fold.
+        K_tilde: array_like
+            The fast CV helper matrix.
+
+        Returns
+        -------
+        residual_cov: array_like [n_data, n_data]
+            Covariance matrix of the concatenated vectro of folds residuals.
+        
+        """
+        # First put everything in torch.
+        if not torch.is_tensor(K_tilde):
+            K_tilde = torch.from_numpy(K_tilde)
+
+        dim = K_tilde.shape[1]
+
+        # Same for folds inds.
+        folds_torch = [torch.from_numpy(fold_inds) for fold_inds in folds]
+        n_data = np.sum([x.shape[0] for x in folds])
+
+        # Add noise in case non-invertivle.
+        if additional_noise > 0:
+            diag = torch.ones(dim)
+            diag[n_data:] = 0
+            K_tilde = K_tilde + additional_noise * torch.diag(diag)
+
+        K_tilde_inv = torch.inverse(K_tilde)
+
+        # Compute the block for each folds.
+        block_mat_list = []
+        for fold in folds:
+            # Get the column extraction matrices.
+            col_extractor_i = self.get_column_extractor(fold, dim).double()
+            # K_inv_ii = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_i)
+            K_inv_ii = col_extractor_i.T @ K_tilde_inv @ col_extractor_i
+            block_mat_list.append(torch.inverse(K_inv_ii))
+        block_mat = torch.block_diag(*block_mat_list)
+
+        # Also compute the full inverse.
+        n_data = np.sum([x.shape[0] for x in folds])
+        col_extractor_full = self.get_column_extractor(list(range(n_data)), dim).double()
+        # K_inv = col_extractor_full.T @ torch.linalg.solve(K_tilde, col_extractor_full)
+        K_inv = torch.inverse(K_tilde)[:, :n_data][:n_data, :]
+
+        residual_cov_1 = block_mat @ K_inv @ block_mat
+
+        # IMPLEMENTATION NR 2.
+        col_extractor_full = self.get_column_extractor(list(range(n_data)), dim)
+
+        # Everything to double.
+        col_extractor_full = col_extractor_full.double()
+
+        # Alternative implementation.
+        # Compute the left-hand part (bock matrix multiplication).
+        block_bands = []
+        for fold in folds:
+            # Get the column extraction matrices.
+            col_extractor_i = self.get_column_extractor(fold, dim).double()
+            K_inv_ii = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_i)
+            # Compute product in horizontal bands.
+            # Have to extract the horizontal band for index i.
+            band_i = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_full)
+            block_bands.append(torch.linalg.solve(K_inv_ii, band_i))
+        lh_term = torch.cat(block_bands, dim=0)
+
+        # Compute the remaining block matrix multiplication. 
+        # Take advantage of the fact that it can be expressed as a transpose 
+        # of the first multiplication.
+        col_extractor_full_lh_term = self.get_column_extractor(list(range(n_data)), n_data).double() # Column extractor for the left hand term.
+        block_bands = []
+        for fold in folds:
+            # Get the column extraction matrices.
+            col_extractor_i_full = self.get_column_extractor(fold, dim).double()
+            col_extractor_i_lh = self.get_column_extractor(fold, n_data).double() # Again, dimensions have changed now.
+            K_inv_ii = col_extractor_i_full.T @ torch.linalg.solve(K_tilde, col_extractor_i_full)
+            # Compute product in horizontal bands.
+            # Have to extract the horizontal band for index i.
+            band_i = col_extractor_i_lh.T @ torch.linalg.solve(lh_term, col_extractor_full_lh_term)
+            block_bands.append(torch.linalg.solve(K_inv_ii, band_i))
+        residual_cov = torch.cat(block_bands, dim=0).T
+
+        return residual_cov, residual_cov_1, block_mat
+
+    @classmethod
+    def uncorrelate_vector(self, vector, cov_matrix):
+        try:
+            chol_L = torch.linalg.cholesky(cov_matrix)
+        except:
+            print("Warning: non-invertible matrix. Adding noise.")
+            chol_L = torch.linalg.cholesky(cov_matrix + 0.1 * torch.eye(cov_matrix.shape[0]))
+
+        uncorr_vector = torch.triangular_solve(vector.double(), chol_L, upper=False)[0]
+        return uncorr_vector
 
     def train_cv_criterion(self, lambda0s, sigma0s, G, y, data_std,
             criterion, k=None, folds=None, out_path=None):
