@@ -646,7 +646,7 @@ class InverseGaussianProcess(torch.nn.Module):
         sigma0 = self.sigma0.detach().cpu().item()
         lambda0 = self.lambda0
 
-        sample = Rinterface.sample(self.kernel, sigma0, lambda0, prior, self.cells_coords)
+        sample = Rinterface.sample(self.kernel, sigma0, lambda0, m0, self.cells_coords)
         return sample
 
     def posterior_variance(self):
@@ -713,6 +713,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         # Sample from prior.
         sample = self.sample_prior()
+        print(sample.shape)
 
         # Generate hypotherical data.
         noise = torch.normal(mean=0.0, std=data_std, size=(G.shape[0], 1))
