@@ -183,7 +183,7 @@ def compute_cov(lambda0, cells_coords, i, j):
 
 def compute_full_cov(lambda0, cells_coords, device=None, n_chunks=200,
         n_flush=50):
-    """ Compute the covariance pushforward.
+    """ Compute the full covariance matrix.
 
     The covariance pushforward is just KF^T, where K is the model
     covariance matrix.

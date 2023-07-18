@@ -671,6 +671,21 @@ class InverseGaussianProcess(torch.nn.Module):
         self.post_variance = self.sigma0**2 * prior_variances
         return self.post_variance
 
+    def prior_covariance(self):
+        """ Computes prior covariance matrix.
+
+        Returns
+        -------
+        cov_mat: (self.cells_coords.n_cells, self.cells_coords.n_cells) Tensor
+            Posterior covariance matrix.
+
+        """
+        prior_covariance = self.kernel.compute_full_cov(
+                self.lambda0, self.cells_coords, self.device,
+                n_chunks=self.n_chunks, n_flush=50)
+
+        return self.sigma0**2 * prior_covariance
+
     def posterior_covariance(self):
         """ Computes posterior covariance matrix.
         WARNING: needs pushforward and inversion operator to be only computed,
@@ -682,7 +697,7 @@ class InverseGaussianProcess(torch.nn.Module):
             Posterior covariance matrix.
 
         """
-        prior_covariance = self.kernel.compute_covariance(
+        prior_covariance = self.kernel.compute_full_cov(
                 self.lambda0, self.cells_coords, self.device,
                 n_chunks=self.n_chunks, n_flush=50)
 
