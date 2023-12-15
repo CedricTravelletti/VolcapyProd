@@ -15,6 +15,10 @@ For more information, please see the [Project Website](https://cedrictravelletti
 *The name Volcapy comes from the origin of the project as an inversion code for volcano gravimetry. It has now evolved into a general large scale Bayesian inversion framework.*
 
 
+Cédric Travelletti gratefully acknowledges funding from the **Swiss National Science Fundation
+(SNF)** through project no. 178858.
+
+
 ## References
 <a id="1">[1]</a> 
 Tarantola, A. (2005). 

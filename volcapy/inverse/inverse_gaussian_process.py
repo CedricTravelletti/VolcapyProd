@@ -646,7 +646,7 @@ class InverseGaussianProcess(torch.nn.Module):
         sigma0 = self.sigma0.detach().cpu().item()
         lambda0 = self.lambda0
 
-        sample = Rinterface.sample(self.kernel, sigma0, lambda0, prior, self.cells_coords)
+        sample = Rinterface.sample(self.kernel, sigma0, lambda0, m0, self.cells_coords)
         return sample
 
     def posterior_variance(self):
@@ -671,6 +671,21 @@ class InverseGaussianProcess(torch.nn.Module):
         self.post_variance = self.sigma0**2 * prior_variances
         return self.post_variance
 
+    def prior_covariance(self):
+        """ Computes prior covariance matrix.
+
+        Returns
+        -------
+        cov_mat: (self.cells_coords.n_cells, self.cells_coords.n_cells) Tensor
+            Posterior covariance matrix.
+
+        """
+        prior_covariance = self.kernel.compute_full_cov(
+                self.lambda0, self.cells_coords, self.device,
+                n_chunks=self.n_chunks, n_flush=50)
+
+        return self.sigma0**2 * prior_covariance
+
     def posterior_covariance(self):
         """ Computes posterior covariance matrix.
         WARNING: needs pushforward and inversion operator to be only computed,
@@ -682,7 +697,7 @@ class InverseGaussianProcess(torch.nn.Module):
             Posterior covariance matrix.
 
         """
-        prior_covariance = self.kernel.compute_covariance(
+        prior_covariance = self.kernel.compute_full_cov(
                 self.lambda0, self.cells_coords, self.device,
                 n_chunks=self.n_chunks, n_flush=50)
 
@@ -713,6 +728,7 @@ class InverseGaussianProcess(torch.nn.Module):
 
         # Sample from prior.
         sample = self.sample_prior()
+        print(sample.shape)
 
         # Generate hypotherical data.
         noise = torch.normal(mean=0.0, std=data_std, size=(G.shape[0], 1))

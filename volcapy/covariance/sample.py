@@ -49,7 +49,7 @@ def sample(kernel, sigma0, lambda0, m0, cells):
         print("Sampling from exponential model")
         model = rflib.RMexp(var=sigma0**2,
                 scale=lambda0)
-    elif kernel.KERNEL_FAMILY == "squared_exponential":
+    elif kernel.KERNEL_FAMILY == "squared exponential":
         print("Sampling from squared exponential model")
         model = rflib.RMgauss(var=sigma0**2,
                 scale=lambda0)
@@ -66,7 +66,8 @@ def sample(kernel, sigma0, lambda0, m0, cells):
     # Sample.
     # Warning: the implementation seems to have changed. We have to make 
     # the model circulant now.
-    simu = rflib.RFsimulate(rflib.RPtbm(model, linesimustep=10.0), cells)
+    # simu = rflib.RFsimulate(rflib.RPtbm(model, linesimustep=10.0), cells)
+    simu = rflib.RFsimulate(rflib.RPcirculant(model), x=cells.reshape(-1))
 
     # Back to numpy, make column vector also.
     sample = torch.from_numpy(

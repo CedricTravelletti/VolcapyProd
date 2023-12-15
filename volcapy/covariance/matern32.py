@@ -66,7 +66,7 @@ def compute_cov_pushforward(lambda0, F, cells_coords, device=None, n_chunks=200,
         if not torch.is_tensor(lambda0):
             lambda0 = torch.from_numpy(np.array([lambda0]))
 
-        if double is True.
+        if double is True:
             lambda0 = lambda0.to(device).double().detach()
             F = F.to(device).double().detach()
             cells_coords = cells_coords.to(device).double().detach()
