@@ -97,7 +97,7 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
         pushfwd = self.cov_module.compute_cov_pushforward(
                 lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
-                n_flush=self.n_flush, double)
+                n_flush=self.n_flush, double=double)
         if ignore_trend is True:
             # Caching.
             self._pushfwd_cache = pushfwd
