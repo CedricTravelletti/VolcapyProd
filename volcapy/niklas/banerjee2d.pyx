@@ -29,7 +29,7 @@ def banerjee(double xh, double xl, double yh, double yl,
     """
     cdef int i, j
     cdef double dx, dy
-    cdef int sign
+    cdef double sign
 
     # Generate the different combinations we need.
     deltas_x = [xh - x_data, xl - x_data]
@@ -42,7 +42,7 @@ def banerjee(double xh, double xl, double yh, double yl,
             B += _banerjee(dx, dy, sign)
     return B
 
-cdef double _banerjee(double x, double y, int sign):
+cdef double _banerjee(double x, double y, double sign):
     """ Helper function for readability.
     """
     cdef double R = x**2 + y**2

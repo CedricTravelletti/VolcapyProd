@@ -38,7 +38,7 @@ cdef double cbanerjee(double xh, double xl, double yh, double yl, double zh, dou
     """
     cdef int i, j, l
     cdef double dx, dy, dz
-    cdef int sign
+    cdef double sign
 
     # Generate the different combinations we need.
     deltas_x = [xh - x_data, xl - x_data]
@@ -53,7 +53,7 @@ cdef double cbanerjee(double xh, double xl, double yh, double yl, double zh, dou
                 B += _banerjee(dx, dy, dz, sign)
     return B
 
-cdef double _banerjee(double x, double y, double z, int sign):
+cdef double _banerjee(double x, double y, double z, double sign):
     """ Helper function for readability.
     """
     cdef double x_term
