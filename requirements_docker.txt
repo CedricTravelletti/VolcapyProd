@@ -35,5 +35,4 @@ tifffile==2021.11.2
 torch==1.13.1
 typing_extensions==4.7.1
 tzlocal==5.1
--e git+https://github.com/CedricTravelletti/VolcapyProd.git@b60fccba4b9b8ba2d43368e6564a1c45bdfc44d4#egg=volcapy
 vtk==9.3.0
