@@ -29,7 +29,8 @@ torch.set_num_threads(8)
 gpu = torch.device('cuda:0')
 cpu = torch.device('cpu')
 
-data_folder = "/storage/homefs/ct19x463/Data/InversionDatas/stromboli_173018"
+data_folder = "/home/docker/data/InversionDatas/stromboli_173018"
+save_folder = "/home/docker/data/samples"
 
 # Load
 G = torch.from_numpy(
@@ -112,15 +113,11 @@ noise = MultivariateNormal(loc=torch.zeros(n_data), covariance_matrix=data_std**
 synth_data = G @ ground_truth + noise
 
 
-# In[3]:
-
-
-save_folder = "/storage/homefs/ct19x463/Dev/VolcapyProd/reporting/paper_universal_kriging/data"
-
 np.save(os.path.join(save_folder, "ground_truth.npy"), ground_truth.cpu().numpy())
 np.save(os.path.join(save_folder, "data_vals_niklas_points.npy"), synth_data.cpu().numpy())
 
 
+"""
 # In[3]:
 
 
@@ -151,4 +148,4 @@ fig.update_layout(height=900, width=1200,
                                  colorbar_len=0.75,
                                  cmin=vmin, cmax=vmax))
 fig.show()
-
+"""

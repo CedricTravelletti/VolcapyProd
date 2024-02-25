@@ -671,8 +671,9 @@ class UniversalUpdatableGP(UpdatableGP):
         distrib = MultivariateNormal(
                 loc=self.coeff_prior_mean.reshape(-1), covariance_matrix=self.coeff_prior_cov)
         trend_sample = distrib.rsample().float()
+        sample = centred_sample.reshape(-1) + self.coeff_F @ trend_sample.reshape(-1)
 
-        return (centred_sample.reshape(-1) + self.coeff_F @ trend_sample.reshape(-1), trend_sample)
+        return (sample, trend_sample)
 
     def neg_log_likelihood(self, lambda0, sigma0, coeff_mean, coeff_cov, G, y, data_std=0.0):
         """ Compute the negative log-likelihood (up to a constant and a factor 1/2).
