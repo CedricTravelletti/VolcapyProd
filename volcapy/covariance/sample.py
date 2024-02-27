@@ -66,7 +66,7 @@ def sample(kernel, sigma0, lambda0, m0, cells):
     # Sample.
     # Warning: the implementation seems to have changed. We have to make 
     # the model circulant now.
-    approx_model = rflib.RPtbm(model, linesimustep=10.0)
+    approx_model = rflib.RPtbm(model, linessimufactor=8.0, linesimustep=0.1)
     # approx_model = rflib.RPcirculant(model)
     simu = rflib.RFsimulate(approx_model, x=cells, maxGB=4)
 
