@@ -60,24 +60,28 @@ model = UniversalUpdatableGP(kernel, lambda0_N41, sigma0_N41,
 
 
 def compute_criterions(model):
-    # Compute posterior means.
-    post_mean = model.predict_uniform(G, data, data_std)
-
-    rmse = model.prediction_rmse(G, data)
-    nll = model.nll(G, data)
+    # After this, covariance pushfwd is cached.
+    rmse = model.prediction_rmse(G, data, data_std)
+    nll = model.nll(G, data, data_std)
     # bic = model.bayes_information_criterion(G, data)
     
     # Compute cross-validation residuals.
-    residuals_loocv = model.leave_1_out_residuals(G, data, data_std=0.1)
-    residuals_loocv_decorr = model.decorrelated_leave_1_out_residuals(G, data, data_std=0.1)
+    residuals_loocv = model.leave_1_out_residuals(G, data, data_std,
+            use_cached_pushfwd=True)
+    residuals_loocv_decorr = model.decorrelated_leave_1_out_residuals(G, data, data_std,
+            use_cached_pushfwd=True)
     
     folds = kMeans_folds(2, data_coords)
-    residuals_2folds_clustered = model.k_fold_residuals(folds, G, data, data_std)
-    residuals_2folds_clustered_decorr = model.decorrelated_k_fold_residuals(folds, G, data, data_std)
+    residuals_2folds_clustered = model.k_fold_residuals(folds, G, data, data_std,
+            use_cached_pushfwd=True)
+    residuals_2folds_clustered_decorr = model.decorrelated_k_fold_residuals(folds, G, data, data_std,
+            use_cached_pushfwd=True)
     
     folds = kMeans_folds(10, data_coords)
-    residuals_10folds_clustered = model.k_fold_residuals(folds, G, data, data_std)
-    residuals_10folds_clustered_decorr = model.decorrelated_k_fold_residuals(folds, G, data, data_std)
+    residuals_10folds_clustered = model.k_fold_residuals(folds, G, data, data_std,
+            use_cached_pushfwd=True)
+    residuals_10folds_clustered_decorr = model.decorrelated_k_fold_residuals(folds, G, data, data_std,
+            use_cached_pushfwd=True)
 
     return (rmse, nll, bic,
             residuals_loocv, residuals_loocv_decorr,

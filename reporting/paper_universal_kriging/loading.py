@@ -9,7 +9,7 @@ from volcapy.grid.grid_from_dsm import Grid
 
 
 def load_niklas_volcano_data(base_folder):
-    data_folder = os.path.joine(base_folder, "InversionDatas/stromboli_173018")
+    data_folder = os.path.join(base_folder, "InversionDatas/stromboli_173018")
 
     G = (
         torch.from_numpy(np.load(os.path.join(data_folder, "F_corrected_final.npy")))

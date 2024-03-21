@@ -321,7 +321,7 @@ class UniversalUpdatableGP(UpdatableGP):
         """
         if not y.device == DEVICE: y = y.to(DEVICE)
 
-        if out_inds.shape[0] > 1:
+        if len(out_inds) > 1:
             """
             block_1 = K_tilde_inv[out_inds, :][:, out_inds]
             block_2 = (K_tilde_inv[:y.shape[0], :y.shape[0]] @ y.double())[out_inds]
@@ -416,7 +416,6 @@ class UniversalUpdatableGP(UpdatableGP):
             cov_ij = block_i * block_ij * block_j
         return cov_ij.numpy()
 
-    @classmethod
     def get_column_extractor(self, inds, dim):
         """ Compute the column extraction matrix for a given set of indices.
         The column extractor is a matrix E such that for any matrix A of 
@@ -440,7 +439,6 @@ class UniversalUpdatableGP(UpdatableGP):
         column_extractor = id_matrix[:, inds]
         return column_extractor
 
-    @classmethod
     def residual_cov_newimplementation(self, inds_i, inds_j, K_tilde):
         """ Compute covariance matrix between batches of residuals.
 
@@ -465,16 +463,19 @@ class UniversalUpdatableGP(UpdatableGP):
         if not torch.is_tensor(K_tilde):
             K_tilde = torch.from_numpy(K_tilde)
 
+        # Everyting on correct device.
+        K_tilde = K_tilde.to(DEVICE).double()
+
         # Promote scalars to tensors.
         if isinstance(inds_i, int): inds_i = np.array([inds_i])
         if isinstance(inds_i, int): inds_j = np.array([inds_j])
 
-        inds_i, inds_ = torch.from_numpy(inds_i), torch.from_numpy(inds_j)
+        inds_i, inds_ = torch.from_numpy(np.array(inds_i)), torch.from_numpy(np.array(inds_j))
 
         # Get the column extraction matrices.
         dim = K_tilde.shape[1]
-        col_extractor_i = self.get_column_extractor(inds_i, dim)
-        col_extractor_j = self.get_column_extractor(inds_j, dim)
+        col_extractor_i = self.get_column_extractor(inds_i, dim).double().to(DEVICE)
+        col_extractor_j = self.get_column_extractor(inds_j, dim).double().to(DEVICE)
 
         # Extract lines and columns of the inverse.
         K_inv_ij = col_extractor_i.T @ torch.linalg.solve(K_tilde, col_extractor_j)
@@ -485,31 +486,29 @@ class UniversalUpdatableGP(UpdatableGP):
         residual_cov = torch.linalg.solve(K_inv_ii, second_term)
         return residual_cov
     
-    @classmethod
     def concatenated_residuals_cov(self, folds, K_tilde):
-        n = np.sum([np.size(x) for x in folds])
-        cov_matrix = zeros((n, n))
+        n = np.sum([len(x) for x in folds])
+        cov_matrix = torch.zeros((n, n))
 
         # Initialize all blocks.
         for inds_i in folds:
             for inds_j in folds:
-                cov_matrix[inds_i, inds_j] = self,residual_cov_newimplementation(inds_i, inds_j, K_tilde)
+                cov_matrix[inds_i, inds_j] = self.residual_cov_newimplementation(inds_i, inds_j, K_tilde).float()
         return(cov_matrix)
     
-    @classmethod
-    def decorrelated_k_fold_residuals(cls, folds, G, y, data_std):
-        k_fold_residuals = cls.k_fold_residuals(folds, G, y, data_std)
-        residuals = np.concatenate(k_fold_residuals(folds, G, y, data_std))
-        cov = cls.concatenated_residuals_cov(folds, K_tilde)
-        decorr_residuals = cls.uncorrelate_vector(residuals, cov)
+    def decorrelated_k_fold_residuals(self, folds, G, y, data_std, use_cached_pushfwd=False):
+        k_fold_residuals = self.k_fold_residuals(folds, G, y, data_std, use_cached_pushfwd)
+        K_tilde = self.compute_cv_matrix(G, data_std,
+                use_cached_pushfwd=use_cached_pushfwd)
+        residuals = np.concatenate(k_fold_residuals)
+        cov = self.concatenated_residuals_cov(folds, K_tilde)
+        decorr_residuals = self.decorrelate_vector(residuals, cov)
         return(decorr_residuals)
     
-    @classmethod
-    def uncorrelated_leave_1_out_residuals(cls, G, y, data_std):
-        folds = [[i] for i in range(np.size(data))]
-        return(cls.decorrelated_k_fold_residuals(cls, folds, G, y, data_std))
+    def decorrelated_leave_1_out_residuals(self, G, y, data_std, use_cached_pushfwd=False):
+        folds = [[i] for i in range(y.shape[0])]
+        return(self.decorrelated_k_fold_residuals(folds, G, y, data_std, use_cached_pushfwd))
 
-    @classmethod
     def concatenated_residuals_cov_old(self, folds, K_tilde, additional_noise=0):
         """ Compute covariance matrix of the concatenated vector of residuals 
         (across all folds).
@@ -601,8 +600,7 @@ class UniversalUpdatableGP(UpdatableGP):
 
         return residual_cov, residual_cov_1, block_mat
 
-    @classmethod
-    def uncorrelate_vector(self, vector, cov_matrix):
+    def decorrelate_vector(self, vector, cov_matrix):
         try:
             chol_L = torch.linalg.cholesky(cov_matrix)
         except:
@@ -876,13 +874,13 @@ class UniversalUpdatableGP(UpdatableGP):
         end = timer()
         print("Training done in {} minutes.".format((end-start)/60))
 
-    def nll(self, G, data, data_std):
+    def nll(self, G, y, data_std):
         return(self.neg_log_likelihood_universal(
-            self.cov_module.lambda0, self.cov_module.sigma0, G, data, data_std))
+            self.lambda0, self.sigma0, G, y, data_std))
     
-    def prediction_rmse(G, data):
-        prediction = predict(self, G, y, data_std)
-        rmse = torch.sqrt(torch.mean((prediction.reshape(-1) - data.reshape(-1))**2))
+    def prediction_rmse(self, G, y, data_std):
+        prediction = G @ self.predict_uniform(G, y, data_std)
+        rmse = torch.sqrt(torch.mean((prediction.reshape(-1) - y.reshape(-1))**2))
         return(rmse)
 
 

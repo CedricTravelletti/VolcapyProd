@@ -2,7 +2,10 @@
 
 """
 
-from .loading import load_niklas_volcano_data
+from loading import load_niklas_volcano_data
+import volcapy.covariance.matern52 as kernel
+from volcapy.update.universal_kriging import UniversalUpdatableGP
+from volcapy.universal_kriging.basis_functions import *
 
 N_CHUNKS = 200
 
