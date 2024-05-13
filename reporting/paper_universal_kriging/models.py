@@ -1,7 +1,6 @@
 """ Builds models used in the paper.
 
 """
-
 from loading import load_niklas_volcano_data
 import volcapy.covariance.matern52 as kernel
 from volcapy.update.universal_kriging import UniversalUpdatableGP
@@ -98,7 +97,7 @@ def load_paper_models(base_folder):
     volcano_coords = niklas_volcano_data["volcano_coords"]
 
     return {
-        "fault line": build_fault_line_model(volcano_coords, kernel, lambda0, sigma0),
-        "cylinder": build_cylinder_model(volcano_coords, kernel, lambda0, sigma0),
-        "constant": build_constant_model(volcano_coords, kernel, lambda0, sigma0),
+            "fault line": lambda: build_fault_line_model(volcano_coords, kernel, lambda0, sigma0),
+            "cylinder": lambda: build_cylinder_model(volcano_coords, kernel, lambda0, sigma0),
+            "constant": lambda: build_constant_model(volcano_coords, kernel, lambda0, sigma0),
     }
