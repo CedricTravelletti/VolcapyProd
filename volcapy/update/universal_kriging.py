@@ -1,6 +1,7 @@
 """ Module implementing universal kriging for inversion.
 
 """
+import pdb
 import itertools
 import numpy as np
 import pandas as pd
@@ -97,7 +98,7 @@ class UniversalUpdatableCovariance(UpdatableCovariance):
         pushfwd = self.cov_module.compute_cov_pushforward(
                 lambda0, G, self.cells_coords, DEVICE,
                 n_chunks=self.n_chunks,
-                n_flush=self.n_flush, double=double)
+                n_flush=self.n_flush)
         if ignore_trend is True:
             # Caching.
             self._pushfwd_cache = pushfwd
@@ -160,6 +161,7 @@ class UniversalUpdatableGP(UpdatableGP):
             Increase if computations do not fit in memory.
     
         """
+        pdb.set_trace()
         if not torch.is_tensor(coeff_F): coeff_F = torch.from_numpy(coeff_F)
         # We work in single precision to allow more to fit on GPU.
         coeff_F = coeff_F.float()
@@ -836,8 +838,9 @@ class UniversalUpdatableGP(UpdatableGP):
 
         """
         start = timer()
-        # Store results in Pandas DataFrame.
-        df = pd.DataFrame(columns=['lambda0', 'sigma0', 'beta_hat', 'nll', 'train RMSE'])
+
+        beta_hats, nlls, train_RMSEs = [], [], []
+        lambda0s_effective, sigma0s_effective = [], []
 
         # Some preprocessing.
         if not G.device == DEVICE: G = G.to(DEVICE)
@@ -865,11 +868,14 @@ class UniversalUpdatableGP(UpdatableGP):
                 data_pred = G @ post_mean
                 rmse = torch.sqrt(torch.mean((data_pred.reshape(-1) - y.reshape(-1))**2))
 
-                df = df.append({'lambda0': lambda0, 'sigma0': sigma0,
-                    'beta_hat': beta_hat.cpu().numpy(),
-                    'nll': nll.cpu().numpy()[0, 0],
-                    'train RMSE': rmse.cpu().numpy()}, ignore_index=True)
+                beta_hats.append(beta_hat.cpu().numpy())
+                nlls.append(nll.cpu().numpy()[0, 0])
+                train_RMSEs.append(rmse.cpu().numpy())
+                lambda0s_effective.append(lambda0)
+                sigma0s_effective.append(sigma0)
+
             # Save after each lambda0.
+            df = pd.DataFrame({'lambda0': lambda0s_effective, 'sigma0': sigma0s_effective, 'beta_hat': beta_hats, 'nll': nlls, 'train RMSE': train_RMSEs})
             df.to_pickle(out_path)
         end = timer()
         print("Training done in {} minutes.".format((end-start)/60))
