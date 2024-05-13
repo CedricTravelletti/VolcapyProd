@@ -3,8 +3,10 @@
 """
 
 import sys
-from .models import load_paper_models
-from .loading import load_niklas_volcano_data
+import os
+import numpy as np
+from models import load_paper_models
+from loading import load_niklas_volcano_data
 
 
 base_folder = sys.argv[1]
@@ -15,13 +17,19 @@ lambda0s = np.linspace(1.0, 3000, 40)
 sigma0s = np.linspace(1, 1400, 40)
 
 base_folder = sys.argv[1]
-model = load_paper_models(base_folder)["fault line"]
+print("1")
+model_lazy = load_paper_models(base_folder)["fault line"]
+# Preceding call was lazy. Now do instantiation.
+print("1.5")
+model = model_lazy()
+print("2")
 
 results_folder = os.path.join(base_folder, "paper_universal")
 os.makedirs(results_folder, exist_ok=True)
 out_path = os.path.join(results_folder, "./train_ground_truth.pkl")
 
-model["model"].train_MLE(
+print("Pre-loading done.")
+model.train_MLE(
     lambda0s,
     sigma0s,
     niklas_volcano_data["y_std"],
