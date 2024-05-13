@@ -4,11 +4,16 @@ using hyperparameters trained on Niklas data.
 
 """
 
+import sys
 import torch
 from torch.distributions.multivariate_normal import MultivariateNormal
 from .loading import load_niklas_volcano_data
 from .models import build_fault_line_model
 
+
+base_folder = sys.argv[1]
+output_folder = os.path.join(base_folder, "paper_universal/ground_truths")
+os.makedirs(output_folder, exist_ok=True)
 
 niklas_volcano_data = load_niklas_volcano_data(base_folder)
 volcano_coords = niklas_volcano_data["volcano_coords"]
@@ -18,6 +23,10 @@ data_std = 0.1
 sigma0 = 284.66
 m0 = 2139.1
 lambda0 = 651.58
+
+lambda0 = 462.384615
+sigma0 = 359.717949
+m0 = 605.6599
 
 # TODO: Note that this is a hack. We KNOW the estimated trend model,
 # so should just add the fluctuation around it.
